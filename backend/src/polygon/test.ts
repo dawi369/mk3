@@ -1,7 +1,8 @@
 import { websocketClient } from "@polygon.io/client-js";
 import { POLYGON_API_KEY, POLYGON_WS_URL } from "../config/env.js";
 
-const SUBSCRIPTION_PARAMS = "AM.ES";
+const SUBSCRIPTION_PARAMS = "A.ESZ5";
+// const SUBSCRIPTION_PARAMS = "A.ESF6";
 
 // create a websocket client using the polygon client-js library
 const ws = websocketClient(POLYGON_API_KEY, POLYGON_WS_URL).futures();
@@ -23,10 +24,8 @@ ws.onmessage = (msg: MessageEvent) => {
     parsedMessage[0].ev === "status" &&
     parsedMessage[0].status === "auth_success"
   ) {
-    console.log("Subscribing to the minute aggregates channel for ES");
-    ws.send(
-      JSON.stringify({ action: "subscribe", params: SUBSCRIPTION_PARAMS })
-    );
+    console.log("Subscribing to the second aggregates channel");
+    ws.send(JSON.stringify({ action: "subscribe", params: SUBSCRIPTION_PARAMS }));
   }
 
   console.log("Message received:", parsedMessage);
