@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node-dev --respawn --transpile-only --ignore-watch node_modules src",
+    "start": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node --esm",
+    "run:test2": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node --esm src/polygon/test2.ts",
+    "run:test": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node --esm src/polygon/test.ts"
   },
   "keywords": [],
   "author": "",
