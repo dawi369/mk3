@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node-dev --respawn --transpile-only --ignore-watch node_modules src",
-    "start": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node --esm",
-    "run:test2": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node --esm src/polygon/test2.ts",
-    "run:test": "NODE_OPTIONS='--enable-source-maps --trace-warnings' ts-node --esm src/polygon/test.ts"
+    "dev": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx watch src",
+    "start": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src",
+    "run:test2": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/api/polygon/test2.ts",
+    "run:test": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/api/polygon/test.ts",
+    "run:hub": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/servers/hub/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,7 @@
     "@types/ws": "^8.18.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
 }

@@ -1,4 +1,4 @@
-import { Tickers } from "../utils/tickers.js";
+import { Tickers } from "@/utils/tickers.js";
 
 const tickers = new Tickers();
 

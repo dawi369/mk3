@@ -40,6 +40,12 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "esModuleInterop": true,
+
+    // Path Aliases
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
   "include": ["src"],
   "ts-node": {
