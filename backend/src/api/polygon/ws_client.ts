@@ -1,7 +1,7 @@
 import { websocketClient } from "@polygon.io/client-js";
 import { POLYGON_API_KEY } from "@/config/env.js";
-import { POLYGON_WS_URL } from "@/consts.js";
-import type { PolygonWsRequest, PolygonMarketType, PolygonStatusMessage } from "@/types.js";
+import { POLYGON_WS_URL } from "@/utils/consts.js";
+import type { PolygonWsRequest, PolygonMarketType, PolygonStatusMessage } from "@/utils/types.js";
 import {
   buildSubscribeParams,
   isAggregateEvent,
@@ -9,7 +9,7 @@ import {
   isQuoteEvent,
   isTradeEvent,
   aggregateToBar,
-} from "@/types.js";
+} from "@/utils/types.js";
 import { flowStore } from "@/data/flow_store.js";
 
 

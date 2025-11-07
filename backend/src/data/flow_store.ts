@@ -1,5 +1,5 @@
 // src/data/flow_store.ts
-import type { Bar } from '@/types.js';
+import type { Bar } from '@/utils/types.js';
 
 class FlowStore {
   private latest: Map<string, Bar> = new Map();

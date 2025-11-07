@@ -1,1 +1,0 @@
-export const POLYGON_WS_URL = 'wss://socket.polygon.io'
