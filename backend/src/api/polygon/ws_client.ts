@@ -11,6 +11,7 @@ import {
   aggregateToBar,
 } from "@/utils/types.js";
 import { flowStore } from "@/data/flow_store.js";
+import { redisStore } from "@/data/redis_store.js";
 
 
 // Health status type
@@ -121,6 +122,12 @@ export class PolygonWSClient {
       if (isAggregateEvent(m)) {
         const bar = aggregateToBar(m);
         flowStore.setBar(bar.symbol, bar);
+        
+        // Write to Redis (non-blocking, errors logged)
+        redisStore.writeBar(bar).catch(err => {
+          console.error('Redis write failed:', err);
+        });
+        
         return;
       }
 
