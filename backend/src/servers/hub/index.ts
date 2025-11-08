@@ -8,9 +8,9 @@ const client = new PolygonWSClient();
 const futuresMarket: PolygonMarketType = "futures";
 
 // Test Redis connection
-console.log("Testing Redis connection...");
-const pingResult = await redisStore.ping();
-console.log("Redis ping:", pingResult);
+// console.log("Testing Redis connection...");
+// const pingResult = await redisStore.ping();
+// console.log("Redis ping:", pingResult);
 
 await client.connect(futuresMarket);
 await client.subscribe(futuresSecondRequest);

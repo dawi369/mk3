@@ -3,7 +3,7 @@ import { POLYGON_API_KEY } from "@/config/env.js";
 import { POLYGON_WS_URL } from "@/utils/consts.js"
 
 // const SUBSCRIPTION_PARAMS = "AM.ESZ5";
-const SUBSCRIPTION_PARAMS = "A.ESZ5";
+const SUBSCRIPTION_PARAMS = "A.NQZ5";
 
 
 // [
