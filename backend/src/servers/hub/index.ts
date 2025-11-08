@@ -1,8 +1,8 @@
-import { PolygonWSClient } from "@/polygon/ws_client.js";
+import { PolygonWSClient } from "@/api/polygon/ws_client.js";
 import { flowStore } from "@/data/flow_store.js";
 import { redisStore } from "@/data/redis_store.js";
 import type { PolygonMarketType } from "@/utils/types.js";
-import { futuresSecondRequest } from "@/utils/consts.js";
+import { futuresUSIndicesSecondRequest } from "@/utils/consts.js";
 import { startHubRESTApi } from "./api.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 
@@ -10,7 +10,7 @@ const polygonClient = new PolygonWSClient();
 const futuresMarket: PolygonMarketType = "futures";
 
 await polygonClient.connect(futuresMarket);
-await polygonClient.subscribe(futuresSecondRequest);
+await polygonClient.subscribe(futuresUSIndicesSecondRequest);
 
 // Load persisted job status
 await dailyClearJob.loadStatus();

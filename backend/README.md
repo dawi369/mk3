@@ -1,5 +1,3 @@
-This is my futures dashboard project that utilizes the polygon websocket api. All code needs to be written with extreme care and precession, less is more. Only work is small steps and keep trying to get into from me.
-
 ## Backend Architecture
 
 **Current Phase: Production-Ready Core Infrastructure ✅**

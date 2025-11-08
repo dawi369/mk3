@@ -1,4 +1,3 @@
-// Imports
 import fs from 'fs';
 // Purpose: Dynamically load and access tickers by asset class, with one-liner access by product_code/ticker, e.g. tickers.grains.ZC or tickers.all.ES
 
