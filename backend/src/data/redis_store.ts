@@ -3,7 +3,7 @@ import { REDIS_HOST, REDIS_PORT } from '@/config/env.js';
 import type { Bar } from '@/utils/types.js';
 
 class RedisStore {
-  private redis: Redis;
+  public redis: Redis;
   
   constructor() {
     this.redis = new Redis({
@@ -34,6 +34,27 @@ class RedisStore {
     await multi.exec();
   }
 
+  private async scanKeys(pattern: string): Promise<string[]> {
+    const keys = [];
+    let cursor = '0';
+    do {
+      const [newCursor, foundKeys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      keys.push(...foundKeys);
+      cursor = newCursor;
+    } while (cursor !== '0');
+    return keys;
+  }
+
+  private async deleteInBatches(keys: string[], batchSize = 100): Promise<number> {
+    let deleted = 0;
+    for (let i = 0; i < keys.length; i += batchSize) {
+      const batch = keys.slice(i, i + batchSize);
+      await this.redis.del(...batch);
+      deleted += batch.length;
+    }
+    return deleted;
+  }
+
   async getLatest(symbol: string): Promise<Bar | null> {
     const data = await this.redis.get(`bar:latest:${symbol}`);
     return data ? JSON.parse(data) : null;
@@ -48,6 +69,37 @@ class RedisStore {
     const date = await this.redis.get('meta:trading_date') || 'unknown';
     const count = parseInt(await this.redis.get('meta:bar_count') || '0');
     return { date, barCount: count };
+  }
+
+  async clearTodayData(): Promise<{ cleared: number; newDate: string }> {
+    const today = new Date().toISOString().split('T')[0]!;
+    const lastClear = await this.redis.get('meta:trading_date') || '';
+    
+    if (lastClear === today) {
+      console.log('Already cleared today, skipping');
+      return { cleared: 0, newDate: today };
+    }
+    
+    console.log(`Clearing Redis data (last clear: ${lastClear || 'never'}, new date: ${today})`);
+    
+    const todayKeys = await this.scanKeys('bar:today:*');
+    const latestKeys = await this.scanKeys('bar:latest:*');
+    
+    let clearedCount = 0;
+    if (todayKeys.length > 0) {
+      clearedCount += await this.deleteInBatches(todayKeys);
+    }
+    if (latestKeys.length > 0) {
+      clearedCount += await this.deleteInBatches(latestKeys);
+    }
+
+    // This means it has to run in the morning of the new trading day
+    await this.redis.set('meta:trading_date', today);
+    await this.redis.set('meta:bar_count', '0');
+    
+    console.log(`Cleared ${clearedCount} keys`);
+    
+    return { cleared: clearedCount, newDate: today };
   }
 }
 

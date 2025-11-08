@@ -22,6 +22,33 @@ interface WSHealth {
   latencyMs: number | null;
 }
 
+enum ConnectionState {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  SUBSCRIBED = 'subscribed',
+  RECONNECTING = 'reconnecting',
+}
+
+function isMarketHours(): { isOpen: boolean; reason?: string } {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  const hour = et.getHours();
+  
+  // Weekend
+  if (day === 0 || day === 6) {
+    return { isOpen: false, reason: 'Weekend' };
+  }
+  
+  // Daily futures reset: 5pm-6pm ET (no trading)
+  if (hour === 17) {
+    return { isOpen: false, reason: 'Daily settlement period (5pm-6pm ET)' };
+  }
+  
+  return { isOpen: true };
+}
+
 export class PolygonWSClient {
   private ws: any = null;
   private health: WSHealth = {
@@ -30,11 +57,26 @@ export class PolygonWSClient {
     subscriptionCount: 0,
     latencyMs: null,
   };
+  
+  private state: ConnectionState = ConnectionState.DISCONNECTED;
+  private reconnectAttempts = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
+  private market: PolygonMarketType | null = null;
+  private subscriptions: PolygonWsRequest[] = [];
   private authResolver: (() => void) | null = null;
   private subscribeResolver: (() => void) | null = null;
 
   async connect(marketType: PolygonMarketType): Promise<void> {
+    this.market = marketType;
+    this.state = ConnectionState.CONNECTING;
+    
     console.log(`Connecting to Polygon ${marketType}...`);
+    
+    const marketStatus = isMarketHours();
+    if (!marketStatus.isOpen) {
+      console.warn(`⚠️  Market closed: ${marketStatus.reason}. No live data expected.`);
+    }
 
     const client = websocketClient(POLYGON_API_KEY, POLYGON_WS_URL);
 
@@ -68,11 +110,14 @@ export class PolygonWSClient {
     this.ws.onerror = (err: unknown) => {
       console.error("WebSocket error:", err);
       this.health.connected = false;
+      this.state = ConnectionState.DISCONNECTED;
     };
 
     this.ws.onclose = (code: number, reason: string) => {
-      console.log("Connection closed", code, reason);
+      console.log(`Connection closed: ${code} ${reason}`);
       this.health.connected = false;
+      this.state = ConnectionState.DISCONNECTED;
+      this.scheduleReconnect();
     };
 
     // Wait for authentication before returning
@@ -94,6 +139,8 @@ export class PolygonWSClient {
 
         if (m.status === "auth_success") {
           this.health.connected = true;
+          this.state = ConnectionState.CONNECTED;
+          this.reconnectAttempts = 0;
         //   console.log("Connected");
           
           // Resolve the auth promise to allow connect() to return
@@ -153,6 +200,14 @@ export class PolygonWSClient {
   }
 
   async subscribe(request: PolygonWsRequest): Promise<void> {
+    // Save subscription for reconnects (deduplicate)
+    if (!this.subscriptions.find(s => 
+      s.ev === request.ev && 
+      JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
+    )) {
+      this.subscriptions.push(request);
+    }
+    
     const params = buildSubscribeParams(request);
     console.log("Subscribing to:", params);
 
@@ -175,9 +230,24 @@ export class PolygonWSClient {
   }
 
   disconnect(): void {
-    if (this.ws) {
-      this.ws.close();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
+    
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.close();
+      this.ws = null;
+    }
+    
+    this.state = ConnectionState.DISCONNECTED;
   }
 
   async getHealth(): Promise<WSHealth> {
@@ -205,6 +275,54 @@ export class PolygonWSClient {
     } catch (err) {
       console.error("Failed to measure latency:", err);
       this.health.latencyMs = null;
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer || this.state === ConnectionState.RECONNECTING) {
+      return;
+    }
+    
+    if (this.state === ConnectionState.SUBSCRIBED || this.state === ConnectionState.CONNECTED) {
+      return;
+    }
+
+    this.state = ConnectionState.RECONNECTING;
+    
+    const delay = Math.min(
+      500 * Math.pow(2, this.reconnectAttempts),
+      20_000
+    );
+
+    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.reconnectAttempts++;
+      this.reconnect();
+    }, delay);
+  }
+
+  private async reconnect(): Promise<void> {
+    if (!this.market) {
+      console.error('Cannot reconnect: market type not saved');
+      return;
+    }
+
+    console.log('Attempting reconnect...');
+    
+    // Clean up old connection before creating new one
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.close();
+      this.ws = null;
+    }
+    
+    await this.connect(this.market);
+
+    for (const sub of this.subscriptions) {
+      await this.subscribe(sub);
     }
   }
 }

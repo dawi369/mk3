@@ -2,22 +2,30 @@ This is my futures dashboard project that utilizes the polygon websocket api. Al
 
 ## Backend Architecture
 
-**Current Phase: Redis Real-Time Pipeline**
+**Current Phase: Production-Ready Core Infrastructure ✅**
+
+**Completed:**
+- ✅ Polygon WS client (self-healing, auto-reconnect, exponential backoff, market hours detection)
+- ✅ Dual storage: flowStore (memory, latest + 100 bars) + Redis (today's data, persisted)
+- ✅ Hub REST API (port 3000): Query bars, health, symbols, manual clear trigger
+- ✅ Daily Redis clear (2 AM ET cron, persisted status, batched deletes, scales to 500+ tickers)
+- ✅ Graceful operations (status tracking, idempotent clears, non-blocking scans)
 
 **Data Flow:**
-- Real-time: Polygon WS (1-sec bars) → flowStore (memory) → Redis (today's bars)
-- Redis clears daily at 2 AM ET (cron job)
-- All futures tickers tracked (available on Polygon)
+- Polygon WS (1-sec bars) → flowStore + Redis → Hub API
+- Daily: Redis clears at 2 AM ET, preserves job metrics across restarts
 
-**Storage (Phase 1):**
-- flowStore: In-memory singleton (latest + 100 bars per symbol)
-- Redis: Today's intraday 1-sec bars, Docker local on Hub (~175MB/day for 50 symbols)
+**Hub API Endpoints:**
+- `GET /health` - System status, Redis stats, daily job status
+- `GET /bars/latest` - All latest bars from flowStore
+- `GET /bars/latest/:symbol` - Specific symbol's latest bar
+- `GET /bars/today/:symbol` - All today's bars from Redis
+- `GET /symbols` - List of subscribed symbols
+- `POST /admin/clear-redis` - Manual trigger for Redis clear
 
-**Future Phases:**
-- Phase 2: Add TimescaleDB Cloud for historical storage (1-min bars from flat files)
-- Phase 3: Chart API combining Redis (today) + TimescaleDB (history)
-- Phase 4: ML export from TimescaleDB
-
-**Servers (Not Built Yet):**
-- Hub: Owns Polygon WS, writes to Redis, serves Edge servers
-- Edge: Reads from Hub, serves dashboard clients via WebSocket
+**Next Phases:**
+- Phase 2: Multi-ticker support (load all futures from Tickers class)
+- Phase 3: Hub WebSocket server (real-time push to Edge servers)
+- Phase 4: Edge server (client-facing layer)
+- Phase 5: TimescaleDB + historical data
+- Phase 6: ML data export
