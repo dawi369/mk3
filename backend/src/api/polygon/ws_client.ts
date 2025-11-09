@@ -66,6 +66,7 @@ export class PolygonWSClient {
   private subscriptions: PolygonWsRequest[] = [];
   private authResolver: (() => void) | null = null;
   private subscribeResolver: (() => void) | null = null;
+  private unsubscribeResolver: (() => void) | null = null;
 
   async connect(marketType: PolygonMarketType): Promise<void> {
     this.market = marketType;
@@ -85,6 +86,7 @@ export class PolygonWSClient {
       case "futures":
         this.ws = client.futures();
         break;
+      // here for the future of the app
       case "stocks":
         this.ws = client.stocks();
         break;
@@ -160,6 +162,17 @@ export class PolygonWSClient {
             this.subscribeResolver = null;
           }
         }
+
+        // Check for unsubscription confirmation
+        if (m.status === "success" && m.message?.includes("unsubscribed to:")) {
+        //   console.log("Unsubscription confirmed");
+          
+          // Resolve the unsubscribe promise
+          if (this.unsubscribeResolver) {
+            this.unsubscribeResolver();
+            this.unsubscribeResolver = null;
+          }
+        }
         
         statusMessage = m;
         return;
@@ -227,6 +240,85 @@ export class PolygonWSClient {
 
     // Wait for subscription confirmation before returning
     await subscribePromise;
+  }
+
+  async unsubscribe(request: PolygonWsRequest): Promise<void> {
+    if (!this.ws || this.state === ConnectionState.DISCONNECTED) {
+      console.log("Cannot unsubscribe: not connected");
+      // Still remove from local tracking
+      this.subscriptions = this.subscriptions.filter(s => 
+        !(s.ev === request.ev && JSON.stringify(s.symbols) === JSON.stringify(request.symbols))
+      );
+      return;
+    }
+
+    const params = buildSubscribeParams(request);
+    console.log("Unsubscribing from:", params);
+
+    // Create a promise that resolves when unsubscription is confirmed
+    const unsubscribePromise = new Promise<void>((resolve) => {
+      this.unsubscribeResolver = resolve;
+    });
+
+    this.ws.send(
+      JSON.stringify({
+        action: "unsubscribe",
+        params,
+      })
+    );
+
+    // Wait for unsubscription confirmation before removing from tracking
+    await unsubscribePromise;
+
+    // Remove from tracked subscriptions
+    this.subscriptions = this.subscriptions.filter(s => 
+      !(s.ev === request.ev && JSON.stringify(s.symbols) === JSON.stringify(request.symbols))
+    );
+
+    // Update subscription count
+    this.health.subscriptionCount = this.subscriptions.reduce(
+      (total, sub) => total + sub.symbols.length, 
+      0
+    );
+  }
+
+  async updateSubscription(old: PolygonWsRequest, newRequest: PolygonWsRequest): Promise<void> {
+    const oldSymbols = old.symbols.sort().join(',');
+    const newSymbols = newRequest.symbols.sort().join(',');
+
+    if (oldSymbols === newSymbols && old.ev === newRequest.ev) {
+      console.log("No subscription change needed - symbols unchanged");
+      return;
+    }
+
+    console.log(`Updating subscription: ${old.symbols.length} symbols → ${newRequest.symbols.length} symbols`);
+
+    // Unsubscribe from old
+    await this.unsubscribe(old);
+
+    // Subscribe to new with retry logic
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.subscribe(newRequest);
+        console.log(`Subscription updated successfully`);
+        return;
+      } catch (err) {
+        console.error(`Subscribe attempt ${attempt}/${maxRetries} failed:`, err);
+        
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to subscribe after ${maxRetries} attempts: ${err}`);
+        }
+        
+        // Wait before retry (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  getSubscriptions(): PolygonWsRequest[] {
+    return [...this.subscriptions];
   }
 
   disconnect(): void {

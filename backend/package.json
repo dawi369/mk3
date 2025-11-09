@@ -7,10 +7,12 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx watch src",
     "start": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src",
-    "run:test_t": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/test_tickers.ts",
+    "run:test_t": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/tests/test_tickers.ts",
     "run:test_p": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/api/polygon/test_polygon.ts",
     "run:hub": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/servers/hub/index.ts",
-    "run:test_cb": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/test_contract_builder.ts"
+    "run:test_cb": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/tests/test_contract_builder.ts",
+    "run:test_subs": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/tests/test_subscription_methods.ts"
+
   },
   "keywords": [],
   "author": "",

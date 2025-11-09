@@ -3,8 +3,11 @@ import { flowStore } from "@/data/flow_store.js";
 import { redisStore } from "@/data/redis_store.js";
 import { HUB_REST_PORT } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
+import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
+import type { PolygonWSClient } from "@/api/polygon/ws_client.js";
 
 const app = express();
+let polygonClient: PolygonWSClient | null = null;
 
 app.use(express.json());
 
@@ -12,6 +15,7 @@ app.get("/health", async (req, res) => {
   const redisStats = await redisStore.getStats();
   const symbols = flowStore.getSymbols();
   const clearJobStatus = dailyClearJob.getStatus();
+  const refreshJobStatus = monthlySubscriptionJob.getStatus();
 
   res.json({
     status: "ok",
@@ -20,6 +24,7 @@ app.get("/health", async (req, res) => {
     symbolCount: symbols.length,
     redis: redisStats,
     dailyClearJob: clearJobStatus,
+    subscriptionRefreshJob: refreshJobStatus,
   });
 });
 
@@ -53,7 +58,39 @@ app.post("/admin/clear-redis", async (req, res) => {
   res.json({ message: 'Manual clear triggered', status });
 });
 
-export function startHubRESTApi(): Promise<void> {
+app.post("/admin/refresh-subscriptions", async (req, res) => {
+  try {
+    await monthlySubscriptionJob.runRefresh();
+    const status = monthlySubscriptionJob.getStatus();
+    res.json({ 
+      message: 'Manual subscription refresh triggered', 
+      status 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      error: 'Refresh failed', 
+      details: err instanceof Error ? err.message : String(err)
+    });
+  }
+});
+
+app.get("/admin/subscriptions", (req, res) => {
+  if (!polygonClient) {
+    res.status(503).json({ error: "Polygon client not initialized" });
+    return;
+  }
+  
+  const subscriptions = polygonClient.getSubscriptions();
+  res.json({ 
+    subscriptions,
+    count: subscriptions.length,
+    totalSymbols: subscriptions.reduce((sum, sub) => sum + sub.symbols.length, 0)
+  });
+});
+
+export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
+  polygonClient = client;
+  
   return new Promise((resolve) => {
     app.listen(HUB_REST_PORT, () => {
       console.log(`Hub REST API listening on port ${HUB_REST_PORT}`);

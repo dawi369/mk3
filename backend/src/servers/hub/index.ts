@@ -1,35 +1,43 @@
-import { PolygonWSClient } from "@/api/polygon/ws_client.js";
-import { flowStore } from "@/data/flow_store.js";
-import { redisStore } from "@/data/redis_store.js";
-import type { PolygonMarketType } from "@/utils/types.js";
-import { futuresUSIndicesSecondRequest } from "@/utils/consts.js";
-import { startHubRESTApi } from "./api.js";
-import { dailyClearJob } from "@/jobs/clear_daily.js";
+import { PolygonWSClient } from '@/api/polygon/ws_client.js';
+import { flowStore } from '@/data/flow_store.js';
+import { redisStore } from '@/data/redis_store.js';
+import type { PolygonMarketType } from '@/utils/types.js';
+import { startHubRESTApi } from './api.js';
+import { dailyClearJob } from '@/jobs/clear_daily.js';
+import { monthlySubscriptionJob } from '@/jobs/refresh_subscriptions.js';
+import {
+  futuresUSIndicesSecondsRequest,
+  futuresMetalsSecondsRequests,
+} from '@/utils/consts.js';
 
 const polygonClient = new PolygonWSClient();
-const futuresMarket: PolygonMarketType = "futures";
+const futuresMarket: PolygonMarketType = 'futures';
 
 await polygonClient.connect(futuresMarket);
-await polygonClient.subscribe(futuresUSIndicesSecondRequest);
 
-// Load persisted job status
+await polygonClient.subscribe(futuresUSIndicesSecondsRequest);
+await polygonClient.subscribe(futuresMetalsSecondsRequests);
+
+// Load persisted job statuses
 await dailyClearJob.loadStatus();
+await monthlySubscriptionJob.loadStatus();
 
-// Schedule daily Redis clear job
+// Schedule jobs
 dailyClearJob.schedule();
+monthlySubscriptionJob.schedule(polygonClient);
 
-// Start Hub REST API
-await startHubRESTApi();
+// Start Hub REST API (pass polygon client for subscription management)
+await startHubRESTApi(polygonClient);
 
-console.log("")
+console.log('');
 setInterval(async () => {
-  console.log("--- flowStore ---");
-  console.log("Symbols:", flowStore.getSymbols());
-  console.log("Latest bars:", flowStore.getAllLatest().length);
+  console.log('--- flowStore ---');
+  console.log('Symbols:', flowStore.getSymbols());
+  console.log('Latest bars:', flowStore.getAllLatest().length);
 
-  console.log("\n--- Redis ---");
+  console.log('\n--- Redis ---');
   const stats = await redisStore.getStats();
-  console.log("Stats:", stats);
+  console.log('Stats:', stats);
 
   // Test reading one symbol from Redis
   const symbols = flowStore.getSymbols();
@@ -39,7 +47,7 @@ setInterval(async () => {
     console.log(`Latest ${symbol} from Redis:`, latest);
   }
 
-  console.log("-----------------------------------\n");
+  console.log('-----------------------------------\n');
 }, 5_000);
 
 // setInterval(async () => {

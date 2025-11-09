@@ -59,6 +59,7 @@ class MetalsContractBuilder {
     return {
       ev: eventType,
       symbols,
+      assetClass: 'metals',
     };
   }
 }

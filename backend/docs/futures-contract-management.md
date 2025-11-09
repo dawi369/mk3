@@ -461,14 +461,198 @@ GET /symbols
 
 ---
 
+## Subscription Refresh Strategy
+
+### **The Stale Subscription Problem**
+
+**Issue:** Contract subscriptions are built at module load time and become stale over time.
+
+**Example:**
+```
+Nov 1, 2025 - Hub starts, subscribes to ESZ25 (Dec contract)
+Dec 1, 2025 - Still subscribed to ESZ25, but should be on ESH26 (Mar 2026)
+             - Data flow stops for expired/inactive contracts
+```
+
+**Why it matters:**
+- Quarterly contracts roll every 3 months (indices)
+- Monthly contracts roll every month (metals)
+- Static subscriptions break after the first roll period
+
+---
+
+### **Option 1: Monthly Hub Restart (Manual)**
+
+**How it works:** Restart the Hub server monthly to rebuild subscriptions.
+
+**Pros:**
+- Simple, clean slate
+- Forces system review
+- No complex code
+
+**Cons:**
+- Manual intervention required
+- Loses in-memory state
+- Downtime during restart
+- Not scalable for 24/7 operation
+
+**Verdict:** ❌ Not recommended for production
+
+---
+
+### **Option 2: Automated Monthly Subscription Refresh Job** ⭐ **(Selected)**
+
+**How it works:** Background job refreshes subscriptions periodically without restart.
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  MonthlySubscriptionJob (cron-based)                        │
+│                                                              │
+│  Schedule:                                                   │
+│  - Metals: 1st of every month @ 00:05 ET                   │
+│  - US Indices: 1st of Mar/Jun/Sep/Dec @ 00:05 ET          │
+│                                                              │
+│  Actions:                                                    │
+│  1. Calculate new contract symbols (using builders)         │
+│  2. Compare with current subscriptions                      │
+│  3. Unsubscribe from old symbols (if changed)              │
+│  4. Subscribe to new symbols                                │
+│  5. Update internal subscription tracking                   │
+│  6. Log changes to Redis for observability                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Timeline Example (November → December):**
+
+```
+Nov 1, 2025 00:00
+  ├─ Hub starts
+  ├─ Builds subscriptions: ESZ25, GCX25, ... (current contracts)
+  ├─ Connects to Polygon WS
+  └─ Starts receiving data
+
+Nov 1, 2025 02:00
+  └─ Daily clear job runs (clears Oct 31 data)
+
+... (29 days of normal operation) ...
+
+Dec 1, 2025 00:05
+  ├─ Monthly subscription refresh job runs
+  ├─ US Indices: No change (ESZ25 still current quarter)
+  ├─ Metals: Change detected!
+  │   ├─ Old: GCX25 (Nov) → New: GCZ25 (Dec)
+  │   ├─ Unsubscribe: GCX25, SIX25, HGX25, ...
+  │   ├─ Subscribe: GCZ25, SIZ25, HGZ25, ...
+  │   └─ Update tracking: last_refresh_metals=2025-12-01
+  └─ Log: "Refreshed metals subscriptions: 6 symbols updated"
+
+Dec 1, 2025 02:00
+  └─ Daily clear job runs (clears Nov 30 data)
+
+... (continues indefinitely) ...
+
+Mar 1, 2026 00:05
+  ├─ Monthly subscription refresh job runs
+  ├─ US Indices: Change detected!
+  │   ├─ Old: ESZ25 (Dec 2025) → New: ESH26 (Mar 2026)
+  │   ├─ Unsubscribe: ESZ25, NQZ25, ...
+  │   ├─ Subscribe: ESH26, NQH26, ...
+  │   └─ Update tracking: last_refresh_indices=2026-03-01
+  └─ Metals: Updated to GCH26, SIH26, ... (Mar contracts)
+```
+
+**Key Features:**
+
+1. **Zero Downtime**
+   - Hub keeps running
+   - WS connection stays alive
+   - API remains available
+   - flowStore/Redis continue operating
+
+2. **Smart Detection**
+   - Only refreshes if symbols actually changed
+   - Prevents unnecessary unsubscribe/resubscribe cycles
+   - Logs when no refresh needed
+
+3. **Data Continuity**
+   - Old symbols: stop receiving data naturally (expired)
+   - New symbols: start flowing in immediately
+   - Symbol-based keys in stores handle transition automatically
+   - No data corruption or loss
+
+4. **Observability**
+   - Track last refresh time per asset class in Redis
+   - Log all subscription changes
+   - Include refresh status in `/health` endpoint
+   - Alert if refresh fails
+
+5. **Manual Override**
+   - `POST /admin/refresh-subscriptions` endpoint
+   - Useful for testing or emergency fixes
+   - Same logic as automated job
+
+**Implementation Phases:**
+
+| Phase | Component | Description | Effort |
+|-------|-----------|-------------|--------|
+| 1 | `PolygonWSClient` | Add subscription management methods | 2 hours |
+| 2 | `MonthlySubscriptionJob` | Create cron job with refresh logic | 3 hours |
+| 3 | Admin API | Add manual trigger endpoint | 1 hour |
+| 4 | Monitoring | Add metrics and alerts | 2 hours |
+
+**Total Effort:** ~8 hours
+
+---
+
+### **Option 3: Lazy/On-Demand Refresh**
+
+**How it works:** Detect stale subscriptions by monitoring data flow, refresh when needed.
+
+**Pros:**
+- Only refreshes when actually needed
+- Could detect issues automatically
+
+**Cons:**
+- Complex detection logic
+- Harder to debug
+- Might miss roll window
+- Risk of data gaps
+
+**Verdict:** ❌ Too complex for marginal benefit
+
+---
+
+### **Selected Approach: Option 2**
+
+**Why:**
+- ✅ Predictable, runs on schedule
+- ✅ Zero downtime
+- ✅ Fully automated
+- ✅ Observable and debuggable
+- ✅ Scales to 24/7 operation
+- ✅ Manual override available
+
+**Trade-offs accepted:**
+- Runs on calendar dates, not market-aware dates (acceptable for 1-month/quarter buffers)
+- Requires cron job management (already have `DailyClearJob` pattern)
+
+---
+
 ## Conclusion
 
-**Current State:** Hub successfully subscribes to quarterly US indices contracts, providing raw Polygon data to Redis.
+**Current State:** Hub successfully subscribes to US indices and metals contracts with dynamic builders.
+
+**Critical Gap:** Subscriptions are static at startup and become stale after first roll period.
+
+**Solution:** Implement automated monthly subscription refresh job (Option 2).
 
 **Next Steps:** 
-1. Expand to 2 quarters (current + next) for roll coverage
-2. Add other asset classes (metals, softs)
-3. Build Edge server with front month intelligence
+1. ✅ Phase 1 & 2 Complete: Dynamic contract builders (US indices, metals)
+2. 🔄 **Now**: Add subscription refresh mechanism
+3. 🔜 Build Edge server with front month intelligence
+4. 🔜 Add continuous contract data for charting
 
-**Long-term Vision:** Users interact with root symbols ("ES"), system handles all contract complexity behind the scenes.
+**Long-term Vision:** Users interact with root symbols ("ES"), system handles all contract complexity behind the scenes with zero manual intervention.
 

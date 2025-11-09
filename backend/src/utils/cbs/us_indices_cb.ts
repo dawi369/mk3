@@ -65,6 +65,7 @@ class USIndicesContractBuilder {
     return {
       ev: eventType,
       symbols,
+      assetClass: 'us_indices',
     };
   }
 }

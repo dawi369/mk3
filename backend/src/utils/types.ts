@@ -2,9 +2,16 @@
 
 // Polygon WebSocket protocol types
 
+export type PolygonMarketType = "futures" | "stocks" | "crypto";
+
+export type PolygonAssetClass = "us_indices" | "metals";
+
+export type MarketStatus = "open" | "closed" | "pre" | "post" | "halted";
+
 export interface PolygonWsRequest {
   ev: "AM" | "A";
   symbols: string[];
+  assetClass?: PolygonAssetClass;
 }
 
 export interface PolygonSubscribeMessage {
@@ -81,10 +88,6 @@ export interface FuturesInstrument {
   currency?: string; // e.g. USD
 }
 
-export type MarketStatus = "open" | "closed" | "pre" | "post" | "halted";
-
-export type PolygonMarketType = "futures" | "stocks" | "crypto";
-
 // Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
 export type MonthCode =
   | "F"
@@ -99,3 +102,21 @@ export type MonthCode =
   | "V"
   | "X"
   | "Z";
+
+export interface RefreshDetails {
+  assetClass: PolygonAssetClass;
+  eventType: "A" | "AM";
+  oldSymbols: string[];
+  newSymbols: string[];
+  changed: boolean;
+  success: boolean;
+  error?: string;
+}
+
+export interface RefreshJobStatus {
+  lastRunTime: number | null;
+  lastSuccess: boolean;
+  lastError: string | null;
+  lastRefreshDetails: RefreshDetails[];
+  totalRuns: number;
+}
