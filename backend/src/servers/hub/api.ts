@@ -53,8 +53,11 @@ app.post("/admin/clear-redis", async (req, res) => {
   res.json({ message: 'Manual clear triggered', status });
 });
 
-export function startHubRESTApi(): void {
-  app.listen(HUB_REST_PORT, () => {
-    console.log(`Hub REST API listening on port ${HUB_REST_PORT}`);
+export function startHubRESTApi(): Promise<void> {
+  return new Promise((resolve) => {
+    app.listen(HUB_REST_PORT, () => {
+      console.log(`Hub REST API listening on port ${HUB_REST_PORT}`);
+      resolve();
+    });
   });
 }

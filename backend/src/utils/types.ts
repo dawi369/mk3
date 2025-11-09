@@ -1,25 +1,26 @@
 // Types for Polygon realtime messages and normalized shapes for a futures dashboard
 
+// Polygon WebSocket protocol types
+
 export interface PolygonWsRequest {
   ev: "AM" | "A";
   symbols: string[];
 }
 
-export function buildSubscribeParams(req: PolygonWsRequest): string {
-  return req.symbols.map((s) => `${req.ev}.${s}`).join(",");
+export interface PolygonSubscribeMessage {
+  action: "subscribe";
+  params: string; // e.g. "A.ESZ5,Q.ESZ5"
 }
 
-// Polygon status message (sent on connect/auth)
 export interface PolygonStatusMessage {
   ev: "status";
   status: "connected" | "auth_success" | "auth_failed" | string;
   message?: string;
 }
 
-// Polygon aggregate (bar) message
 export interface PolygonAggregateEvent {
-  ev: "A"; // aggregate event
-  sym: string; // symbol, e.g. ESZ5
+  ev: "A";
+  sym: string; // e.g. ESZ5
   v: number; // volume
   dv: number; // dollar volume
   n: number; // number of trades
@@ -31,10 +32,9 @@ export interface PolygonAggregateEvent {
   e: number; // end timestamp (ms)
 }
 
-// Polygon quote message (top of book)
 export interface PolygonQuoteEvent {
   ev: "Q";
-  sym: string; // symbol
+  sym: string;
   bp: number; // best bid price
   bs: number; // best bid size
   ap: number; // best ask price
@@ -42,23 +42,22 @@ export interface PolygonQuoteEvent {
   t: number; // timestamp (ms)
 }
 
-// Polygon trade message (individual trade print)
 export interface PolygonTradeEvent {
   ev: "T";
-  sym: string; // symbol
+  sym: string;
   p: number; // price
   s: number; // size
   t: number; // timestamp (ms)
 }
 
-// Union of Polygon messages we care about
 export type PolygonRealtimeMessage =
   | PolygonStatusMessage
   | PolygonAggregateEvent
   | PolygonQuoteEvent
   | PolygonTradeEvent;
 
-// Normalized bar shape for the app
+// Application domain types
+
 export interface Bar {
   symbol: string;
   open: number;
@@ -72,7 +71,6 @@ export interface Bar {
   endTime: number; // ms since epoch
 }
 
-// Lightweight instrument metadata for futures
 export interface FuturesInstrument {
   symbol: string; // e.g. ESZ5
   root: string; // e.g. ES
@@ -83,49 +81,21 @@ export interface FuturesInstrument {
   currency?: string; // e.g. USD
 }
 
-// Basic market status useful for gating UI updates
 export type MarketStatus = "open" | "closed" | "pre" | "post" | "halted";
 
-export type PolygonMarketType = "futures" | "stocks" | "crypto"
+export type PolygonMarketType = "futures" | "stocks" | "crypto";
 
-// WebSocket subscribe message shape
-export interface PolygonSubscribeMessage {
-  action: "subscribe";
-  params: string; // e.g. "A.ESZ5,Q.ESZ5"
-}
-
-// Helpers
-export function toDate(epochMs: number): Date {
-  return new Date(epochMs);
-}
-
-export function aggregateToBar(a: PolygonAggregateEvent): Bar {
-  return {
-    symbol: a.sym,
-    open: a.o,
-    high: a.h,
-    low: a.l,
-    close: a.c,
-    volume: a.v,
-    trades: a.n,
-    dollarVolume: a.dv,
-    startTime: a.s,
-    endTime: a.e,
-  };
-}
-
-export function isStatusMessage(m: unknown): m is PolygonStatusMessage {
-  return !!m && typeof m === "object" && (m as any).ev === "status";
-}
-
-export function isAggregateEvent(m: unknown): m is PolygonAggregateEvent {
-  return !!m && typeof m === "object" && (m as any).ev === "A";
-}
-
-export function isQuoteEvent(m: unknown): m is PolygonQuoteEvent {
-  return !!m && typeof m === "object" && (m as any).ev === "Q";
-}
-
-export function isTradeEvent(m: unknown): m is PolygonTradeEvent {
-  return !!m && typeof m === "object" && (m as any).ev === "T";
-}
+// Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
+export type MonthCode =
+  | "F"
+  | "G"
+  | "H"
+  | "J"
+  | "K"
+  | "M"
+  | "N"
+  | "Q"
+  | "U"
+  | "V"
+  | "X"
+  | "Z";

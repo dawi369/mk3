@@ -19,8 +19,9 @@ await dailyClearJob.loadStatus();
 dailyClearJob.schedule();
 
 // Start Hub REST API
-startHubRESTApi();
+await startHubRESTApi();
 
+console.log("")
 setInterval(async () => {
   console.log("--- flowStore ---");
   console.log("Symbols:", flowStore.getSymbols());

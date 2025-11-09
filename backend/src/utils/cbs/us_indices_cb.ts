@@ -1,9 +1,6 @@
-import type { PolygonWsRequest } from '@/utils/types.js';
+import type { PolygonWsRequest, MonthCode } from '@/utils/types.js';
 import { Tickers } from '@/utils/tickers.js';
-
-type MonthCode = 'F' | 'G' | 'H' | 'J' | 'K' | 'M' | 'N' | 'Q' | 'U' | 'V' | 'X' | 'Z';
-
-const QUARTERLY_MONTHS: MonthCode[] = ['H', 'M', 'U', 'Z'];  // Mar, Jun, Sep, Dec
+import { QUARTERLY_MONTHS } from '@/utils/consts.js';
 
 class USIndicesContractBuilder {
   private tickers: Tickers;
@@ -51,7 +48,7 @@ class USIndicesContractBuilder {
     return `${root}${month}${yearSuffix}`;
   }
 
-  buildQuarterlyRequest(eventType: 'A' | 'AM' = 'A', totalQuarters: number): PolygonWsRequest {
+  buildQuarterlyRequest(eventType: 'A' | 'AM', totalQuarters: number): PolygonWsRequest {
     const currentQuarter = this.getCurrentQuarter();
     const quarters = this.getNextQuarters(currentQuarter.month, currentQuarter.year, totalQuarters);
     

@@ -9,7 +9,7 @@ import {
   isQuoteEvent,
   isTradeEvent,
   aggregateToBar,
-} from "@/utils/types.js";
+} from "@/utils/polygon_utils.js";
 import { flowStore } from "@/data/flow_store.js";
 import { redisStore } from "@/data/redis_store.js";
 

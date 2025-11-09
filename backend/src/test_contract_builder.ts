@@ -1,4 +1,4 @@
-import { usIndicesBuilder } from './utils/contract_builder.js';
+import { usIndicesBuilder } from './utils/cbs/us_indices_cb.js';
 
 console.log('Testing US Indices Contract Builder\n');
 console.log('Today:', new Date().toISOString().split('T')[0]);
