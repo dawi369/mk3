@@ -21,33 +21,33 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    POLYGON.IO (Data Source)                  │
-│                    WebSocket API - Futures                   │
+│                    POLYGON.IO (Data Source)                 │
+│                    WebSocket API - Futures                  │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     HUB SERVER (Backend)                     │
+│                     HUB SERVER (Backend)                    │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  Polygon WS Client (Self-Healing)                     │  │
 │  │  - Auto-reconnect with exponential backoff            │  │
 │  │  - Market hours detection                             │  │
 │  │  - Dynamic contract subscriptions                     │  │
-│  │  - Monthly auto-refresh (1st @ 00:05 ET)            │  │
+│  │  - Monthly auto-refresh (1st @ 00:05 ET)              │  │
 │  └───────────┬──────────────────────────┬────────────────┘  │
-│              │                          │                    │
-│              ▼                          ▼                    │
-│  ┌──────────────────┐      ┌──────────────────────────┐    │
-│  │   flowStore      │      │       Redis              │    │
-│  │   (In-Memory)    │      │    (Persistent+PubSub)   │    │
-│  │                  │      │                          │    │
-│  │  • Latest bars   │      │  • bar:latest:{symbol}   │    │
-│  │  • 100 bar hist  │      │  • bar:today:{symbol}    │    │
-│  │  • Per symbol    │      │  • Job status            │    │
-│  └──────────────────┘      │  • Pub/sub channel       │    │
-│                            │  • Daily clear @ 2 AM    │    │
-│                            └──────┬───────────────────┘    │
-│                                                             │
+│              │                          │                   │
+│              ▼                          ▼                   │
+│  ┌──────────────────┐      ┌──────────────────────────┐     │
+│  │   flowStore      │      │       Redis              │     │
+│  │   (In-Memory)    │      │    (Persistent+PubSub)   │     │
+│  │                  │      │                          │     │
+│  │  • Latest bars   │      │  • bar:latest:{symbol}   │     │
+│  │  • 100 bar hist  │      │  • bar:today:{symbol}    │     │
+│  │  • Per symbol    │      │  • Job status            │     │
+│  └──────────────────┘      │  • Pub/sub channel       │     │
+│                            │  • Daily clear @ 2 AM    │     │
+│                            └──────┬───────────────────┘     │
+│                                   ▼                         │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │             Hub REST API (Port 3001)                  │  │
 │  │  GET  /health                                         │  │
@@ -269,43 +269,14 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 
 ---
 
-### 🔜 Phase 3: Hub WebSocket Server (12-16 hours)
-
-**Goal:** Enable real-time data push to Edge servers
-
-**Architecture:**
-```
-Hub WS Server (Port 3002)
-├─ Connection management
-├─ Subscribe/unsubscribe requests from Edge
-├─ Pub/sub from flowStore → Edge clients
-└─ Health checks
-```
-
-**Tasks:**
-1. Create Hub WS server (`servers/hub/ws_server.ts`)
-2. Connection authentication (API key or JWT)
-3. Subscription protocol (Edge requests symbols)
-4. Real-time push (flowStore → Edge)
-5. Connection health monitoring
-6. Graceful disconnects
-
-**Deliverables:**
-- Hub WS server
-- WebSocket protocol definition
-- Connection management
-- Testing tools
-
----
-
-### 🔜 Phase 4: Edge Server (16-20 hours)
+### 🔜 Phase 3: Edge Server (16-20 hours)
 
 **Goal:** Client-facing servers with front month intelligence
 
 **Architecture:**
 ```
 Edge Server
-├─ Connect to Hub WS (upstream)
+├─ Connect to Redis Pub/Sub
 ├─ Serve clients via WS (downstream)
 ├─ Front month detection (by volume/open interest)
 ├─ Roll period management
@@ -315,7 +286,7 @@ Edge Server
 
 **Tasks:**
 1. Create Edge server structure
-2. Hub WS client (connects to Hub)
+2. Redis client (connects to Redis)
 3. Client WS server (serves dashboards)
 4. Front month detection algorithm
 5. Roll detection (when both contracts trade)
@@ -333,7 +304,7 @@ Edge Server
 
 ---
 
-### 🔜 Phase 5: TimescaleDB Integration (12-16 hours)
+### 🔜 Phase 4: TimescaleDB Integration (12-16 hours)
 
 **Goal:** Store historical data for charting and ML
 
@@ -363,7 +334,7 @@ Daily Job (3 AM ET)
 
 ---
 
-### 🔜 Phase 6: ML Data Export (8-12 hours)
+### 🔜 Phase 5: ML Data Export (8-12 hours)
 
 **Goal:** Export data for ML training
 
@@ -392,7 +363,7 @@ Export Job (Weekly/On-Demand)
 
 ---
 
-### 🔜 Phase 7: Frontend Dashboard (24-32 hours)
+### 🔜 Phase 6: Frontend Dashboard (24-32 hours)
 
 **Goal:** User-facing real-time dashboard
 
@@ -462,8 +433,9 @@ backend/
 │   │   └── refresh_subscriptions.ts  # Monthly refresh
 │   ├── servers/
 │   │   └── hub/
-│   │       ├── index.ts              # Hub entry point
-│   │       └── api.ts                # REST API
+│   │       ├── index.ts  
+│   │       └── api/                   # Apis entry point
+│   │          └── api.ts              # REST API
 │   ├── utils/
 │   │   ├── cbs/
 │   │   │   ├── us_indices_cb.ts      # US indices builder
@@ -663,7 +635,6 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 - [ ] Performance validated with full symbol set
 
 ### Phase 3-4
-- [ ] Hub WS server handles 10+ Edge connections
 - [ ] Edge server detects front month correctly
 - [ ] Roll periods handled seamlessly
 - [ ] End-to-end latency < 500ms

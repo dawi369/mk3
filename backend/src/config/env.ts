@@ -2,8 +2,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+//fix port naming
 export const PORT = process.env.PORT || 5001;
-export const HUB_REST_PORT = process.env.PORT || 3000;
+export const HUB_REST_PORT = process.env.HUB_REST_PORT || 3000;
+export const EDGE_REST_PORT = process.env.EDGE_REST_PORT || 4000;
 export const POLYGON_API_KEY = process.env.POLYGON_API_KEY || 'no_api_key_:(';
 export const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
 export const REDIS_PORT = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT) : 6379;
