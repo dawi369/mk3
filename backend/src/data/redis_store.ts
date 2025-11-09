@@ -32,6 +32,9 @@ class RedisStore {
     multi.incr('meta:bar_count');
     
     await multi.exec();
+    
+    // Publish to Redis pub/sub channel for Edge servers
+    await this.redis.publish('bars', JSON.stringify(bar));
   }
 
   private async scanKeys(pattern: string): Promise<string[]> {

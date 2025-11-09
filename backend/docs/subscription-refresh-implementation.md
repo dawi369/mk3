@@ -1,427 +1,230 @@
-# Subscription Refresh Implementation Plan
+# Subscription Refresh Implementation
 
-## Status: ✅ **IMPLEMENTATION COMPLETE** (Steps 1-3 done)
+## Status
 
-## Goal
-Implement automated monthly subscription refresh to prevent stale contract subscriptions without requiring Hub restarts.
+Steps 1-3 complete. System operational.
 
-## Summary of Changes
+## What Was Built
 
-### **Core Features Implemented:**
+### 1. Subscription Management (PolygonWSClient)
 
-1. **Smart Subscription Management** (`PolygonWSClient`)
-   - `getSubscriptions()` - Inspect current subscriptions
-   - `unsubscribe()` - Remove subscriptions (idempotent)
-   - `updateSubscription()` - Atomic update with retry logic (3 attempts)
+Added three methods to `ws_client.ts`:
 
-2. **Asset Class Metadata** (`PolygonWsRequest`)
-   - Added optional `assetClass` field to track subscription type
-   - Builders now include metadata: `us_indices`, `metals`
-   - Enables smart comparison without regex pattern matching
+**getSubscriptions()**
+- Returns copy of current subscriptions
+- Used by refresh job for comparison
 
-3. **Configurable Contract Counts** (`SUBSCRIPTION_CONFIG`)
-   - `US_INDICES_QUARTERS` - Default: 1 (current quarter only)
-   - `METALS_MONTHS` - Default: 1 (current month only)
-   - Change in one place to adjust all subscriptions
+**unsubscribe(request)**
+- Sends unsubscribe message to Polygon
+- Removes from internal tracking
+- Updates subscription count
+- Idempotent (safe if disconnected)
 
-4. **Monthly Subscription Job** (`MonthlySubscriptionJob`)
-   - Runs 1st of month @ 00:05 ET
-   - Quarterly check: Refreshes indices only in Mar/Jun/Sep/Dec
-   - Monthly check: Always refreshes metals
-   - Partial success: Marks success if any asset class succeeds
-   - Detailed tracking: Per asset class, per event type results
+**updateSubscription(old, new)**
+- Atomic operation: unsubscribe old + subscribe new
+- Compares symbols before acting (skips if unchanged)
+- Retry logic: 3 attempts with exponential backoff
+- Logs all actions
 
-5. **Admin API Endpoints**
-   - `GET /health` - Includes refresh job status
-   - `GET /admin/subscriptions` - Inspect current subscriptions
-   - `POST /admin/refresh-subscriptions` - Manual trigger
+### 2. Asset Class Metadata (Types)
 
-### **Testing:**
-- Manual trigger via API: ✅ Available
-- Automated scheduling: ✅ Configured
-- Step 4 (comprehensive testing): 🔄 **Next**
-
----
-
-## Phase 1: Add Subscription Management to PolygonWSClient
-
-### Current State
-- `PolygonWSClient` tracks subscriptions in `this.subscriptions: PolygonWsRequest[]`
-- Used only for re-subscribing after reconnect
-- No way to update/modify subscriptions while running
-
-### Required Changes
-
-#### 1.1 Add Unsubscribe Method
+Updated `PolygonWsRequest` interface:
 ```typescript
-async unsubscribe(request: PolygonWsRequest): Promise<void>
+export type PolygonAssetClass = "us_indices" | "metals";
+
+export interface PolygonWsRequest {
+  ev: "AM" | "A";
+  symbols: string[];
+  assetClass?: PolygonAssetClass;  // NEW
+}
 ```
 
-**Responsibilities:**
-- Send unsubscribe message to Polygon: `{"action":"unsubscribe","params":"A.ESZ25,A.NQZ25"}`
-- Remove the request from `this.subscriptions` array
-- Wait for confirmation (status message)
-- Log the action
+Builders now include metadata for smart comparison.
 
-**Edge cases:**
-- What if already unsubscribed? (idempotent)
-- What if WS disconnected? (no-op, clean up local state)
-- What if unsubscribe fails? (retry logic)
+### 3. Configurable Contract Counts
 
-#### 1.2 Add Update Subscription Method
+Created `config/subscriptions.ts`:
 ```typescript
-async updateSubscription(old: PolygonWsRequest, new: PolygonWsRequest): Promise<void>
+export const SUBSCRIPTION_CONFIG = {
+  US_INDICES_QUARTERS: 1,  // 1 = current, 2 = current + next
+  METALS_MONTHS: 1,
+} as const;
 ```
 
-**Responsibilities:**
-- Compare old vs new symbols
-- If different:
-  - Call `unsubscribe(old)`
-  - Call `subscribe(new)`
-  - Update `this.subscriptions`
-- If same:
-  - Log "No change needed"
-  - Return early
+Change in one place to adjust all subscriptions.
 
-**Why separate method:**
-- Atomic operation (both unsubscribe + subscribe)
-- Cleaner API for refresh job
-- Easier to add retry logic
+### 4. Monthly Subscription Job
 
-#### 1.3 Add Get Current Subscriptions Method
+Created `jobs/refresh_subscriptions.ts`:
+
+**MonthlySubscriptionJob class:**
+- `runRefresh()` - Main logic
+- `schedule(wsClient)` - Cron setup (1st of month @ 00:05 ET)
+- `loadStatus()` / `saveStatus()` - Redis persistence
+- `getStatus()` - Current job state
+
+**Refresh logic:**
+- Quarterly check: Indices refresh only in Mar/Jun/Sep/Dec
+- Monthly check: Metals refresh every month
+- Finds current subscription by asset class metadata
+- Compares symbols, updates if changed
+- Partial success: Marks success if any asset succeeds
+
+**Status tracking:**
 ```typescript
-getSubscriptions(): PolygonWsRequest[]
-```
-
-**Responsibilities:**
-- Return a copy of `this.subscriptions`
-- Used by refresh job to compare current vs new
-
----
-
-## Phase 2: Create MonthlySubscriptionJob
-
-### 2.1 Job Structure
-```typescript
-// src/jobs/refresh_subscriptions.ts
-
 interface RefreshJobStatus {
   lastRunTime: number | null;
   lastSuccess: boolean;
   lastError: string | null;
-  lastRefreshDetails: {
-    assetClass: string;
-    oldSymbols: string[];
-    newSymbols: string[];
-    changed: boolean;
-  }[];
+  lastRefreshDetails: RefreshDetails[];  // Per asset class results
   totalRuns: number;
 }
-
-class MonthlySubscriptionJob {
-  private status: RefreshJobStatus;
-  private wsClient: PolygonWSClient;
-  
-  constructor(wsClient: PolygonWSClient) { }
-  
-  async loadStatus(): Promise<void> { }
-  private async saveStatus(): Promise<void> { }
-  
-  async runRefresh(): Promise<void> { }
-  
-  private shouldRefreshIndices(): boolean { }
-  private shouldRefreshMetals(): boolean { }
-  
-  getStatus(): RefreshJobStatus { }
-  
-  schedule(): void { }
-}
-
-export const monthlySubscriptionJob = new MonthlySubscriptionJob(polygonClient);
 ```
 
-### 2.2 Schedule Logic
+### 5. Admin API
 
-**Cron Expression:**
+Added to `servers/hub/api.ts`:
+
+**GET /health**
+- Now includes `subscriptionRefreshJob` status
+
+**GET /admin/subscriptions**
+- Inspect current WS subscriptions
+
+**POST /admin/refresh-subscriptions**
+- Manual trigger for testing/emergency
+
+### 6. Hub Integration
+
+Updated `servers/hub/index.ts`:
+- Load refresh job status on startup
+- Schedule cron job
+- Pass WS client to job
+
+## Testing
+
+### Manual Trigger
+```bash
+curl -X POST http://localhost:3001/admin/refresh-subscriptions | jq
+```
+
+### Check Status
+```bash
+curl http://localhost:3001/health | jq '.subscriptionRefreshJob'
+```
+
+### View Current Subscriptions
+```bash
+curl http://localhost:3001/admin/subscriptions | jq
+```
+
+## How It Works
+
+### Startup
+1. Hub loads persisted job status from Redis
+2. Schedules cron job (1st of month @ 00:05 ET)
+3. Job runs automatically on schedule
+
+### Monthly Run
+1. Check if indices need refresh (Mar/Jun/Sep/Dec only)
+2. Check metals (always)
+3. For each asset class:
+   - Build new request using builder
+   - Find current subscription by asset class
+   - Compare symbols
+   - Update if changed
+4. Save status to Redis
+5. Log summary
+
+### Manual Run
+Same logic as automated, triggered via API endpoint.
+
+## Implementation Details
+
+### Finding Current Subscriptions
 ```typescript
-// Run at 00:05 ET on the 1st of every month
-cron.schedule('5 0 1 * *', async () => {
-  await this.runRefresh();
-}, {
-  timezone: 'America/New_York'
-});
-```
-
-**Why 00:05?**
-- After midnight, ensure date logic is correct
-- Before 02:00 daily clear job
-- Markets closed, minimal impact
-
-### 2.3 Refresh Logic Flow
-
-```
-runRefresh() {
-  ├─ Check if indices need refresh (Mar/Jun/Sep/Dec only)
-  │  ├─ If yes:
-  │  │  ├─ Build new request: usIndicesBuilder.buildQuarterlyRequest('A', 1)
-  │  │  ├─ Get current request from wsClient
-  │  │  ├─ Compare symbols
-  │  │  ├─ If different: wsClient.updateSubscription(old, new)
-  │  │  └─ Log change
-  │  └─ If no: log "No refresh needed"
-  │
-  ├─ Check metals (every month)
-  │  ├─ Build new request: metalsBuilder.buildMonthlyRequest('A', 1)
-  │  ├─ Get current request from wsClient
-  │  ├─ Compare symbols
-  │  ├─ If different: wsClient.updateSubscription(old, new)
-  │  └─ Log change
-  │
-  ├─ Update status and save to Redis
-  └─ Log summary
-}
-```
-
-### 2.4 Comparison Logic
-
-**Problem:** How to identify which `PolygonWsRequest` in `this.subscriptions` to update?
-
-**Solution:** Match by event type and asset class pattern
-
-```typescript
-private findSubscriptionByPattern(
-  subscriptions: PolygonWsRequest[], 
-  pattern: RegExp
+private findSubscriptionByAssetClass(
+  subscriptions: PolygonWsRequest[],
+  assetClass: PolygonAssetClass,
+  eventType: 'A' | 'AM'
 ): PolygonWsRequest | undefined {
-  return subscriptions.find(sub => 
-    sub.symbols.some(sym => pattern.test(sym))
+  return subscriptions.find(
+    sub => sub.assetClass === assetClass && sub.ev === eventType
   );
 }
-
-// Usage:
-const indicesPattern = /^(ES|NQ|YM|RTY)[HMUZ]\d{2}$/;
-const metalsPattern = /^(GC|SI|HG|PL|PA|MGC)[FGHJKMNQUVXZ]\d{2}$/;
-
-const currentIndicesSub = this.findSubscriptionByPattern(current, indicesPattern);
 ```
 
----
+No regex needed - uses asset class metadata.
 
-## Phase 3: Admin API Integration
-
-### 3.1 Add Manual Trigger Endpoint
-
+### Partial Success Handling
 ```typescript
-// src/servers/hub/api.ts
+const anySuccess = results.some(r => r.success);
+const anyFailure = results.some(r => !r.success);
 
-app.post('/admin/refresh-subscriptions', async (req, res) => {
-  try {
-    await monthlySubscriptionJob.runRefresh();
-    const status = monthlySubscriptionJob.getStatus();
-    res.json({ 
-      message: 'Manual refresh triggered', 
-      status 
-    });
-  } catch (err) {
-    res.status(500).json({ 
-      error: 'Refresh failed', 
-      details: err.message 
-    });
-  }
-});
+if (anyFailure) {
+  status.lastSuccess = anySuccess;  // Partial success
+  status.lastError = errors.join('; ');
+} else {
+  status.lastSuccess = true;
+  status.lastError = null;
+}
 ```
 
-### 3.2 Update Health Endpoint
-
+### Status Persistence
 ```typescript
-app.get('/health', async (req, res) => {
-  const redisStats = await redisStore.getStats();
-  const symbols = flowStore.getSymbols();
-  const clearJobStatus = dailyClearJob.getStatus();
-  const refreshJobStatus = monthlySubscriptionJob.getStatus(); // NEW
+// Save after each run
+await redisStore.redis.set('job:refresh:status', JSON.stringify(this.status));
 
-  res.json({
-    status: 'ok',
-    timestamp: Date.now(),
-    symbols: symbols,
-    symbolCount: symbols.length,
-    redis: redisStats,
-    dailyClearJob: clearJobStatus,
-    subscriptionRefreshJob: refreshJobStatus, // NEW
-  });
-});
+// Load on startup
+const saved = await redisStore.redis.get('job:refresh:status');
+if (saved) {
+  this.status = JSON.parse(saved);
+}
 ```
 
----
+## Files Modified
 
-## Phase 4: Hub Integration
+**New:**
+- `config/subscriptions.ts`
+- `jobs/refresh_subscriptions.ts`
 
-### 4.1 Update Hub Index
+**Modified:**
+- `utils/types.ts` - Added `PolygonAssetClass`, updated `PolygonWsRequest`
+- `utils/cbs/us_indices_cb.ts` - Added `assetClass: 'us_indices'`
+- `utils/cbs/metals_cb.ts` - Added `assetClass: 'metals'`
+- `utils/consts.ts` - Uses `SUBSCRIPTION_CONFIG`
+- `api/polygon/ws_client.ts` - Added subscription management methods
+- `servers/hub/api.ts` - Added endpoints, updated health
+- `servers/hub/index.ts` - Integrated refresh job
 
+## Configuration
+
+To change contract counts, edit `config/subscriptions.ts` and restart Hub.
+
+For roll coverage, set both to `2`:
 ```typescript
-// src/servers/hub/index.ts
-
-import { monthlySubscriptionJob } from '@/jobs/refresh_subscriptions.js';
-
-// ... existing code ...
-
-// Load persisted job statuses
-await dailyClearJob.loadStatus();
-await monthlySubscriptionJob.loadStatus(); // NEW
-
-// Schedule jobs
-dailyClearJob.schedule();
-monthlySubscriptionJob.schedule(polygonClient); // NEW, pass WS client
-
-// ... rest of code ...
+US_INDICES_QUARTERS: 2,  // Current + next
+METALS_MONTHS: 2,         // Current + next
 ```
 
-### 4.2 Graceful Shutdown (Future)
+## Monitoring
 
-```typescript
-process.on('SIGTERM', async () => {
-  console.log('Shutting down gracefully...');
-  await polygonClient.disconnect();
-  await redisStore.redis.quit();
-  process.exit(0);
-});
+Check job status in health endpoint:
+```bash
+curl http://localhost:3001/health | jq '.subscriptionRefreshJob'
 ```
 
----
+Expected fields:
+- `lastRunTime` - Timestamp of last run
+- `lastSuccess` - Boolean
+- `lastError` - Error string or null
+- `lastRefreshDetails` - Array of per-asset results
+- `totalRuns` - Count of all runs
 
-## Implementation Steps (Ordered)
+## Next Steps
 
-### Step 1: Enhance PolygonWSClient (~1-2 hours) ✅ **COMPLETE**
-1. ✅ Add `unsubscribe()` method
-2. ✅ Add `updateSubscription()` method with retry logic
-3. ✅ Add `getSubscriptions()` method
-4. ✅ Add `/admin/subscriptions` endpoint for inspection
-
-**Validation:**
-- ✅ Can unsubscribe from a symbol
-- ✅ Can see subscription removed from `this.subscriptions`
-- ✅ Re-subscribe works correctly
-- ✅ Manual testing via API completed
-
----
-
-### Step 2: Create MonthlySubscriptionJob (~2-3 hours) ✅ **COMPLETE**
-1. ✅ Created `src/jobs/refresh_subscriptions.ts`
-2. ✅ Implemented `RefreshJobStatus` interface with detailed tracking
-3. ✅ Implemented `runRefresh()` with logging and error handling
-4. ✅ Added asset class metadata to `PolygonWsRequest`
-5. ✅ Created `SUBSCRIPTION_CONFIG` for easy contract count changes
-6. ✅ Added comparison logic using asset class metadata
-7. ✅ Added `schedule()` with cron (1st of month @ 00:05 ET)
-8. ✅ Added partial success handling (marks success if any refresh succeeds)
-
-**Validation:**
-- ✅ Job scheduled with cron
-- ✅ Detects quarterly vs monthly refresh needs
-- ✅ Logs correctly to console and Redis
-- ✅ `/admin/refresh-subscriptions` manual trigger available
-- ✅ Health endpoint includes refresh job status
-
----
-
-### Step 3: Integration (~1 hour) ✅ **COMPLETE**
-1. ✅ Wired up job in `hub/index.ts`
-2. ✅ Added `/admin/refresh-subscriptions` endpoint
-3. ✅ Updated `/health` endpoint with refresh job status
-4. ✅ Job loads/saves status from Redis
-5. ✅ Both jobs (daily clear + monthly refresh) integrated
-
-**Validation:**
-- ✅ Health endpoint shows refresh job status
-- ✅ Manual trigger works via API
-- ✅ Automated schedule configured correctly
-
----
-
-### Step 4: Testing & Validation (~1-2 hours)
-1. Test month-to-month transition (mock date)
-2. Test quarterly transition (mock date)
-3. Test reconnect after refresh (disconnect WS, verify re-subscribes to new symbols)
+Comprehensive testing:
+1. Test month-to-month transition (mock date to Dec 1st)
+2. Test quarterly transition (mock date to Mar 1st)
+3. Test reconnect after refresh
 4. Test failure scenarios (Polygon down, Redis down)
-
-**Validation:**
-- Subscriptions update correctly on the 1st of month
-- WS reconnect uses new symbols
-- Errors are logged and persisted
-
----
-
-## Testing Strategy
-
-### Unit Tests
-- `usIndicesBuilder.buildQuarterlyRequest()` returns correct symbols for any date
-- `metalsBuilder.buildMonthlyRequest()` returns correct symbols for any date
-- `shouldRefreshIndices()` returns true only for Mar/Jun/Sep/Dec
-
-### Integration Tests
-- Mock Polygon WS client
-- Verify unsubscribe + subscribe messages sent
-- Verify `this.subscriptions` updated correctly
-
-### Manual Tests
-1. Start Hub on Nov 1st → verify ESZ25, GCX25 subscribed
-2. Trigger manual refresh → verify no change (same month)
-3. Mock date to Dec 1st → trigger manual refresh → verify GCZ25 subscribed, GCX25 unsubscribed
-4. Mock date to Mar 1st → trigger manual refresh → verify ESH26 subscribed, ESZ25 unsubscribed
-
----
-
-## Open Questions
-
-### Q1: Should we keep old subscriptions during a buffer period?
-**Context:** Traders roll positions 1-2 weeks before expiration. Should we subscribe to both old and new contracts during transition?
-
-**Options:**
-- A: Subscribe only to new contract (current plan)
-- B: Subscribe to current + next contract (2 quarters/months)
-- C: Detect roll period and subscribe to both temporarily
-
-**Recommendation:** Start with A (simple), add B later if needed.
-
----
-
-### Q2: What if refresh fails?
-**Context:** Polygon API down, network issue, etc.
-
-**Options:**
-- A: Retry with exponential backoff (up to 5 attempts)
-- B: Alert and wait for next scheduled run
-- C: Keep retrying until success
-
-**Recommendation:** A - Retry 3 times with 1min/5min/15min delays, then give up and alert.
-
----
-
-### Q3: How to handle Hub restarts mid-month?
-**Context:** Hub restarts on Dec 15th. Should it wait until Jan 1st to refresh, or refresh immediately?
-
-**Options:**
-- A: Refresh on startup if current contracts don't match expected (smart)
-- B: Wait for next scheduled run (simple)
-
-**Recommendation:** B for now (simple), add A later for robustness.
-
----
-
-## Success Metrics
-
-1. **Zero Downtime:** Hub runs continuously without manual restarts
-2. **Fresh Subscriptions:** Symbols update automatically on the 1st of each month/quarter
-3. **Observable:** Health endpoint shows last refresh time and status
-4. **Reliable:** Retry logic handles transient failures
-5. **Testable:** Can manually trigger refresh for validation
-
----
-
-## Next Actions
-
-1. Read through this plan with the user
-2. Confirm approach and answer open questions
-3. Start with Step 1: Enhance PolygonWSClient
-4. Implement a few lines at a time, test incrementally
-
