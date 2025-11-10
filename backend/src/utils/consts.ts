@@ -1,7 +1,6 @@
-import { metalsBuilder } from './cbs/metals_cb.js';
-import type { MonthCode, PolygonWsRequest } from './types.js';
-import { usIndicesBuilder } from '@/utils/cbs/us_indices_cb.js';
-import { SUBSCRIPTION_CONFIG } from '@/config/subscriptions.js';
+import type { MonthCode, PolygonWsRequest } from "./types.js";
+import { quarterlyBuilder } from "@/utils/cbs/quarterly_cb.js";
+import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 
 // Polygon API configuration
 export const POLYGON_WS_URL = 'wss://socket.polygon.io';
@@ -25,13 +24,30 @@ export const ALL_MONTHS: MonthCode[] = [
 
 // Pre-built subscription requests for US indices
 export const futuresUSIndicesSecondsRequest: PolygonWsRequest =
-  usIndicesBuilder.buildQuarterlyRequest('A', SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS);
+  quarterlyBuilder.buildQuarterlyRequest(
+    "us_indices",
+    "A",
+    SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS
+  );
 
 export const futuresUSIndicesMinutesRequest: PolygonWsRequest =
-  usIndicesBuilder.buildQuarterlyRequest('AM', SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS);
+  quarterlyBuilder.buildQuarterlyRequest(
+    "us_indices",
+    "AM",
+    SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS
+  );
 
+// Pre-built subscription requests for metals
 export const futuresMetalsSecondsRequests: PolygonWsRequest =
-  metalsBuilder.buildMonthlyRequest('A', SUBSCRIPTION_CONFIG.METALS_MONTHS);
+  quarterlyBuilder.buildQuarterlyRequest(
+    "metals",
+    "A",
+    SUBSCRIPTION_CONFIG.METALS_QUARTERS
+  );
 
 export const futuresMetalsMinutesRequests: PolygonWsRequest =
-  metalsBuilder.buildMonthlyRequest('AM', SUBSCRIPTION_CONFIG.METALS_MONTHS);
+  quarterlyBuilder.buildQuarterlyRequest(
+    "metals",
+    "AM",
+    SUBSCRIPTION_CONFIG.METALS_QUARTERS
+  );

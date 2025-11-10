@@ -7,8 +7,7 @@ import type {
   RefreshJobStatus,
   RefreshDetails,
 } from "@/utils/types.js";
-import { usIndicesBuilder } from "@/utils/cbs/us_indices_cb.js";
-import { metalsBuilder } from "@/utils/cbs/metals_cb.js";
+import { quarterlyBuilder } from "@/utils/cbs/quarterly_cb.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 
 class MonthlySubscriptionJob {
@@ -57,8 +56,10 @@ class MonthlySubscriptionJob {
   }
 
   private shouldRefreshMetals(): boolean {
-    // Metals roll monthly, so always check
-    return true;
+    // Metals roll quarterly, check quarterly months
+    const now = new Date();
+    const month = now.getMonth() + 1; // Jan = 1
+    return [3, 6, 9, 12].includes(month); // Mar, Jun, Sep, Dec
   }
 
   private findSubscriptionByAssetClass(
@@ -92,14 +93,16 @@ class MonthlySubscriptionJob {
       // Build new request based on asset class
       let newRequest: PolygonWsRequest;
       if (assetClass === "us_indices") {
-        newRequest = usIndicesBuilder.buildQuarterlyRequest(
+        newRequest = quarterlyBuilder.buildQuarterlyRequest(
+          assetClass,
           eventType,
           SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS
         );
       } else {
-        newRequest = metalsBuilder.buildMonthlyRequest(
+        newRequest = quarterlyBuilder.buildQuarterlyRequest(
+          assetClass,
           eventType,
-          SUBSCRIPTION_CONFIG.METALS_MONTHS
+          SUBSCRIPTION_CONFIG.METALS_QUARTERS
         );
       }
 
@@ -175,12 +178,14 @@ class MonthlySubscriptionJob {
       console.log("US Indices: No refresh needed (not a quarterly month)");
     }
 
-    // Check metals (monthly)
+    // Check metals (quarterly)
     if (this.shouldRefreshMetals()) {
-      console.log("Metals: Refresh needed (monthly check)");
+      console.log("Metals: Refresh needed (quarterly month)");
       refreshTasks.push(this.refreshAssetClass("metals", "A"));
       // Uncomment when subscribing to minute data:
       // refreshTasks.push(this.refreshAssetClass('metals', 'AM'));
+    } else {
+      console.log("Metals: No refresh needed (not a quarterly month)");
     }
 
     // Execute all refreshes
@@ -214,6 +219,7 @@ class MonthlySubscriptionJob {
       `Summary: ${successCount}/${results.length} successful, ${changedCount} changed`
     );
     console.log("-----------------------------------\n");
+    console.log('')
   }
 
   getStatus(): RefreshJobStatus {

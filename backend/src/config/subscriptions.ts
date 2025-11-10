@@ -8,14 +8,14 @@
 export const SUBSCRIPTION_CONFIG = {
   /**
    * Number of quarterly contracts to subscribe to for US indices
-   * Example: 1 = current quarter only, 2 = current + next quarter
+   * Example: 1 = current quarter only, 4 = full year ahead
    */
   US_INDICES_QUARTERS: 1,
-  
+
   /**
-   * Number of monthly contracts to subscribe to for metals
-   * Example: 1 = current month only, 2 = current + next month
+   * Number of quarterly contracts to subscribe to for metals
+   * Example: 1 = current quarter only, 4 = full year ahead
    */
-  METALS_MONTHS: 1,
+  METALS_QUARTERS: 1,
 } as const;
 

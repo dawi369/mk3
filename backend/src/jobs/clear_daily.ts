@@ -54,6 +54,7 @@ class DailyClearJob {
       await this.saveStatus();
       
       console.log(`Daily clear completed: ${result.cleared} keys cleared, new date: ${result.newDate}`);
+      console.log('')
     } catch (err) {
       this.status.lastSuccess = false;
       this.status.lastError = err instanceof Error ? err.message : String(err);
