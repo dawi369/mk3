@@ -269,38 +269,50 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 
 ---
 
-### 🔜 Phase 3: Edge Server (16-20 hours)
+### 🔄 Phase 3: Edge Server (8-12 hours total)
 
-**Goal:** Client-facing servers with front month intelligence
+**Goal:** Client-facing server with REST API, WebSocket streaming, and contract management
+
+**Status:** Phase 1 Complete ✅ | Phase 2 Next
 
 **Architecture:**
 ```
 Edge Server
-├─ Connect to Redis Pub/Sub
-├─ Serve clients via WS (downstream)
-├─ Front month detection (by volume/open interest)
-├─ Roll period management
-├─ Symbol mapping (ES → ESZ25)
-└─ Continuous contract generation
+├─ Phase 1: Redis Integration ✅
+│   ├─ Connect to Redis Pub/Sub
+│   ├─ Load today's snapshot
+│   └─ In-memory bar cache
+├─ Phase 2: REST API (~2-3 hours)
+│   ├─ Health & monitoring endpoints
+│   ├─ Bar queries (latest, history)
+│   ├─ Symbol grouping by asset class
+│   └─ Contract grouping by root symbol
+├─ Phase 3: WebSocket Server (~4-6 hours)
+│   ├─ Client connection management
+│   ├─ Symbol subscription (default: all, can specify)
+│   ├─ Time-delayed streaming (configurable delay, e.g., 15 min)
+│   └─ Broadcast bars to subscribed clients
+└─ Phase 4: Front Month Detection (~2-3 hours)
+    ├─ Date-based front month (not volume-based)
+    ├─ Symbol mapping (ES → ESZ25)
+    ├─ Contract grouping for frontend dropdown
+    └─ Asset class organization
 ```
 
-**Tasks:**
-1. Create Edge server structure
-2. Redis client (connects to Redis)
-3. Client WS server (serves dashboards)
-4. Front month detection algorithm
-5. Roll detection (when both contracts trade)
-6. Symbol mapping layer (root → contract)
-7. Continuous contract data (for charts)
-8. Edge REST API (similar to Hub, but with FX logic)
+**Key Features:**
+- **Symbol Subscription:** Clients can subscribe to specific symbols or all (default)
+- **Time Delay:** Configurable delay (real-time or e.g., 15-min delayed stream)
+- **Contract Grouping:** Group contracts by root for frontend selection (ES → [ESZ25, ESH26, ...])
+- **Front Month by Date:** Use contract builder logic (not volume tracking)
+- **Asset Class Grouping:** Organize by US indices, metals, etc.
+
+**Roll Period Management:** On backburner (not implementing now)
 
 **Deliverables:**
-- Edge server codebase
-- Front month algorithm
-- Symbol mapping system
-- Continuous contracts
-- Edge API
-- Testing framework
+- ✅ Phase 1: Redis client + bar cache
+- 🔄 Phase 2: REST API
+- 🔜 Phase 3: WebSocket server
+- 🔜 Phase 4: Front month detection
 
 ---
 

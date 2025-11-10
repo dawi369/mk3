@@ -2,11 +2,11 @@
 
 > For comprehensive system overview, see [system-overview.md](./system-overview.md)
 
-**Current Phase: Phase 1 Complete | Phase 2 Next**
+**Current Phase: Phase 1 Complete ✅ | Edge Phase 1 Complete ✅ | Edge Phase 2 Next 🔄**
 
 ---
 
-## Phase 1: Hub Core Infrastructure - COMPLETE
+## Phase 1: Hub Core Infrastructure - COMPLETE ✅
 
 ### Completed Components
 
@@ -118,17 +118,41 @@ export const SUBSCRIPTION_CONFIG = {
 
 ---
 
-## Next Phase
+## Phase 2: Edge Server - IN PROGRESS 🔄
 
-### Phase 2: Multi-Asset Expansion (8-12 hours)
+### Edge Phase 1: Redis Integration - COMPLETE ✅
 
-**Goal:** Add contract builders for softs, energies, grains, treasuries
+**Completed:**
+- ✅ Redis client (main + subscriber connections)
+- ✅ Load today's snapshot from Redis
+- ✅ Subscribe to Redis pub/sub channel `bars`
+- ✅ In-memory bar cache (10,000 bars per symbol)
+- ✅ Stats logging
+
+**Files:**
+- `src/servers/edge/data/bar_cache.ts`
+- `src/servers/edge/data/redis_client.ts`
+- `src/servers/edge/index.ts`
+
+### Edge Phase 2: REST API - NEXT 🔄
+
+**Goal:** HTTP endpoints for data queries and observability
 
 **Tasks:**
-1. Research trading cycles for each asset class
-2. Implement builder classes
-3. Extend `PolygonAssetClass` type
-4. Update refresh job logic
-5. Test multi-asset refresh
+1. Create REST API server (Express, port 3002)
+2. Health endpoint with cache stats
+3. Bar queries (latest, history by symbol)
+4. Symbol grouping by asset class
+5. Contract grouping by root symbol
+
+**See [edge-implementation-plan.md](./edge-implementation-plan.md) for detailed plan.**
+
+---
+
+## Future Phases
+
+### Phase 3: Multi-Asset Expansion (8-12 hours)
+
+**Goal:** Add contract builders for softs, energies, grains, treasuries
 
 **See [system-overview.md](./system-overview.md) for complete roadmap.**

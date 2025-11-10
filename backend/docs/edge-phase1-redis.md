@@ -399,19 +399,23 @@ if (keys.length === 0) {
 
 ## Next Steps (After Phase 1)
 
-**Phase 2: Frontend WebSocket Server**
+**Phase 2: Edge REST API** (~2-3 hours)
+- Health endpoint with cache stats
+- Bar queries (latest, history by symbol)
+- Symbol info grouped by asset class
+- Contract grouping (show all available contracts for a root symbol)
+
+**Phase 3: WebSocket Server** (~4-6 hours)
 - Accept client connections
-- Broadcast bars to clients
-- Handle subscriptions
+- Client subscription to specific symbols (default: all symbols)
+- Time-delayed streaming (e.g., 15-min delay, emulating real-time)
+- Broadcast bars to subscribed clients
 
-**Phase 3: Front Month Logic**
-- Determine current front month by volume
-- Map root symbols (ES) to contracts (ESZ25)
-
-**Phase 4: Edge REST API**
-- Health endpoint
-- Bar queries
-- Symbol info
+**Phase 4: Front Month Detection** (~2-3 hours)
+- Determine current front month by date (use contract builder logic)
+- Map root symbols to current contract (ES → ESZ25)
+- Group contracts by root symbol for frontend dropdown
+- Asset class grouping (US indices, metals, etc.)
 
 ## Success Metrics
 

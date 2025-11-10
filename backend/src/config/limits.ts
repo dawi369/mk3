@@ -5,4 +5,5 @@ export const LIMITS = {
     maxSymbolsGlobal: 2000,      // protects upstream sub list size
     heartbeatMs: 15_000,
     reconnectBackoffMs: { base: 500, max: 20_000 },
+    maxEdgeBars: 10_000,
   };

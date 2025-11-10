@@ -1,7 +1,7 @@
 # MK3 Futures Dashboard - Documentation
 
-Last Updated: November 9, 2025  
-Status: Phase 1 Complete
+Last Updated: November 10, 2025  
+Status: Hub Phase 1 Complete ✅ | Edge Phase 1 Complete ✅ | Edge Phase 2 Next 🔄
 
 ## Documentation Index
 
@@ -11,9 +11,21 @@ Status: Phase 1 Complete
 - 7-phase development plan
 
 **[architecture.md](./architecture.md)** - Technical details
-- Phase 1 components
+- Hub Phase 1 components
+- Edge Phase 1 components
 - Data flow
 - API endpoints
+
+**[edge-implementation-plan.md](./edge-implementation-plan.md)** - Edge server plan (NEW)
+- Detailed Edge implementation roadmap
+- Phase 2: REST API
+- Phase 3: WebSocket server
+- Phase 4: Front month detection
+
+**[edge-phase1-redis.md](./edge-phase1-redis.md)** - Edge Redis integration
+- Redis pub/sub setup
+- Snapshot loading
+- Bar cache implementation
 
 **[futures-contract-management.md](./futures-contract-management.md)** - Contract strategy
 - Problem and solution
@@ -32,9 +44,9 @@ Status: Phase 1 Complete
 
 ## Current Status
 
-Phase 1 complete:
+### Hub Phase 1 Complete ✅
 - Real-time data ingestion from Polygon.io
-- Dynamic contract builders (US indices, metals)
+- Dynamic contract builders (US indices, metals - both quarterly now)
 - Automated monthly subscription refresh
 - Dual storage (flowStore + Redis with pub/sub)
 - Redis pub/sub broadcasting for Edge servers
@@ -43,27 +55,48 @@ Phase 1 complete:
 - Self-healing WebSocket client
 - Status persistence
 
+### Edge Phase 1 Complete ✅
+- Redis client (main + subscriber connections)
+- Load today's snapshot from Redis
+- Subscribe to Redis pub/sub channel `bars`
+- In-memory bar cache (10,000 bars per symbol)
+- Stats logging
+
+### Edge Phase 2 Next 🔄
+- REST API server (port 3002)
+- Health & monitoring endpoints
+- Bar queries (latest, history)
+- Symbol grouping by asset class
+- Contract grouping by root symbol
+
 Current subscriptions:
 - US Indices: ES, NQ, YM, RTY (quarterly)
-- Metals: GC, SI, HG, PL, PA, MGC (monthly)
+- Metals: GC, SI, HG, PL, PA, MGC (quarterly)
 
 Jobs:
 - Daily clear: 2 AM ET
 - Monthly refresh: 1st of month @ 00:05 ET
 
 Data distribution:
-- Redis keys: `bar:latest:*`, `bar:today:*`
-- Redis pub/sub: Channel `bars` (for Edge servers)
+- Hub → Redis keys: `bar:latest:*`, `bar:today:*`
+- Hub → Redis pub/sub: Channel `bars`
+- Edge ← Redis: Subscribes to channel `bars`, loads snapshot on startup
 
 ## Quick Start
 
 ### Start Hub
 ```bash
 cd /home/david/dev/mk3/backend
-npx tsx src/servers/hub/index.ts
+npm run run:hub
 ```
 
-### Test API
+### Start Edge
+```bash
+cd /home/david/dev/mk3/backend
+npm run run:edge
+```
+
+### Test Hub API
 ```bash
 # Health check
 curl http://localhost:3001/health | jq
@@ -73,6 +106,18 @@ curl http://localhost:3001/admin/subscriptions | jq
 
 # Latest bars
 curl http://localhost:3001/bars/latest | jq
+```
+
+### Test Edge (after Phase 2)
+```bash
+# Health check
+curl http://localhost:3002/health | jq
+
+# Latest bars
+curl http://localhost:3002/bars/latest | jq
+
+# Contracts for ES
+curl http://localhost:3002/contracts/ES | jq
 ```
 
 ### Manual Operations
@@ -102,23 +147,40 @@ For roll coverage, change values to 2 and restart Hub.
 
 Edit `backend/.env`:
 ```bash
+# Polygon API
 POLYGON_API_KEY=your_key_here
+
+# Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
+
+# Hub Server
 HUB_REST_PORT=3001
+
+# Edge Server (add these)
+EDGE_REST_PORT=3002
+EDGE_WS_PORT=3003
 ```
 
 ## Next Steps
 
-Phase 2: Multi-asset expansion (next 2 weeks)
-- Add softs (KT, CJ, TT, YO)
-- Add energies (CL, NG, RB, HO)
-- Add grains (ZC, ZS, ZW)
-- Add treasuries (ZB, ZN, ZF, ZT)
+### Immediate: Edge Phase 2 (REST API) - ~2-3 hours
+- Create REST API server (Express, port 3002)
+- Health endpoint with cache stats
+- Bar queries (latest, history)
+- Symbol grouping by asset class
+- Contract grouping by root symbol
 
-Effort: 8-12 hours
+### Short-term: Edge Phases 3-4 - ~6-9 hours
+- Phase 3: WebSocket server with client subscriptions and time-delayed streaming
+- Phase 4: Front month detection (date-based) and contract mapping
 
-See [system-overview.md](./system-overview.md) for complete roadmap (Phases 3-7).
+### Medium-term: Multi-Asset Expansion - ~8-12 hours
+- Add softs, energies, grains, treasuries contract builders
+- Extend refresh job for all asset classes
+
+See [edge-implementation-plan.md](./edge-implementation-plan.md) for detailed Edge roadmap.  
+See [system-overview.md](./system-overview.md) for complete system roadmap.
 
 ## Troubleshooting
 
