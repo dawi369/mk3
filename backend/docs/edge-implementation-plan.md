@@ -1,7 +1,7 @@
 # Edge Server Implementation Plan
 
-**Status:** Phase 1 Complete ✅ | Phase 2 Next  
-**Last Updated:** November 10, 2025
+**Status:** Phase 2 Complete ✅ | Phase 3 Next  
+**Last Updated:** November 11, 2025
 
 ---
 
@@ -27,9 +27,9 @@ Redis (persistent + pub/sub)
 Edge Server (YOU ARE HERE)
   ├─ Redis Client (Phase 1 ✅)
   ├─ Bar Cache (Phase 1 ✅)
-  ├─ REST API (Phase 2 - Next)
-  ├─ WebSocket Server (Phase 3)
-  └─ Contract Mapper (Phase 4)
+  ├─ REST API (Phase 2 ✅)
+  ├─ WebSocket Server (Phase 3 - Next)
+  └─ Front Month Detection (Phase 4)
     ↓
 Frontend Dashboard (Future)
 ```
@@ -54,9 +54,20 @@ Frontend Dashboard (Future)
 
 ---
 
-## Phase 2: Edge REST API (~2-3 hours)
+## Phase 2: Edge REST API ✅ COMPLETE
 
 **Goal:** Provide HTTP endpoints for data queries and observability
+
+**Completed:**
+- ✅ Express server on port 3002
+- ✅ Health endpoint with cache stats
+- ✅ Bar query endpoints (latest, history)
+- ✅ Symbol listing and grouping by asset class
+- ✅ Contract grouping by root symbol
+
+**Files:**
+- `src/servers/edge/api/rest.ts` - REST API endpoints
+- `src/config/env.ts` - Added `EDGE_REST_PORT`
 
 ### Endpoints
 

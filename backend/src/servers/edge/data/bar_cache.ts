@@ -69,6 +69,45 @@ class BarCache {
       totalBars,
     };
   }
+
+  /**
+   * Get bars within a time range across all symbols or specific symbols
+   * Used for delayed streaming - query bars from virtual time window
+   * 
+   * @param symbols - Array of symbols to query, or ['*'] for all
+   * @param fromTimestamp - Start of time range (inclusive)
+   * @param toTimestamp - End of time range (inclusive)
+   * @returns Array of bars in time range, sorted chronologically
+   */
+  getBarsInRange(
+    symbols: string[] | Set<string>,
+    fromTimestamp: number,
+    toTimestamp: number
+  ): Bar[] {
+    const result: Bar[] = [];
+    const symbolSet = symbols instanceof Set ? symbols : new Set(symbols);
+    const queryAll = symbolSet.has('*');
+
+    // Iterate through cache
+    for (const [symbol, bars] of this.cache) {
+      // Filter by subscription
+      if (!queryAll && !symbolSet.has(symbol)) {
+        continue;
+      }
+
+      // Find bars in time range (use endTime for comparison)
+      for (const bar of bars) {
+        if (bar.endTime >= fromTimestamp && bar.endTime <= toTimestamp) {
+          result.push(bar);
+        }
+      }
+    }
+
+    // Sort by endTime to maintain chronological order
+    result.sort((a, b) => a.endTime - b.endTime);
+
+    return result;
+  }
 }
 
 export const barCache = new BarCache();

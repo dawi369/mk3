@@ -1,7 +1,9 @@
 # MK3 Futures Dashboard - Documentation
 
-Last Updated: November 10, 2025  
-Status: Hub Phase 1 Complete ✅ | Edge Phase 1 Complete ✅ | Edge Phase 2 Next 🔄
+Note: In the future, edge needs to set the delay according to some auth or account. The client should not set this.
+
+Last Updated: November 11, 2025  
+Status: Hub Phase 1 Complete ✅ | Edge Phase 2 Complete ✅ | Edge Phase 3 Next 🔄
 
 ## Documentation Index
 
@@ -62,12 +64,18 @@ Status: Hub Phase 1 Complete ✅ | Edge Phase 1 Complete ✅ | Edge Phase 2 Next
 - In-memory bar cache (10,000 bars per symbol)
 - Stats logging
 
-### Edge Phase 2 Next 🔄
+### Edge Phase 2 Complete ✅
 - REST API server (port 3002)
 - Health & monitoring endpoints
 - Bar queries (latest, history)
 - Symbol grouping by asset class
 - Contract grouping by root symbol
+
+### Edge Phase 3 Next 🔄
+- WebSocket server for real-time streaming
+- Client subscription management
+- Time-delayed streaming (configurable delay)
+- Pub/sub to connected clients
 
 Current subscriptions:
 - US Indices: ES, NQ, YM, RTY (quarterly)
