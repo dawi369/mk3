@@ -7,12 +7,13 @@ export const LIMITS = {
     // reconnectBackoffMs: { base: 500, max: 20_000 },
     maxEdgeBars: 10_000,
     
-    // WebSocket server limits
-    maxWsClients: 1000,                    // Max concurrent WS connections
-    maxMessagesPerSecond: 1000,            // Rate limit per client
-    wsHeartbeatIntervalMs: 30_000,         // Send ping every 30s
-    wsHeartbeatTimeoutMs: 10_000,          // Expect pong within 10s
-    delayPollIntervalMs: 100,              // Poll delayed bars every 100ms
-    maxDelaySeconds: 3600,                 // Max 1 hour delay
-    delayedBarRetentionMs: 1_200_000,      // Keep 20 min of bars for delayed clients
+  // WebSocket server limits
+  maxWsClients: 10_000,                  // Max concurrent WS connections (total)
+  maxRealTimeClients: 2_500,             // Max real-time clients (bandwidth limited)
+  maxMessagesPerSecond: 1_000,           // Rate limit per client
+  wsHeartbeatIntervalMs: 30_000,         // Send ping every 30s
+  wsHeartbeatTimeoutMs: 10_000,          // Expect pong within 10s
+  delayPollIntervalMs: 100,              // Poll delayed bars every 100ms
+  maxDelaySeconds: 3_600,                // Max 1 hour delay
+  delayedBarRetentionMs: 1_200_000,      // Keep 20 min of bars for delayed clients
   };

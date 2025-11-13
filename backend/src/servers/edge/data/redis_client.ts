@@ -13,6 +13,7 @@ import { barCache } from './bar_cache.js';
 class EdgeRedisClient {
   private redis: Redis;
   private subscriber: Redis;
+  private barCallbacks: Array<(bar: Bar) => void> = [];
 
   constructor() {
     // Main Redis connection for normal operations
@@ -123,6 +124,13 @@ class EdgeRedisClient {
   }
 
   /**
+   * Register callback to be notified when new bar arrives
+   */
+  onBar(callback: (bar: Bar) => void): void {
+    this.barCallbacks.push(callback);
+  }
+
+  /**
    * Handle incoming bar from pub/sub
    */
   private handleBar(message: string): void {
@@ -131,6 +139,11 @@ class EdgeRedisClient {
 
       // Update cache
       barCache.append(bar);
+
+      // Notify all registered callbacks
+      for (const callback of this.barCallbacks) {
+        callback(bar);
+      }
 
       console.log(`Bar received: ${bar.symbol} @ ${bar.close}`);
     } catch (err) {

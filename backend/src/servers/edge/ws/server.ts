@@ -11,6 +11,7 @@ import type { ClientConnection, ClientMessage, ServerMessage } from './types.js'
 export class EdgeWSServer {
   private wss: WebSocketServer | null = null;
   private clients: Map<string, ClientConnection> = new Map();
+  private clientsByDelay: Map<number, Set<string>> = new Map();
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
   /**
@@ -73,6 +74,10 @@ export class EdgeWSServer {
     };
 
     this.clients.set(clientId, client);
+    
+    // Add to delay group (default is 0 = real-time)
+    this.addClientToDelayGroup(clientId, 0);
+    
     console.log(`[WS] Client connected: ${clientId} (${ipAddress}) | Total: ${this.clients.size}`);
 
     // Send welcome message
@@ -152,8 +157,27 @@ export class EdgeWSServer {
       return;
     }
 
+    // Check real-time client limit if switching to real-time
+    if (delaySeconds === 0 && client.delaySeconds !== 0) {
+      const realTimeGroup = this.clientsByDelay.get(0);
+      const currentRealTimeCount = realTimeGroup ? realTimeGroup.size : 0;
+      
+      if (currentRealTimeCount >= LIMITS.maxRealTimeClients) {
+        this.sendError(client, `Real-time client limit reached (${LIMITS.maxRealTimeClients}). Please use delayed mode.`);
+        return;
+      }
+    }
+
+    // Remove from old delay group
+    this.removeClientFromDelayGroup(client.id, client.delaySeconds);
+
+    // Update client delay
     client.delaySeconds = delaySeconds;
     client.lastSentTimestamp = Date.now() - (delaySeconds * 1000);
+
+    // Add to new delay group
+    this.addClientToDelayGroup(client.id, delaySeconds);
+
     console.log(`[WS] Client ${client.id} set delay to ${delaySeconds}s`);
     this.sendToClient(client, { type: 'delaySet', delaySeconds });
   }
@@ -171,6 +195,7 @@ export class EdgeWSServer {
    */
   private handleDisconnect(client: ClientConnection): void {
     this.clients.delete(client.id);
+    this.removeClientFromDelayGroup(client.id, client.delaySeconds);
     console.log(`[WS] Client disconnected: ${client.id} | Total: ${this.clients.size}`);
   }
 
@@ -211,6 +236,56 @@ export class EdgeWSServer {
         }
       }
     }, LIMITS.wsHeartbeatIntervalMs);
+  }
+
+  /**
+   * Add client to delay group
+   */
+  private addClientToDelayGroup(clientId: string, delaySeconds: number): void {
+    if (!this.clientsByDelay.has(delaySeconds)) {
+      this.clientsByDelay.set(delaySeconds, new Set());
+    }
+    this.clientsByDelay.get(delaySeconds)!.add(clientId);
+  }
+
+  /**
+   * Remove client from delay group
+   */
+  private removeClientFromDelayGroup(clientId: string, delaySeconds: number): void {
+    const group = this.clientsByDelay.get(delaySeconds);
+    if (group) {
+      group.delete(clientId);
+      if (group.size === 0) {
+        this.clientsByDelay.delete(delaySeconds);
+      }
+    }
+  }
+
+  /**
+   * Broadcast bar to subscribed clients (real-time only)
+   * Delayed clients will receive bars via polling
+   */
+  broadcastBar(bar: any): void {
+    const realTimeGroup = this.clientsByDelay.get(0);
+    if (!realTimeGroup || realTimeGroup.size === 0) {
+      return; // No real-time clients
+    }
+
+    // Broadcast to real-time clients only
+    for (const clientId of realTimeGroup) {
+      const client = this.clients.get(clientId);
+      if (!client) continue;
+
+      // Check if client is subscribed to this symbol or all symbols
+      const isSubscribed = client.subscriptions.has('*') || client.subscriptions.has(bar.symbol);
+      
+      if (isSubscribed) {
+        this.sendToClient(client, {
+          type: 'bar',
+          data: bar,
+        });
+      }
+    }
   }
 
   /**

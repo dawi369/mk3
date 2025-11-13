@@ -16,6 +16,11 @@ await startEdgeRESTApi();
 // 4. Start WebSocket server
 await edgeWSServer.start();
 
+// 5. Connect Redis bar stream to WebSocket broadcast
+edgeRedisClient.onBar((bar) => {
+  edgeWSServer.broadcastBar(bar);
+});
+
 console.log('Edge server running\n');
 
 // Log stats every 10 seconds
