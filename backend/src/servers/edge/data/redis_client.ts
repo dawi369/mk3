@@ -155,7 +155,7 @@ class EdgeRedisClient {
         callback(bar);
       }
 
-      console.log(`Bar received: ${bar.symbol} @ ${bar.close}`);
+      // console.log(`Bar received: ${bar.symbol} @ ${bar.close}`);
     } catch (err) {
       console.error("Failed to parse bar:", err);
     }

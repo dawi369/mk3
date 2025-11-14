@@ -13,7 +13,11 @@ export const LIMITS = {
   maxMessagesPerSecond: 1_000, // Rate limit per client
   wsHeartbeatIntervalMs: 30_000, // Send ping every 30s
   wsHeartbeatTimeoutMs: 10_000, // Expect pong within 10s
+  
+  // Delayed streaming configuration
   delayPollIntervalMs: 100, // Poll delayed bars every 100ms
   maxDelaySeconds: 3_600, // Max 1 hour delay
   delayedBarRetentionMs: 1_200_000, // Keep 20 min of bars for delayed clients
+  delayedBarBatchSize: 100, // Max bars to send per poll cycle per client
+  delayedStreamWindowMs: 200 // Window size for gathering bars to send (ms)
 };
