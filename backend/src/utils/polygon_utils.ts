@@ -3,9 +3,10 @@ import type {
   PolygonAggregateEvent,
   PolygonQuoteEvent,
   PolygonTradeEvent,
-  Bar,
   PolygonStatusMessage,
-} from "./types.js";
+} from "./polygon_types.js";
+
+import type { Bar } from "@/utils/general_types.js";
 
 // Type guards for Polygon WebSocket messages
 export function isStatusMessage(m: unknown): m is PolygonStatusMessage {

@@ -1,4 +1,4 @@
-import type { Bar } from '@/utils/types.js';
+import type { Bar } from '@/utils/general_types.js';
 import { LIMITS } from '@/config/limits.js';
 
 /**

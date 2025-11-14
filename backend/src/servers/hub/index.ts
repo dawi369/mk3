@@ -1,8 +1,8 @@
 import { PolygonWSClient } from '@/api/polygon/ws_client.js';
-import { flowStore } from '@/data/flow_store.js';
+import { flowStore } from '@/servers/hub/data/flow_store.js';
 import { redisStore } from '@/data/redis_store.js';
-import type { PolygonMarketType } from '@/utils/types.js';
-import { startHubRESTApi } from './api/rest.js';
+import type { PolygonMarketType } from '@/utils/polygon_types.js';
+import { startHubRESTApi } from './api/rest_client.js';
 import { dailyClearJob } from '@/jobs/clear_daily.js';
 import { monthlySubscriptionJob } from '@/jobs/refresh_subscriptions.js';
 import {
@@ -10,50 +10,66 @@ import {
   futuresMetalsSecondsRequests,
 } from '@/utils/consts.js';
 
-const polygonClient = new PolygonWSClient();
-const futuresMarket: PolygonMarketType = 'futures';
+/**
+ * Main Hub server startup
+ * If Redis connection fails, process will exit and can be restarted
+ */
+async function startHubServer() {
+  try {
+    console.log('Starting Hub server...');
 
-await polygonClient.connect(futuresMarket); 
+    const polygonClient = new PolygonWSClient();
+    const futuresMarket: PolygonMarketType = 'futures';
 
-await polygonClient.subscribe(futuresUSIndicesSecondsRequest);
-await polygonClient.subscribe(futuresMetalsSecondsRequests); 
+    await polygonClient.connect(futuresMarket); 
 
-// Load persisted job statuses
-await dailyClearJob.loadStatus();
-await monthlySubscriptionJob.loadStatus();
+    await polygonClient.subscribe(futuresUSIndicesSecondsRequest);
+    await polygonClient.subscribe(futuresMetalsSecondsRequests); 
 
-// Schedule jobs
-dailyClearJob.schedule();
-monthlySubscriptionJob.schedule(polygonClient);
+    // Load persisted job statuses
+    await dailyClearJob.loadStatus();
+    await monthlySubscriptionJob.loadStatus();
 
-// Start Hub REST API (pass polygon client for subscription management)
-await startHubRESTApi(polygonClient);
+    // Schedule jobs
+    dailyClearJob.schedule();
+    monthlySubscriptionJob.schedule(polygonClient);
 
+    // Start Hub REST API (pass polygon client for subscription management)
+    await startHubRESTApi(polygonClient);
 
+    console.log('Hub server running\n');
 
+    // Log stats every 5 seconds
+    setInterval(async () => {
+      console.log('--- flowStore ---');
+      console.log('Symbols:', flowStore.getSymbols());
+      console.log('Latest bars:', flowStore.getAllLatest().length);
 
+      console.log('\n--- Redis ---');
+      const stats = await redisStore.getStats();
+      console.log('Stats:', stats);
 
+      console.log('-----------------------------------\n');
+    }, 5_000);
+  } catch (err) {
+    console.error('Hub server startup failed:', err);
+    console.error('Retrying in 10 seconds...');
+    setTimeout(() => {
+      startHubServer();
+    }, 19000);
+  }
+}
 
-console.log('');
-setInterval(async () => {
-  console.log('--- flowStore ---');
-  console.log('Symbols:', flowStore.getSymbols());
-  console.log('Latest bars:', flowStore.getAllLatest().length);
+// Handle process exit
+process.on('SIGINT', () => {
+  console.log('\nShutting down Hub server...');
+  process.exit(0);
+});
 
-  console.log('\n--- Redis ---');
-  const stats = await redisStore.getStats();
-  console.log('Stats:', stats);
+process.on('SIGTERM', () => {
+  console.log('\nShutting down Hub server...');
+  process.exit(0);
+});
 
-  // Test reading one symbol from Redis
-  const symbol = "MGCZ5"
-  const latest = await redisStore.getLatest(symbol);
-  console.log(`Latest ${symbol} from Redis:`, latest);
-
-
-  console.log('-----------------------------------\n');
-}, 5_000);
-
-// setInterval(async () => {
-//     const health = await client.getHealth();
-//     console.log('Health:', health);
-// }, 5_000);
+// Start server
+startHubServer();

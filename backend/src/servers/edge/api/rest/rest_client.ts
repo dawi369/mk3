@@ -1,7 +1,7 @@
 import express from 'express';
 import { EDGE_REST_PORT } from '@/config/env.js';
-import { barCache } from '../data/bar_cache.js';
-import { edgeRedisClient } from '../data/redis_client.js';
+import { barCache } from '@/servers/edge/data/bar_cache.js';
+import { edgeRedisClient } from '@/servers/edge/data/redis_client.js';
 import { Tickers } from '@/utils/tickers.js';
 
 const app = express();

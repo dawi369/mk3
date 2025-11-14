@@ -1,5 +1,5 @@
 import { PolygonWSClient } from '@/api/polygon/ws_client.js';
-import type { PolygonMarketType, PolygonWsRequest } from '@/utils/types.js';
+import type { PolygonMarketType, PolygonWsRequest } from '@/utils/polygon_types.js';
 
 console.log('\n=== Testing Subscription Management Methods ===\n');
 

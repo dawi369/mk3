@@ -1,4 +1,4 @@
-import type { Bar } from '@/utils/types.js';
+import type { Bar } from '@/utils/general_types.js';
 
 /**
  * In-memory cache for today's bars with memory limits and sampling

@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import { REDIS_HOST, REDIS_PORT } from '@/config/env.js';
-import type { Bar } from '@/utils/types.js';
+import type { Bar } from '@/utils/general_types.js';
 import { barCache } from './bar_cache.js';
 
 /**
@@ -44,10 +44,18 @@ class EdgeRedisClient {
    */
   private setupListeners(): void {
     this.redis.on('connect', () => console.log('Edge Redis connected'));
-    this.redis.on('error', (err) => console.error('Edge Redis error:', err));
+    this.redis.on('error', (err) => {
+      console.error('Edge Redis error:', err);
+      console.error('Fatal: Redis connection failed. Exiting...');
+      process.exit(1);
+    });
 
     this.subscriber.on('connect', () => console.log('Edge Redis subscriber connected'));
-    this.subscriber.on('error', (err) => console.error('Edge subscriber error:', err));
+    this.subscriber.on('error', (err) => {
+      console.error('Edge subscriber error:', err);
+      console.error('Fatal: Redis subscriber failed. Exiting...');
+      process.exit(1);
+    });
   }
 
   /**

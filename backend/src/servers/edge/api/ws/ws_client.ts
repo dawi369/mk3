@@ -4,9 +4,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { randomUUID } from 'crypto';
 import { EDGE_WS_PORT } from '@/config/env.js';
 import { LIMITS } from '@/config/limits.js';
-import { validateConnection } from './auth.js';
-import { delayTime } from './types.js';
-import type { ClientConnection, ClientMessage, ServerMessage } from './types.js';
+import { validateConnection } from '@/servers/edge/auth/auth.js';
+import { delayTime } from '@/utils/api_types.js';
+import type { ClientConnection, ClientMessage, ServerMessage } from '@/utils/api_types.js';
 
 export class EdgeWSServer {
   private wss: WebSocketServer | null = null;
