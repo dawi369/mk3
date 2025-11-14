@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
 import { REDIS_HOST, REDIS_PORT } from "@/config/env.js";
+import { LIMITS } from "@/config/limits.js";
 import type { Bar } from "@/utils/general_types.js";
 
 class RedisStore {
@@ -32,7 +33,7 @@ class RedisStore {
 
     multi.set(`bar:latest:${bar.symbol}`, JSON.stringify(bar));
     multi.rpush(`bar:today:${bar.symbol}`, JSON.stringify(bar));
-    multi.ltrim(`bar:today:${bar.symbol}`, -10000, -1);
+    multi.ltrim(`bar:today:${bar.symbol}`, -LIMITS.maxHubBars, -1);
     multi.incr("meta:bar_count");
 
     await multi.exec();
@@ -50,7 +51,7 @@ class RedisStore {
         "MATCH",
         pattern,
         "COUNT",
-        100
+        LIMITS.redisScanBatchSize
       );
       keys.push(...foundKeys);
       cursor = newCursor;
@@ -60,7 +61,7 @@ class RedisStore {
 
   private async deleteInBatches(
     keys: string[],
-    batchSize = 100
+    batchSize = LIMITS.redisDeleteBatchSize
   ): Promise<number> {
     let deleted = 0;
     for (let i = 0; i < keys.length; i += batchSize) {

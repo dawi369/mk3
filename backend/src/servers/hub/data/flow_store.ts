@@ -1,10 +1,11 @@
 // src/data/flow_store.ts
 import type { Bar } from "@/utils/general_types.js";
+import { LIMITS } from "@/config/limits.js";
 
 class FlowStore {
   private latest: Map<string, Bar> = new Map();
   private history: Map<string, Bar[]> = new Map();
-  private readonly MAX_HISTORY = 100;
+  private readonly MAX_HISTORY = LIMITS.maxFlowHistoryBars;
 
   setBar(symbol: string, bar: Bar): void {
     // Update latest

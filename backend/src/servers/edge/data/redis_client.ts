@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
 import { REDIS_HOST, REDIS_PORT } from "@/config/env.js";
+import { LIMITS } from "@/config/limits.js";
 import type { Bar } from "@/utils/general_types.js";
 import { barCache } from "./bar_cache.js";
 
@@ -105,7 +106,7 @@ class EdgeRedisClient {
         "MATCH",
         pattern,
         "COUNT",
-        100
+        LIMITS.redisScanBatchSize
       );
       keys.push(...foundKeys);
       cursor = newCursor;
