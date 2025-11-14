@@ -15,7 +15,7 @@ import {
   aggregateToBar,
 } from "@/utils/polygon_utils.js";
 import { flowStore } from "@/servers/hub/data/flow_store.js";
-import { redisStore } from "@/data/redis_store.js";
+import { redisStore } from "@/servers/hub/data/redis_store.js";
 
 // Health status type
 interface WSHealth {
