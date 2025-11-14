@@ -1,6 +1,6 @@
 /**
  * Configuration for futures contract subscriptions
- * 
+ *
  * These values control how many contracts we subscribe to for each asset class.
  * Increasing these values will provide more data coverage but increase costs.
  */
@@ -18,4 +18,3 @@ export const SUBSCRIPTION_CONFIG = {
    */
   METALS_QUARTERS: 1,
 } as const;
-

@@ -1,12 +1,14 @@
 import cron from "node-cron";
-import { redisStore } from "@/data/redis_store.js";
+import { redisStore } from "@/servers/hub/data/redis_store.js";
 import type { PolygonWSClient } from "@/api/polygon/ws_client.js";
 import type {
   PolygonAssetClass,
   PolygonWsRequest,
+} from "@/utils/polygon_types.js";
+import type {
   RefreshJobStatus,
   RefreshDetails,
-} from "@/utils/types.js";
+} from "@/utils/general_types.js";
 import { quarterlyBuilder } from "@/utils/cbs/quarterly_cb.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 
@@ -219,7 +221,7 @@ class MonthlySubscriptionJob {
       `Summary: ${successCount}/${results.length} successful, ${changedCount} changed`
     );
     console.log("-----------------------------------\n");
-    console.log('')
+    console.log("");
   }
 
   getStatus(): RefreshJobStatus {

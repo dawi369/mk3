@@ -1,4 +1,16 @@
-type MonthCode = 'F' | 'G' | 'H' | 'J' | 'K' | 'M' | 'N' | 'Q' | 'U' | 'V' | 'X' | 'Z';
+type MonthCode =
+  | "F"
+  | "G"
+  | "H"
+  | "J"
+  | "K"
+  | "M"
+  | "N"
+  | "Q"
+  | "U"
+  | "V"
+  | "X"
+  | "Z";
 
 interface MonthInfo {
   number: number;
@@ -7,18 +19,18 @@ interface MonthInfo {
 
 class FuturesMonth {
   private static months: Record<MonthCode, MonthInfo> = {
-    F: { number: 1, name: 'January' },
-    G: { number: 2, name: 'February' },
-    H: { number: 3, name: 'March' },
-    J: { number: 4, name: 'April' },
-    K: { number: 5, name: 'May' },
-    M: { number: 6, name: 'June' },
-    N: { number: 7, name: 'July' },
-    Q: { number: 8, name: 'August' },
-    U: { number: 9, name: 'September' },
-    V: { number: 10, name: 'October' },
-    X: { number: 11, name: 'November' },
-    Z: { number: 12, name: 'December' }
+    F: { number: 1, name: "January" },
+    G: { number: 2, name: "February" },
+    H: { number: 3, name: "March" },
+    J: { number: 4, name: "April" },
+    K: { number: 5, name: "May" },
+    M: { number: 6, name: "June" },
+    N: { number: 7, name: "July" },
+    Q: { number: 8, name: "August" },
+    U: { number: 9, name: "September" },
+    V: { number: 10, name: "October" },
+    X: { number: 11, name: "November" },
+    Z: { number: 12, name: "December" },
   };
 
   static getNumber(code: MonthCode): number {

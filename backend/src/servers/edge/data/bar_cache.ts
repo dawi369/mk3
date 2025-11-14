@@ -1,5 +1,5 @@
-import type { Bar } from '@/utils/general_types.js';
-import { LIMITS } from '@/config/limits.js';
+import type { Bar } from "@/utils/general_types.js";
+import { LIMITS } from "@/config/limits.js";
 
 /**
  * In-memory cache for Edge server to store bars received from Redis pub/sub.
@@ -73,7 +73,7 @@ class BarCache {
   /**
    * Get bars within a time range across all symbols or specific symbols
    * Used for delayed streaming - query bars from virtual time window
-   * 
+   *
    * @param symbols - Array of symbols to query, or ['*'] for all
    * @param fromTimestamp - Start of time range (inclusive)
    * @param toTimestamp - End of time range (inclusive)
@@ -86,7 +86,7 @@ class BarCache {
   ): Bar[] {
     const result: Bar[] = [];
     const symbolSet = symbols instanceof Set ? symbols : new Set(symbols);
-    const queryAll = symbolSet.has('*');
+    const queryAll = symbolSet.has("*");
 
     // Iterate through cache
     for (const [symbol, bars] of this.cache) {
@@ -111,4 +111,3 @@ class BarCache {
 }
 
 export const barCache = new BarCache();
-

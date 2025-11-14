@@ -10,9 +10,9 @@ export interface AuthResult {
 
 /**
  * Validate client authentication token
- * 
+ *
  * Currently returns true for all connections (placeholder)
- * 
+ *
  * TODO: Implement JWT validation when auth is added
  * Steps:
  * 1. Verify JWT token signature
@@ -25,19 +25,19 @@ export async function validateConnection(
   token?: string,
   metadata?: Record<string, any>
 ): Promise<AuthResult> {
-  console.log('[Auth] Connection validation (placeholder - all allowed)');
-  
+  console.log("[Auth] Connection validation (placeholder - all allowed)");
+
   // Placeholder: allow all connections
   return {
     authenticated: true,
-    userId: 'anonymous',
-    permissions: ['read:bars', 'subscribe:symbols'],
+    userId: "anonymous",
+    permissions: ["read:bars", "subscribe:symbols"],
   };
 }
 
 /**
  * Check if client has permission for action
- * 
+ *
  * TODO: Implement RBAC when auth is added
  */
 export function hasPermission(
@@ -47,4 +47,3 @@ export function hasPermission(
   // Placeholder: all clients have all permissions
   return true;
 }
-

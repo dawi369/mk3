@@ -1,6 +1,6 @@
-import { edgeRedisClient } from '@/servers/edge/data/redis_client.js';
-import { startEdgeRESTApi } from '@/servers/edge/api/rest/rest_client.js';
-import { edgeWSServer } from '@/servers/edge/api/ws/ws_client.js';
+import { edgeRedisClient } from "@/servers/edge/data/redis_client.js";
+import { startEdgeRESTApi } from "@/servers/edge/api/rest/rest_client.js";
+import { edgeWSServer } from "@/servers/edge/api/ws/ws_client.js";
 
 /**
  * Main Edge server startup
@@ -8,7 +8,7 @@ import { edgeWSServer } from '@/servers/edge/api/ws/ws_client.js';
  */
 async function startEdgeServer() {
   try {
-    console.log('Starting Edge server...');
+    console.log("Starting Edge server...");
 
     // 1. Load today's snapshot from Redis
     await edgeRedisClient.loadTodaySnapshot();
@@ -27,7 +27,7 @@ async function startEdgeServer() {
       edgeWSServer.broadcastBar(bar);
     });
 
-    console.log('Edge server running\n');
+    console.log("Edge server running\n");
 
     // Log stats every 10 seconds
     setInterval(() => {
@@ -35,12 +35,12 @@ async function startEdgeServer() {
       const wsStats = edgeWSServer.getStats();
       console.log(
         `[Stats] Cache: ${redisStats.symbols} symbols, ${redisStats.totalBars} bars | ` +
-        `WS: ${wsStats.totalClients} clients (${wsStats.realTimeClients} real-time, ${wsStats.delayedClients} delayed)`
+          `WS: ${wsStats.totalClients} clients (${wsStats.realTimeClients} real-time, ${wsStats.delayedClients} delayed)`
       );
     }, 10_000);
   } catch (err) {
-    console.error('Edge server startup failed:', err);
-    console.error('Retrying in 3 seconds...');
+    console.error("Edge server startup failed:", err);
+    console.error("Retrying in 3 seconds...");
     setTimeout(() => {
       startEdgeServer();
     }, 3000);
@@ -48,16 +48,15 @@ async function startEdgeServer() {
 }
 
 // Handle process exit
-process.on('SIGINT', () => {
-  console.log('\nShutting down Edge server...');
+process.on("SIGINT", () => {
+  console.log("\nShutting down Edge server...");
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  console.log('\nShutting down Edge server...');
+process.on("SIGTERM", () => {
+  console.log("\nShutting down Edge server...");
   process.exit(0);
 });
 
 // Start server
 startEdgeServer();
-

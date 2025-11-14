@@ -5,7 +5,7 @@ import type {
   PolygonWsRequest,
   PolygonMarketType,
   PolygonStatusMessage,
-} from "@/utils/types.js";
+} from "@/utils/polygon_types.js";
 import {
   buildSubscribeParams,
   isAggregateEvent,
@@ -14,7 +14,7 @@ import {
   isTradeEvent,
   aggregateToBar,
 } from "@/utils/polygon_utils.js";
-import { flowStore } from "@/data/flow_store.js";
+import { flowStore } from "@/servers/hub/data/flow_store.js";
 import { redisStore } from "@/data/redis_store.js";
 
 // Health status type

@@ -1,5 +1,5 @@
 // src/data/flow_store.ts
-import type { Bar } from '@/utils/general_types.js';
+import type { Bar } from "@/utils/general_types.js";
 
 class FlowStore {
   private latest: Map<string, Bar> = new Map();
@@ -9,15 +9,15 @@ class FlowStore {
   setBar(symbol: string, bar: Bar): void {
     // Update latest
     this.latest.set(symbol, bar);
-    
+
     // Update history (rolling window)
     if (!this.history.has(symbol)) {
       this.history.set(symbol, []);
     }
-    
+
     const hist = this.history.get(symbol)!;
     hist.push(bar);
-    
+
     // Keep only last 100
     if (hist.length > this.MAX_HISTORY) {
       hist.shift();

@@ -55,21 +55,21 @@ app.get("/symbols", (req, res) => {
 app.post("/admin/clear-redis", async (req, res) => {
   await dailyClearJob.runClear();
   const status = dailyClearJob.getStatus();
-  res.json({ message: 'Manual clear triggered', status });
+  res.json({ message: "Manual clear triggered", status });
 });
 
 app.post("/admin/refresh-subscriptions", async (req, res) => {
   try {
     await monthlySubscriptionJob.runRefresh();
     const status = monthlySubscriptionJob.getStatus();
-    res.json({ 
-      message: 'Manual subscription refresh triggered', 
-      status 
+    res.json({
+      message: "Manual subscription refresh triggered",
+      status,
     });
   } catch (err) {
-    res.status(500).json({ 
-      error: 'Refresh failed', 
-      details: err instanceof Error ? err.message : String(err)
+    res.status(500).json({
+      error: "Refresh failed",
+      details: err instanceof Error ? err.message : String(err),
     });
   }
 });
@@ -79,18 +79,21 @@ app.get("/admin/subscriptions", (req, res) => {
     res.status(503).json({ error: "Polygon client not initialized" });
     return;
   }
-  
+
   const subscriptions = polygonClient.getSubscriptions();
-  res.json({ 
+  res.json({
     subscriptions,
     count: subscriptions.length,
-    totalSymbols: subscriptions.reduce((sum, sub) => sum + sub.symbols.length, 0)
+    totalSymbols: subscriptions.reduce(
+      (sum, sub) => sum + sub.symbols.length,
+      0
+    ),
   });
 });
 
 export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
   polygonClient = client;
-  
+
   return new Promise((resolve) => {
     app.listen(HUB_REST_PORT, () => {
       console.log(`Hub REST API listening on port ${HUB_REST_PORT}`);

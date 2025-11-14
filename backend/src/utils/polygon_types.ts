@@ -62,4 +62,3 @@ export type PolygonRealtimeMessage =
   | PolygonAggregateEvent
   | PolygonQuoteEvent
   | PolygonTradeEvent;
-

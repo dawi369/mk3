@@ -4,7 +4,7 @@ import type {
   PolygonQuoteEvent,
   PolygonTradeEvent,
   PolygonStatusMessage,
-} from "./polygon_types.js";
+} from "@/utils/polygon_types.js";
 
 import type { Bar } from "@/utils/general_types.js";
 

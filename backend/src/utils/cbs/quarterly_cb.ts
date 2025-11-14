@@ -1,8 +1,8 @@
 import type {
   PolygonWsRequest,
-  MonthCode,
   PolygonAssetClass,
-} from "@/utils/types.js";
+} from "@/utils/polygon_types.js";
+import type { MonthCode } from "@/utils/general_types.js";
 import { Tickers } from "@/utils/tickers.js";
 import { QUARTERLY_MONTHS } from "@/utils/consts.js";
 
@@ -42,7 +42,10 @@ class QuarterlyContractBuilder {
     let currentYear = startYear;
 
     for (let i = 0; i < count; i++) {
-      quarters.push({ month: QUARTERLY_MONTHS[currentIndex]!, year: currentYear });
+      quarters.push({
+        month: QUARTERLY_MONTHS[currentIndex]!,
+        year: currentYear,
+      });
 
       currentIndex++;
       if (currentIndex >= QUARTERLY_MONTHS.length) {
@@ -94,4 +97,3 @@ class QuarterlyContractBuilder {
 }
 
 export const quarterlyBuilder = new QuarterlyContractBuilder();
-

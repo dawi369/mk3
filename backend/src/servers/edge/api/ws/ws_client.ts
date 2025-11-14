@@ -1,12 +1,16 @@
 // Purpose: WebSocket server for real-time bar streaming to clients
 
-import { WebSocketServer, WebSocket } from 'ws';
-import { randomUUID } from 'crypto';
-import { EDGE_WS_PORT } from '@/config/env.js';
-import { LIMITS } from '@/config/limits.js';
-import { validateConnection } from '@/servers/edge/auth/auth.js';
-import { delayTime } from '@/utils/api_types.js';
-import type { ClientConnection, ClientMessage, ServerMessage } from '@/utils/api_types.js';
+import { WebSocketServer, WebSocket } from "ws";
+import { randomUUID } from "crypto";
+import { EDGE_WS_PORT } from "@/config/env.js";
+import { LIMITS } from "@/config/limits.js";
+import { validateConnection } from "@/servers/edge/auth/auth.js";
+import { delayTime } from "@/utils/api_types.js";
+import type {
+  ClientConnection,
+  ClientMessage,
+  ServerMessage,
+} from "@/utils/api_types.js";
 
 export class EdgeWSServer {
   private wss: WebSocketServer | null = null;
@@ -22,9 +26,9 @@ export class EdgeWSServer {
 
     console.log(`Edge WebSocket server listening on port ${EDGE_WS_PORT}`);
 
-    this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
-    this.wss.on('error', (error) => {
-      console.error('[WS] Server error:', error);
+    this.wss.on("connection", (ws, req) => this.handleConnection(ws, req));
+    this.wss.on("error", (error) => {
+      console.error("[WS] Server error:", error);
     });
 
     // Start heartbeat monitoring
@@ -37,20 +41,23 @@ export class EdgeWSServer {
   private async handleConnection(ws: WebSocket, req: any): Promise<void> {
     // Check max clients limit
     if (this.clients.size >= LIMITS.maxWsClients) {
-      console.warn('[WS] Max clients reached, rejecting connection');
-      ws.close(1008, 'Server at capacity');
+      console.warn("[WS] Max clients reached, rejecting connection");
+      ws.close(1008, "Server at capacity");
       return;
     }
 
     // Extract metadata
-    const ipAddress = req.socket.remoteAddress || 'unknown';
-    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.socket.remoteAddress || "unknown";
+    const userAgent = req.headers["user-agent"];
 
     // Validate connection (placeholder auth)
-    const authResult = await validateConnection(undefined, { ipAddress, userAgent });
+    const authResult = await validateConnection(undefined, {
+      ipAddress,
+      userAgent,
+    });
     if (!authResult.authenticated) {
       console.warn(`[WS] Connection rejected: ${authResult.error}`);
-      ws.close(1008, authResult.error || 'Authentication failed');
+      ws.close(1008, authResult.error || "Authentication failed");
       return;
     }
 
@@ -59,8 +66,8 @@ export class EdgeWSServer {
     const client: ClientConnection = {
       id: clientId,
       ws,
-      subscriptions: new Set(['*']), // Default: subscribe to all symbols
-      delaySeconds: delayTime.zero,                // Default: real-time
+      subscriptions: new Set(["*"]), // Default: subscribe to all symbols
+      delaySeconds: delayTime.zero, // Default: real-time
       lastSentTimestamp: Date.now(),
       connectedAt: Date.now(),
       lastHeartbeat: Date.now(),
@@ -74,24 +81,26 @@ export class EdgeWSServer {
     };
 
     this.clients.set(clientId, client);
-    
+
     // Add to delay group (default is 0 = real-time)
     this.addClientToDelayGroup(clientId, 0);
-    
-    console.log(`[WS] Client connected: ${clientId} (${ipAddress}) | Total: ${this.clients.size}`);
+
+    console.log(
+      `[WS] Client connected: ${clientId} (${ipAddress}) | Total: ${this.clients.size}`
+    );
 
     // Send welcome message
     this.sendToClient(client, {
-      type: 'welcome',
+      type: "welcome",
       clientId,
       serverTime: Date.now(),
     });
 
     // Set up event handlers
-    ws.on('message', (data) => this.handleMessage(client, data));
-    ws.on('pong', () => this.handlePong(client));
-    ws.on('close', () => this.handleDisconnect(client));
-    ws.on('error', (error) => {
+    ws.on("message", (data) => this.handleMessage(client, data));
+    ws.on("pong", () => this.handlePong(client));
+    ws.on("close", () => this.handleDisconnect(client));
+    ws.on("error", (error) => {
       console.error(`[WS] Client ${clientId} error:`, error.message);
     });
   }
@@ -104,16 +113,16 @@ export class EdgeWSServer {
       const message: ClientMessage = JSON.parse(data.toString());
 
       switch (message.action) {
-        case 'subscribe':
+        case "subscribe":
           this.handleSubscribe(client, message.symbols);
           break;
-        case 'unsubscribe':
+        case "unsubscribe":
           this.handleUnsubscribe(client, message.symbols);
           break;
-        case 'setDelay':
+        case "setDelay":
           this.handleSetDelay(client, message.delaySeconds);
           break;
-        case 'pong':
+        case "pong":
           this.handlePong(client);
           break;
         default:
@@ -121,7 +130,7 @@ export class EdgeWSServer {
       }
     } catch (error) {
       console.error(`[WS] Failed to parse message from ${client.id}:`, error);
-      this.sendError(client, 'Invalid message format');
+      this.sendError(client, "Invalid message format");
     }
   }
 
@@ -132,8 +141,10 @@ export class EdgeWSServer {
     for (const symbol of symbols) {
       client.subscriptions.add(symbol);
     }
-    console.log(`[WS] Client ${client.id} subscribed to: ${symbols.join(', ')}`);
-    this.sendToClient(client, { type: 'subscribed', symbols });
+    console.log(
+      `[WS] Client ${client.id} subscribed to: ${symbols.join(", ")}`
+    );
+    this.sendToClient(client, { type: "subscribed", symbols });
   }
 
   /**
@@ -143,8 +154,10 @@ export class EdgeWSServer {
     for (const symbol of symbols) {
       client.subscriptions.delete(symbol);
     }
-    console.log(`[WS] Client ${client.id} unsubscribed from: ${symbols.join(', ')}`);
-    this.sendToClient(client, { type: 'unsubscribed', symbols });
+    console.log(
+      `[WS] Client ${client.id} unsubscribed from: ${symbols.join(", ")}`
+    );
+    this.sendToClient(client, { type: "unsubscribed", symbols });
   }
 
   /**
@@ -153,7 +166,10 @@ export class EdgeWSServer {
   private handleSetDelay(client: ClientConnection, delaySeconds: number): void {
     // Validate delay
     if (delaySeconds < 0 || delaySeconds > LIMITS.maxDelaySeconds) {
-      this.sendError(client, `Delay must be between 0 and ${LIMITS.maxDelaySeconds} seconds`);
+      this.sendError(
+        client,
+        `Delay must be between 0 and ${LIMITS.maxDelaySeconds} seconds`
+      );
       return;
     }
 
@@ -161,9 +177,12 @@ export class EdgeWSServer {
     if (delaySeconds === 0 && client.delaySeconds !== 0) {
       const realTimeGroup = this.clientsByDelay.get(0);
       const currentRealTimeCount = realTimeGroup ? realTimeGroup.size : 0;
-      
+
       if (currentRealTimeCount >= LIMITS.maxRealTimeClients) {
-        this.sendError(client, `Real-time client limit reached (${LIMITS.maxRealTimeClients}). Please use delayed mode.`);
+        this.sendError(
+          client,
+          `Real-time client limit reached (${LIMITS.maxRealTimeClients}). Please use delayed mode.`
+        );
         return;
       }
     }
@@ -173,13 +192,13 @@ export class EdgeWSServer {
 
     // Update client delay
     client.delaySeconds = delaySeconds;
-    client.lastSentTimestamp = Date.now() - (delaySeconds * 1000);
+    client.lastSentTimestamp = Date.now() - delaySeconds * 1000;
 
     // Add to new delay group
     this.addClientToDelayGroup(client.id, delaySeconds);
 
     console.log(`[WS] Client ${client.id} set delay to ${delaySeconds}s`);
-    this.sendToClient(client, { type: 'delaySet', delaySeconds });
+    this.sendToClient(client, { type: "delaySet", delaySeconds });
   }
 
   /**
@@ -196,7 +215,9 @@ export class EdgeWSServer {
   private handleDisconnect(client: ClientConnection): void {
     this.clients.delete(client.id);
     this.removeClientFromDelayGroup(client.id, client.delaySeconds);
-    console.log(`[WS] Client disconnected: ${client.id} | Total: ${this.clients.size}`);
+    console.log(
+      `[WS] Client disconnected: ${client.id} | Total: ${this.clients.size}`
+    );
   }
 
   /**
@@ -212,7 +233,7 @@ export class EdgeWSServer {
    * Send error message to client
    */
   private sendError(client: ClientConnection, message: string): void {
-    this.sendToClient(client, { type: 'error', message });
+    this.sendToClient(client, { type: "error", message });
   }
 
   /**
@@ -251,7 +272,10 @@ export class EdgeWSServer {
   /**
    * Remove client from delay group
    */
-  private removeClientFromDelayGroup(clientId: string, delaySeconds: number): void {
+  private removeClientFromDelayGroup(
+    clientId: string,
+    delaySeconds: number
+  ): void {
     const group = this.clientsByDelay.get(delaySeconds);
     if (group) {
       group.delete(clientId);
@@ -277,11 +301,12 @@ export class EdgeWSServer {
       if (!client) continue;
 
       // Check if client is subscribed to this symbol or all symbols
-      const isSubscribed = client.subscriptions.has('*') || client.subscriptions.has(bar.symbol);
-      
+      const isSubscribed =
+        client.subscriptions.has("*") || client.subscriptions.has(bar.symbol);
+
       if (isSubscribed) {
         this.sendToClient(client, {
-          type: 'bar',
+          type: "bar",
           data: bar,
         });
       }
@@ -298,7 +323,11 @@ export class EdgeWSServer {
   /**
    * Get server stats
    */
-  getStats(): { totalClients: number; realTimeClients: number; delayedClients: number } {
+  getStats(): {
+    totalClients: number;
+    realTimeClients: number;
+    delayedClients: number;
+  } {
     let realTimeClients = 0;
     let delayedClients = 0;
 
@@ -329,9 +358,8 @@ export class EdgeWSServer {
       this.wss.close();
     }
 
-    console.log('[WS] Server stopped');
+    console.log("[WS] Server stopped");
   }
 }
 
 export const edgeWSServer = new EdgeWSServer();
-

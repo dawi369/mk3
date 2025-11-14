@@ -1,10 +1,9 @@
 import { websocketClient } from "@polygon.io/client-js";
 import { POLYGON_API_KEY } from "@/config/env.js";
-import { POLYGON_WS_URL } from "@/utils/consts.js"
+import { POLYGON_WS_URL } from "@/utils/consts.js";
 
 // const SUBSCRIPTION_PARAMS = "AM.ESZ5";
 const SUBSCRIPTION_PARAMS = "A.MGCZ5";
-
 
 // [
 //   {
@@ -43,7 +42,9 @@ ws.onmessage = (msg: MessageEvent) => {
     parsedMessage[0].status === "auth_success"
   ) {
     console.log("Subscribing to the second aggregates channel");
-    ws.send(JSON.stringify({ action: "subscribe", params: SUBSCRIPTION_PARAMS }));
+    ws.send(
+      JSON.stringify({ action: "subscribe", params: SUBSCRIPTION_PARAMS })
+    );
   }
 
   console.log("Message received:", parsedMessage);
