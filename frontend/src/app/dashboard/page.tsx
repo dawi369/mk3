@@ -1,7 +1,7 @@
 import { Background } from '@/components/backgrounds/bg1';
-import { Dashboard } from '@/features/dashboard';
-import { Sentiment } from '@/features/sentiment';
-import { Indicators } from '@/features/indicators';
+import { Dashboard } from '@/components/features/dashboard/dashboard';
+import { Sentiment } from '@/components/features/sentiment/sentiment';
+import { Indicators } from '@/components/features/indicators/indicators';
 
 export default function Portal() {
   return (
