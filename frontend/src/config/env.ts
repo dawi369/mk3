@@ -19,5 +19,5 @@ function getEnvVarAsInt(key: string): number {
   return parsed;
 }
 
-// export const POLYGON_API_KEY = getEnvVar("POLYGON_API_KEY");
-// export const HUB_REST_PORT = getEnvVarAsInt("HUB_REST_PORT");
+export const CLIENT_REST_PORT = getEnvVarAsInt("CLIENT_REST_PORT");
+export const CLIENT_WS_PORT = getEnvVarAsInt("CLIENT_WS_PORT");
