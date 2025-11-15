@@ -1,2 +1,0 @@
-export { Sentiment } from './sentiment';
-
