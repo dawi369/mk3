@@ -49,7 +49,7 @@ Frontend Dashboard (Future)
 
 **Files:**
 - `src/servers/edge/data/bar_cache.ts` - In-memory cache
-- `src/servers/edge/data/redis_client.ts` - Redis connection + pub/sub
+- `src/servers/edge/data/redis_client.ts` - Redis connection + pub/sub + bar callbacks
 - `src/servers/edge/index.ts` - Entry point
 
 ---
@@ -66,7 +66,7 @@ Frontend Dashboard (Future)
 - ✅ Contract grouping by root symbol
 
 **Files:**
-- `src/servers/edge/api/rest.ts` - REST API endpoints
+- `src/servers/edge/api/rest/rest_client.ts` - REST API endpoints
 - `src/config/env.ts` - Added `EDGE_REST_PORT`
 
 ### Endpoints
@@ -121,7 +121,7 @@ Response: {
 ### Implementation Steps
 
 **Step 1:** Create REST API structure
-- File: `src/servers/edge/api/rest.ts`
+- File: `src/servers/edge/api/rest/rest_client.ts`
 - Use Express (same as Hub)
 - Port: `EDGE_REST_PORT` (env var, default: 3002)
 
@@ -148,9 +148,32 @@ Response: {
 
 ---
 
-## Phase 3: WebSocket Server (~4-6 hours)
+## Phase 3: WebSocket Server 🔄 IN PROGRESS
 
 **Goal:** Real-time streaming to frontend clients with subscription control and time delay
+
+**Completed (Phase 3.1 & 3.2):**
+- ✅ WebSocket server setup with `ws` library
+- ✅ Client connection management with `Map<clientId, ClientConnection>`
+- ✅ Auth placeholder module (`src/servers/edge/auth/auth.ts`)
+- ✅ Type definitions centralized (`src/utils/api_types.ts`)
+- ✅ Subscribe/unsubscribe handling
+- ✅ Set delay functionality
+- ✅ Client grouping by delay (`clientsByDelay` Map)
+- ✅ Real-time client limit enforcement (2,500 real-time, 10,000 total)
+- ✅ Heartbeat mechanism (ping-pong)
+- ✅ Real-time bar broadcasting (delay=0)
+- ✅ Redis bar callback integration
+
+**Next (Phase 3.3):**
+- ⏳ Delayed bar streaming implementation
+- ⏳ Initial snapshot for delayed clients
+
+**Files:**
+- `src/servers/edge/api/ws/ws_client.ts` - WebSocket server
+- `src/servers/edge/auth/auth.ts` - Auth placeholder
+- `src/utils/api_types.ts` - Type definitions
+- `src/config/limits.ts` - System limits
 
 ### Features
 
@@ -201,7 +224,7 @@ Response: {
 ### Implementation Steps
 
 **Step 1:** Create WebSocket server
-- File: `src/servers/edge/ws/server.ts`
+- File: `src/servers/edge/api/ws/ws_client.ts`
 - Use `ws` library (already in dependencies)
 - Port: `EDGE_WS_PORT` (env var, default: 3003)
 

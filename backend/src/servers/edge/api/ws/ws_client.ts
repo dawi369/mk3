@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { EDGE_WS_PORT } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
 import { validateConnection } from "@/servers/edge/auth/auth.js";
+import { barCache } from "@/servers/edge/data/bar_cache.js";
 import { delayTime } from "@/utils/api_types.js";
 import type {
   ClientConnection,
@@ -17,6 +18,7 @@ export class EdgeWSServer {
   private clients: Map<string, ClientConnection> = new Map();
   private clientsByDelay: Map<number, Set<string>> = new Map();
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private delayPollInterval: NodeJS.Timeout | null = null;
 
   /**
    * Start the WebSocket server
@@ -33,6 +35,9 @@ export class EdgeWSServer {
 
     // Start heartbeat monitoring
     this.startHeartbeat();
+
+    // Start delayed bar polling
+    this.startDelayedBarPolling();
   }
 
   /**
@@ -321,6 +326,62 @@ export class EdgeWSServer {
   }
 
   /**
+   * Start delayed bar polling
+   * Polls cache periodically and sends bars to delayed clients
+   */
+  private startDelayedBarPolling(): void {
+    this.delayPollInterval = setInterval(() => {
+      this.processDelayedBars();
+    }, LIMITS.delayPollIntervalMs);
+  }
+
+  /**
+   * Process delayed bars for all delayed client groups
+   */
+  private processDelayedBars(): void {
+    const now = Date.now();
+
+    // Iterate through each delay group (skip real-time group at delay=0)
+    for (const [delaySeconds, clientIds] of this.clientsByDelay.entries()) {
+      if (delaySeconds === 0 || clientIds.size === 0) {
+        continue; // Skip real-time clients
+      }
+
+      // Calculate the "current time" for this delay group
+      const delayedNow = now - delaySeconds * 1000;
+
+      // Process each client in this delay group
+      for (const clientId of clientIds) {
+        const client = this.clients.get(clientId);
+        if (!client) continue;
+
+        // Get bars between last sent timestamp and delayed now
+        const bars = barCache.getBarsInRange(
+          client.subscriptions,
+          client.lastSentTimestamp,
+          delayedNow
+        );
+
+        // Send each bar individually to maintain scattered real-time feel
+        for (const bar of bars) {
+          this.sendToClient(client, {
+            type: "bar",
+            data: bar,
+          });
+        }
+
+        // Update last sent timestamp and log
+        if (bars.length > 0) {
+          client.lastSentTimestamp = delayedNow;
+          console.log(
+            `[WS] Sent ${bars.length} delayed bars to client ${client.id} (delay: ${delaySeconds}s)`
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Get server stats
    */
   getStats(): {
@@ -352,6 +413,10 @@ export class EdgeWSServer {
   async stop(): Promise<void> {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+    }
+
+    if (this.delayPollInterval) {
+      clearInterval(this.delayPollInterval);
     }
 
     if (this.wss) {

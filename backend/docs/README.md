@@ -2,8 +2,8 @@
 
 Note: In the future, edge needs to set the delay according to some auth or account. The client should not set this.
 
-Last Updated: November 11, 2025  
-Status: Hub Phase 1 Complete ✅ | Edge Phase 2 Complete ✅ | Edge Phase 3 Next 🔄
+Last Updated: November 14, 2025  
+Status: Hub Phase 1 Complete ✅ | Edge Phase 2 Complete ✅ | Edge Phase 3 In Progress 🔄
 
 ## Documentation Index
 
@@ -71,11 +71,21 @@ Status: Hub Phase 1 Complete ✅ | Edge Phase 2 Complete ✅ | Edge Phase 3 Next
 - Symbol grouping by asset class
 - Contract grouping by root symbol
 
-### Edge Phase 3 Next 🔄
-- WebSocket server for real-time streaming
-- Client subscription management
-- Time-delayed streaming (configurable delay)
-- Pub/sub to connected clients
+### Edge Phase 3 In Progress 🔄
+**Completed (3.1 & 3.2):**
+- ✅ WebSocket server (port 3003)
+- ✅ Client connection management (max 10,000 clients)
+- ✅ Subscribe/unsubscribe handling
+- ✅ Set delay functionality
+- ✅ Client grouping by delay
+- ✅ Real-time client limit (max 2,500)
+- ✅ Heartbeat mechanism
+- ✅ Real-time bar broadcasting
+- ✅ Auth placeholder module
+
+**Next (3.3):**
+- ⏳ Delayed bar streaming
+- ⏳ Initial snapshot for delayed clients
 
 Current subscriptions:
 - US Indices: ES, NQ, YM, RTY (quarterly)
