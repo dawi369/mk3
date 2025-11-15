@@ -9,7 +9,7 @@ export default function Home() {
             MK3 Futures Dashboard
           </h1>
           <p className="text-lg text-white/70">
-            A beautiful, effortless futures trading experience
+            Ready for features
           </p>
         </div>
       </div>
