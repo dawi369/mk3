@@ -21,3 +21,4 @@ function getEnvVarAsInt(key: string): number {
 
 export const CLIENT_REST_PORT = getEnvVarAsInt("CLIENT_REST_PORT");
 export const CLIENT_WS_PORT = getEnvVarAsInt("CLIENT_WS_PORT");
+export const NEXT_PUBLIC_SITE_URL = getEnvVar("NEXT_PUBLIC_SITE_URL");
