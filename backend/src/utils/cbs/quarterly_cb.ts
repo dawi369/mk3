@@ -1,8 +1,8 @@
 import type {
   PolygonWsRequest,
   PolygonAssetClass,
-} from "@/utils/polygon_types.js";
-import type { MonthCode } from "@/utils/general_types.js";
+} from "@/types/polygon.types.js";
+import type { MonthCode } from "@/types/common.types.js";
 import { Tickers } from "@/utils/tickers.js";
 import { QUARTERLY_MONTHS } from "@/utils/consts.js";
 

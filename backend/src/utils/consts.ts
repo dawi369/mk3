@@ -1,5 +1,5 @@
-import type { PolygonWsRequest } from "@/utils/polygon_types.js";
-import type { MonthCode } from "@/utils/general_types.js";
+import type { PolygonWsRequest } from "@/types/polygon.types.js";
+import type { MonthCode } from "@/types/common.types.js";
 import { quarterlyBuilder } from "@/utils/cbs/quarterly_cb.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 

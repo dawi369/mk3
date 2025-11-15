@@ -1,4 +1,4 @@
-import type { PolygonAssetClass } from "@/utils/polygon_types.js";
+import type { PolygonAssetClass } from "@/types/polygon.types.js";
 
 export interface Bar {
   symbol: string;

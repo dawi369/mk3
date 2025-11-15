@@ -2,22 +2,26 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-export const POLYGON_API_KEY = process.env.POLYGON_API_KEY || "no_api_key_:(";
+function getEnvVar(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
 
-export const HUB_REST_PORT = process.env.HUB_REST_PORT
-  ? parseInt(process.env.HUB_REST_PORT)
-  : 3000;
+function getEnvVarAsInt(key: string): number {
+  const value = getEnvVar(key);
+  const parsed = parseInt(value);
+  if (isNaN(parsed)) {
+    throw new Error(`Environment variable ${key} must be a valid number`);
+  }
+  return parsed;
+}
 
-export const EDGE_REST_PORT = process.env.EDGE_REST_PORT
-  ? parseInt(process.env.EDGE_REST_PORT)
-  : 3002;
-
-export const EDGE_WS_PORT = process.env.EDGE_WS_PORT
-  ? parseInt(process.env.EDGE_WS_PORT)
-  : 3003;
-
-export const REDIS_HOST = process.env.REDIS_HOST || "localhost";
-
-export const REDIS_PORT = process.env.REDIS_PORT
-  ? parseInt(process.env.REDIS_PORT)
-  : 6379;
+export const POLYGON_API_KEY = getEnvVar("POLYGON_API_KEY");
+export const HUB_REST_PORT = getEnvVarAsInt("HUB_REST_PORT");
+export const EDGE_REST_PORT = getEnvVarAsInt("EDGE_REST_PORT");
+export const EDGE_WS_PORT = getEnvVarAsInt("EDGE_WS_PORT");
+export const REDIS_HOST = getEnvVar("REDIS_HOST");
+export const REDIS_PORT = getEnvVarAsInt("REDIS_PORT");

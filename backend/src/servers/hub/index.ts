@@ -1,7 +1,7 @@
 import { PolygonWSClient } from "@/api/polygon/ws_client.js";
 import { flowStore } from "@/servers/hub/data/flow_store.js";
 import { redisStore } from "@/servers/hub/data/redis_store.js";
-import type { PolygonMarketType } from "@/utils/polygon_types.js";
+import type { PolygonMarketType } from "@/types/polygon.types.js";
 import { startHubRESTApi } from "@/servers/hub/api/rest_client.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";

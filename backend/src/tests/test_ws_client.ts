@@ -1,7 +1,7 @@
 // Purpose: Test WebSocket client to verify Edge WS server functionality
 
 import WebSocket from "ws";
-import { delayTime } from "@/utils/api_types.js";
+import { delayTime } from "@/types/api.types.js";
 
 const ws = new WebSocket("ws://localhost:3003");
 

@@ -1,4 +1,3 @@
-// src/config/limits.ts
 export const LIMITS = {
   // maxClients: 200,             // hard cap for concurrent client sockets
   // maxSubscriptionsPerClient: 50,

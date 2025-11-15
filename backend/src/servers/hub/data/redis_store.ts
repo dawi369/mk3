@@ -1,7 +1,7 @@
 import { Redis } from "ioredis";
 import { REDIS_HOST, REDIS_PORT } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
-import type { Bar } from "@/utils/general_types.js";
+import type { Bar } from "@/types/common.types.js";
 
 class RedisStore {
   public redis: Redis;

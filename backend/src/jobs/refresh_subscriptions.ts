@@ -4,11 +4,11 @@ import type { PolygonWSClient } from "@/api/polygon/ws_client.js";
 import type {
   PolygonAssetClass,
   PolygonWsRequest,
-} from "@/utils/polygon_types.js";
+} from "@/types/polygon.types.js";
 import type {
   RefreshJobStatus,
   RefreshDetails,
-} from "@/utils/general_types.js";
+} from "@/types/common.types.js";
 import { quarterlyBuilder } from "@/utils/cbs/quarterly_cb.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 

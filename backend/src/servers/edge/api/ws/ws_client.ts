@@ -6,12 +6,12 @@ import { EDGE_WS_PORT } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
 import { validateConnection } from "@/servers/edge/auth/auth.js";
 import { barCache } from "@/servers/edge/data/bar_cache.js";
-import { delayTime } from "@/utils/api_types.js";
+import { delayTime } from "@/types/api.types.js";
 import type {
   ClientConnection,
   ClientMessage,
   ServerMessage,
-} from "@/utils/api_types.js";
+} from "@/types/api.types.js";
 
 export class EdgeWSServer {
   private wss: WebSocketServer | null = null;
