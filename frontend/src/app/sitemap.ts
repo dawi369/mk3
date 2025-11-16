@@ -13,11 +13,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-      url: `${baseUrl}/portal`,
+      url: `${baseUrl}/dashboard`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
     },
-    // Add more routes as your app grows
   ];
 }
