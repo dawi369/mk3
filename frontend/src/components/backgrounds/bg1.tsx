@@ -3,7 +3,7 @@ import { BackgroundProps } from "@/types/bg.types";
  * Background wrapper component with dark horizon glow
  * Background stays fixed in place while content scrolls over it
  */
-export function Background({ children }: BackgroundProps) {
+export function Bg1({ children }: BackgroundProps) {
   return (
     <div className="min-h-screen w-full relative">
       {/* Dark Horizon Glow - stays fixed while content scrolls */}

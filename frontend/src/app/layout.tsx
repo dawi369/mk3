@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
 import { Header } from "@/components/common/header";
 import { Background } from "@/components/backgrounds/background";
+// import { Bg3 } from "@/components/backgrounds/bg3";
 import { Footer } from "@/components/common/footer";
 import "@/styles/globals.css";
 
@@ -105,7 +106,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
