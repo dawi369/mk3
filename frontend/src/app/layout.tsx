@@ -68,10 +68,21 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico" },
-      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+      // Light mode
+      {
+        url: "/mk3Logo.svg",
+        type: "image/svg+xml",
+        sizes: "any",
+        media: "(prefers-color-scheme: light)",
+      },
+      // Dark mode
+      {
+        url: "/mk3LogoTransparent.svg",
+        type: "image/svg+xml",
+        sizes: "any",
+        media: "(prefers-color-scheme: dark)",
+      },
     ],
-    apple: [{ url: "/apple-icon.png" }],
   },
   manifest: "/manifest.json",
   appleWebApp: {
