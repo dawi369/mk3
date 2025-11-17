@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
 import { Header } from "@/components/common/header";
 import { Background } from "@/components/backgrounds/background";
-// import { Bg3 } from "@/components/backgrounds/bg3";
+import { Bg3 } from "@/components/backgrounds/bg3";
 import { Footer } from "@/components/common/footer";
 import "@/styles/globals.css";
 
@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(NEXT_PUBLIC_SITE_URL),
   title: {
-    default: "Swordfish: Futures Dashboard",
+    default: "Swordfish: Futures Intelligence",
     template: "%s | Swordfish",
   },
   description: "Futures. Focused. Fast",
@@ -108,13 +108,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        <Background variant="solid">
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </Background>
+        <div className="mx-[5%] h-screen">
+          <Background variant="solid">
+          {/* <Bg3> */}
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          {/* </Bg3> */}
+          </Background>
+        </div>
       </body>
     </html>
   );
