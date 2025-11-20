@@ -1,31 +1,38 @@
-import type { FC } from "react";
-import { BackgroundProps } from "@/types/bg.types";
+import { cn } from "@/lib/utils";
 
-const backgrounds = {
-  solid: "bg-background",
-  gradient: "radial-gradient(125% 125% at 50% 100%, #000000 40%, #010133 100%)",
-  horizon: "radial-gradient(125% 125% at 50% 10%, #000000 40%, #0d1a36 100%)",
-};
+interface BackgroundProps {
+  children: React.ReactNode;
+  className?: string;
+  variant?: "solid" | "grid" | "gradient"; // Extensible for future
+}
 
-export const Background: FC<BackgroundProps> = ({ 
-  children, 
-  variant = "solid" 
-}) => {
-  const isGradient = variant !== "solid";
-  
+export function Background({
+  children,
+  className,
+  variant = "solid",
+}: BackgroundProps) {
   return (
-    <div className="min-h-screen w-full relative">
-      <div
-        className="fixed inset-0 -z-10"
-        style={isGradient ? { background: backgrounds[variant] } : undefined}
-        aria-hidden="true"
-      >
-        {!isGradient && <div className="absolute inset-0 bg-background" />}
+    <div className="relative min-h-screen w-full">
+      {/* Fixed Background Layer */}
+      <div className="fixed inset-0 -z-10 h-full w-full">
+        {/* Solid Variant (Default) */}
+        {variant === "solid" && (
+          <div className="absolute inset-0 bg-background transition-colors duration-300" />
+        )}
+
+        {/* Grid Variant (Placeholder/Example) */}
+        {variant === "grid" && (
+          <div className="absolute inset-0 bg-background bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]" />
+        )}
+
+        {/* Gradient Variant (Placeholder) */}
+        {variant === "gradient" && (
+          <div className="absolute inset-0 bg-linear-to-b from-background to-background/80" />
+        )}
       </div>
-      <div className="relative flex flex-col min-h-screen text-foreground">
-        {children}
-      </div>
+
+      {/* Content Layer */}
+      <div className={cn("relative z-0", className)}>{children}</div>
     </div>
   );
-};
-
+}
