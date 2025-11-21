@@ -48,12 +48,7 @@ const assetSections = [
 
 export default function TerminalPage() {
   return (
-    <div className="min-h-screen bg-background p-6 pt-24 pb-12">
-      {/* Background Grid */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-grid-pattern opacity-[0.03]"></div>
-      </div>
-
+    <div className="p-6 pt-24 pb-12">
       <div className="max-w-[1600px] mx-auto relative z-10">
         <motion.div
           initial="initial"
