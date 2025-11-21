@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
 import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
 import { Background } from "@/components/backgrounds/background";
 import "@/styles/globals.css";
@@ -12,6 +12,11 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
@@ -44,24 +49,25 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Swordfish: Futures Dashboard",
-    description: "Futures. Focused. Fast",
-    url: "/",
+    type: "website",
+    locale: "en_US",
+    url: "https://swordfish.trade",
+    title: "Swordfish: Futures Terminal",
+    description:
+      "Next-generation futures trading terminal. Sub-millisecond latency, institutional-grade data, and intelligent insights for professional traders.",
     siteName: "Swordfish",
     images: [
       {
-        url: "/assets/images/fishLogo.png",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Swordfish Futures Dashboard",
+        alt: "Swordfish Futures Terminal",
       },
     ],
-    locale: "en_US",
-    type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Swordfish: Futures Dashboard",
+    title: "Swordfish: Futures Terminal",
     description: "Futures. Focused. Fast",
     creator: "@devDawi",
     images: ["/assets/images/fishLogo.png"],
@@ -106,7 +112,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} antialiased min-h-screen flex flex-col`}
       >
         <RootProvider>
           <Background variant="solid">{children}</Background>

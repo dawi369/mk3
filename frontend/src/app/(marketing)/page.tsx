@@ -1,166 +1,314 @@
-'use client';
+"use client";
 
-import { motion } from 'framer-motion';
-import { TrendingUp, Zap, BarChart3, ArrowRight } from 'lucide-react';
+import { motion } from "framer-motion";
+import {
+  TrendingUp,
+  Zap,
+  BarChart3,
+  ArrowRight,
+  Activity,
+  Globe,
+  Lock,
+} from "lucide-react";
+import Link from "next/link";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 }
+  transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
 };
 
 const stagger = {
   animate: {
     transition: {
-      staggerChildren: 0.1
-    }
-  }
+      staggerChildren: 0.1,
+    },
+  },
 };
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background overflow-hidden selection:bg-primary/20">
+      {/* Background Grid Effect */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]"></div>
+        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+      </div>
+
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center justify-center px-6">
-        <motion.div 
-          className="max-w-4xl mx-auto text-center space-y-8"
+      <section className="relative z-10 min-h-screen flex flex-col justify-center px-6 pt-20">
+        <motion.div
+          className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-center"
           initial="initial"
           animate="animate"
           variants={stagger}
         >
-          <motion.div variants={fadeInUp}>
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-              <span className="text-foreground">Futures Trading</span>
-              <br />
-              <span className="text-muted-foreground">Simplified</span>
-            </h1>
-          </motion.div>
-          
-          <motion.p 
-            className="text-xl text-muted-foreground max-w-2xl mx-auto"
-            variants={fadeInUp}
-          >
-            Real-time market data and intelligent insights for informed trading decisions
-          </motion.p>
-          
-          {/* <motion.div variants={fadeInUp}>
-            <button className="group inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all">
-              Dashboard
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div> */}
-        </motion.div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-20 px-6 border-t border-border">
-        <motion.div 
-          className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8"
-          initial="initial"
-          whileInView="animate"
-          viewport={{ once: true }}
-          variants={stagger}
-        >
-          {[
-            { label: 'Real-time Data', value: '24/7' },
-            { label: 'Markets Tracked', value: '100+' },
-            { label: 'Response Time', value: '<100ms' }
-          ].map((stat) => (
+          <div className="lg:col-span-7 space-y-8">
             <motion.div
-              key={stat.label}
-              className="text-center space-y-2"
               variants={fadeInUp}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono uppercase tracking-wider"
             >
-              <div className="text-4xl font-bold text-foreground">{stat.value}</div>
-              <div className="text-sm text-muted-foreground">{stat.label}</div>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+              System Operational
             </motion.div>
-          ))}
+
+            <motion.h1
+              variants={fadeInUp}
+              className="text-6xl md:text-8xl font-bold tracking-tighter font-space text-foreground leading-[0.9]"
+            >
+              FUTURES.
+              <br />
+              FOCUSED.
+              <br />
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-primary/50">
+                FAST.
+              </span>
+            </motion.h1>
+
+            <motion.p
+              variants={fadeInUp}
+              className="text-xl text-muted-foreground max-w-xl font-light leading-relaxed"
+            >
+              Swordfish is the next-generation terminal for professional futures
+              traders.
+              <span className="text-foreground font-medium">
+                {" "}
+                Sub-millisecond latency
+              </span>
+              , institutional-grade data, and intelligent insights.
+            </motion.p>
+
+            <motion.div variants={fadeInUp} className="flex flex-wrap gap-4">
+              <Link href="/terminal">
+                <button className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-md bg-primary px-8 font-medium text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 hover:ring-offset-background">
+                  <span className="mr-2">Launch Terminal</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              </Link>
+              <Link href="/about">
+                <button className="inline-flex h-12 items-center justify-center rounded-md border border-input bg-background px-8 font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+                  Documentation
+                </button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              variants={fadeInUp}
+              className="pt-8 grid grid-cols-3 gap-8 border-t border-border/50"
+            >
+              <div>
+                <div className="text-3xl font-bold font-space">10ms</div>
+                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
+                  Latency
+                </div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold font-space">50+</div>
+                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
+                  Markets
+                </div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold font-space">24/7</div>
+                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
+                  Uptime
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="lg:col-span-5 relative">
+            <motion.div
+              variants={fadeInUp}
+              className="relative rounded-xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-2xl"
+            >
+              {/* Abstract Trading UI */}
+              <div className="space-y-4 font-mono text-sm">
+                <div className="flex justify-between items-center border-b border-border pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500"></div>
+                  </div>
+                  <div className="text-muted-foreground">ESZ25 • CME</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">BID</div>
+                    <div className="text-2xl text-green-500 font-bold">
+                      4501.25
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Vol: 125
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-right">
+                    <div className="text-xs text-muted-foreground">ASK</div>
+                    <div className="text-2xl text-red-500 font-bold">
+                      4501.50
+                    </div>
+                    <div className="text-xs text-muted-foreground">Vol: 84</div>
+                  </div>
+                </div>
+
+                <div className="h-32 flex items-end gap-1 pt-4 border-t border-border/50 opacity-50">
+                  {[
+                    40, 65, 45, 80, 55, 70, 40, 60, 50, 75, 60, 85, 70, 90, 65,
+                  ].map((h, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 bg-primary/20 hover:bg-primary/40 transition-colors rounded-t-sm"
+                      style={{ height: `${h}%` }}
+                    ></div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </motion.div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-32 px-6">
-        <motion.div 
-          className="max-w-6xl mx-auto space-y-16"
+      {/* Features Grid */}
+      <section className="py-32 px-6 relative z-10">
+        <motion.div
+          className="max-w-7xl mx-auto"
           initial="initial"
           whileInView="animate"
           viewport={{ once: true }}
           variants={stagger}
         >
-          <motion.div className="text-center space-y-4" variants={fadeInUp}>
-            <h2 className="text-3xl md:text-5xl font-bold text-foreground">
-              Everything you need
+          <motion.div variants={fadeInUp} className="mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold font-space mb-6">
+              INTELLIGENCE{" "}
+              <span className="text-muted-foreground">BUILT IN.</span>
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Powerful tools for modern traders
-            </p>
           </motion.div>
 
-          <motion.div 
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
-            variants={stagger}
-          >
-            {[
-              {
-                icon: TrendingUp,
-                title: 'Market Insights',
-                description: 'Track market trends with real-time data and advanced analytics'
-              },
-              {
-                icon: Zap,
-                title: 'Lightning Fast',
-                description: 'Sub-10ms response times for critical trading decisions'
-              },
-              {
-                icon: BarChart3,
-                title: 'Data Visualization',
-                description: 'Beautiful charts and intuitive dashboards for better clarity'
-              }
-            ].map((feature) => (
-              <motion.div
-                key={feature.title}
-                className="group p-8 rounded-lg border border-border bg-card hover:bg-accent/50 transition-all cursor-pointer"
-                variants={fadeInUp}
-                whileHover={{ y: -4 }}
-              >
-                <feature.icon className="w-10 h-10 text-primary mb-4" />
-                <h3 className="text-xl font-semibold mb-2 text-card-foreground">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground">
-                  {feature.description}
-                </p>
-              </motion.div>
-            ))}
-          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Large Card */}
+            <motion.div
+              variants={fadeInUp}
+              className="md:col-span-2 p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
+            >
+              <div className="h-full flex flex-col justify-between">
+                <div className="mb-8">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                    <Activity className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="text-2xl font-bold font-space mb-3">
+                    Real-time Analytics
+                  </h3>
+                  <p className="text-muted-foreground max-w-md">
+                    Process thousands of data points per second with our
+                    advanced aggregation engine. Visualize market depth and
+                    order flow in real-time.
+                  </p>
+                </div>
+                <div className="w-full h-32 bg-linear-to-r from-primary/5 to-transparent rounded-lg border border-primary/10 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(68,68,68,.2)_50%,transparent_75%,transparent_100%)] bg-size-[250%_250%,100%_100%] animate-[shimmer_3s_infinite]"></div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Tall Card */}
+            <motion.div
+              variants={fadeInUp}
+              className="md:row-span-2 p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Globe className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-2xl font-bold font-space mb-3">
+                Global Coverage
+              </h3>
+              <p className="text-muted-foreground mb-8">
+                Access futures markets across CME, EUREX, and ICE. Unified API
+                for all asset classes.
+              </p>
+              <div className="space-y-4 font-mono text-sm">
+                {[
+                  "ES (S&P 500)",
+                  "NQ (Nasdaq)",
+                  "CL (Crude)",
+                  "GC (Gold)",
+                  "SI (Silver)",
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between py-2 border-b border-border/50"
+                  >
+                    <span className="text-muted-foreground">{item}</span>
+                    <span className="text-green-500">● Active</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Small Card 1 */}
+            <motion.div
+              variants={fadeInUp}
+              className="p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Zap className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-xl font-bold font-space mb-2">Low Latency</h3>
+              <p className="text-muted-foreground text-sm">
+                Direct market access with sub-millisecond execution times.
+              </p>
+            </motion.div>
+
+            {/* Small Card 2 */}
+            <motion.div
+              variants={fadeInUp}
+              className="p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Lock className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-xl font-bold font-space mb-2">
+                Enterprise Security
+              </h3>
+              <p className="text-muted-foreground text-sm">
+                Bank-grade encryption and secure authentication protocols.
+              </p>
+            </motion.div>
+          </div>
         </motion.div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-32 px-6 border-t border-border">
-        <motion.div 
+      <section className="py-32 px-6 border-t border-border/50 relative z-10">
+        <motion.div
           className="max-w-4xl mx-auto text-center space-y-8"
           initial="initial"
           whileInView="animate"
           viewport={{ once: true }}
           variants={stagger}
         >
-          <motion.h2 
-            className="text-4xl md:text-5xl font-bold text-foreground"
+          <motion.h2
+            className="text-5xl md:text-7xl font-bold font-space tracking-tight"
             variants={fadeInUp}
           >
-            Ready to start trading?
+            READY TO <span className="text-primary">DIVE IN?</span>
           </motion.h2>
-          <motion.p 
-            className="text-xl text-muted-foreground"
+          <motion.p
+            className="text-xl text-muted-foreground max-w-2xl mx-auto"
             variants={fadeInUp}
           >
-            Join traders who rely on real-time data and intelligent insights
+            Join the elite traders who trust Swordfish for their daily
+            operations.
           </motion.p>
           <motion.div variants={fadeInUp}>
-            <button className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all">
-              Get Started Today
-            </button>
+            <Link href="/login">
+              <button className="inline-flex h-14 items-center justify-center rounded-full bg-foreground px-10 font-medium text-background transition-transform hover:scale-105 active:scale-95">
+                Get Started Now
+              </button>
+            </Link>
           </motion.div>
         </motion.div>
       </section>

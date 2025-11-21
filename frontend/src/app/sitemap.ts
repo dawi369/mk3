@@ -1,5 +1,5 @@
-import { MetadataRoute } from 'next';
-import { NEXT_PUBLIC_SITE_URL } from '@/config/env';
+import { MetadataRoute } from "next";
+import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
 
 // Generate dynamic sitemap for search engines
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -9,13 +9,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     {
       url: baseUrl,
       lastModified: new Date(),
-      changeFrequency: 'daily',
+      changeFrequency: "daily",
       priority: 1,
     },
     {
-      url: `${baseUrl}/dashboard`,
+      url: `${baseUrl}/terminal`,
       lastModified: new Date(),
-      changeFrequency: 'daily',
+      changeFrequency: "daily",
       priority: 0.8,
     },
   ];
