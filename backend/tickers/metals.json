@@ -93,24 +93,5 @@
     "type": "single",
     "unit_of_measure": "TRYOZ",
     "unit_of_measure_quantity": 100
-  },
-  {
-    "asset_class": "commodity",
-    "asset_sub_class": "metals",
-    "date": "2025-10-28",
-    "trading_venue": "XCEC",
-    "last_updated": "2025-08-28",
-    "name": "Micro Gold Futures",
-    "clearing_channel": "exchange_only",
-    "price_quotation": "U.S. dollars and cents per troy ounce",
-    "product_code": "MGC",
-    "sector": "precious",
-    "settlement_currency_code": "USD",
-    "settlement_method": "deliverable",
-    "settlement_type": "fut",
-    "trade_currency_code": "USD",
-    "type": "single",
-    "unit_of_measure": "TRYOZ",
-    "unit_of_measure_quantity": 10
   }
 ]

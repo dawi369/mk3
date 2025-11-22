@@ -16,6 +16,7 @@ import {
 } from "@/utils/polygon.utils.js";
 import { flowStore } from "@/servers/hub/data/flow_store.js";
 import { redisStore } from "@/servers/hub/data/redis_store.js";
+import { timescaleStore } from "@/servers/hub/data/timescale_store.js";
 import { PolygonAggregateEventSchema } from "@/schemas/events.js";
 
 // Health status type
@@ -202,6 +203,12 @@ export class PolygonWSClient {
         redisStore.writeBar(bar).catch((err) => {
           console.error("Redis write failed:", err);
         });
+
+        // Write to TimescaleDB (non-blocking)
+        timescaleStore.insertBar(bar).catch((err) => {
+          console.error("TimescaleDB write failed:", err);
+        });
+
         return;
       }
 

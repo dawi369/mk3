@@ -137,6 +137,38 @@ The original plan included a dedicated Edge Server for WebSocket handling. This 
 
 ---
 
+## Phase 2: Historical Data Architecture (In Progress) 🚧
+
+### The "Read-Through Cache" Pattern
+
+To prevent TimescaleDB from being overwhelmed by heavy historical queries, we use Redis as a **Smart Caching Layer**.
+
+**The Flow:**
+
+1.  **Client Request:** `GET /history?symbol=ES&range=6M`
+2.  **Redis Check:** Check for monthly chunks `history:ES:2024-11`, `history:ES:2024-10`, etc.
+3.  **Cache Miss:**
+    - Query TimescaleDB for the missing month.
+    - **Compress** the result (Gzip/MessagePack).
+    - Store in Redis with `SET history:ES:2024-11 <compressed_blob>`.
+4.  **Response:** Combine chunks and send to client.
+
+**Key Benefits:**
+
+- **Zero DB Load** for 99% of requests.
+- **Low Latency:** Compressed data transfers 10x faster.
+- **Scalability:** Redis handles the read volume; TimescaleDB only handles the "first write" of the day.
+
+### Data Retention & Format
+
+- **Granularity:** 1-minute bars.
+- **Retention:** 1 year per ticker.
+- **Storage:**
+  - **TimescaleDB:** Raw, uncompressed rows (source of truth).
+  - **Redis:** Compressed JSON blobs, chunked by month.
+
+---
+
 ## Future Phases
 
 ### Phase 3: Multi-Asset Expansion (8-12 hours)
