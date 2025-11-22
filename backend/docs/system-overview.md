@@ -39,51 +39,35 @@
 │              ▼                          ▼                   │
 │  ┌──────────────────┐      ┌──────────────────────────┐     │
 │  │   flowStore      │      │       Redis              │     │
-│  │   (In-Memory)    │      │    (Persistent+PubSub)   │     │
+│  │   (In-Memory)    │      │    (Persistent+Stream)   │     │
 │  │                  │      │                          │     │
-│  │  • Latest bars   │      │  • bar:latest:{symbol}   │     │
+│  │  • Latest bars   │      │  • Stream: market_data   │     │
 │  │  • 100 bar hist  │      │  • bar:today:{symbol}    │     │
 │  │  • Per symbol    │      │  • Job status            │     │
-│  └──────────────────┘      │  • Pub/sub channel       │     │
-│                            │  • Daily clear @ 2 AM    │     │
+│  └──────────────────┘      │  • Daily clear @ 2 AM    │     │
 │                            └──────┬───────────────────┘     │
 │                                   ▼                         │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │             Hub REST API (Port 3001)                  │  │
 │  │  GET  /health                                         │  │
 │  │  GET  /bars/latest                                    │  │
-│  │  GET  /bars/latest/:symbol                            │  │
-│  │  GET  /bars/today/:symbol                             │  │
-│  │  GET  /symbols                                        │  │
 │  │  GET  /admin/subscriptions                            │  │
-│  │  POST /admin/clear-redis                              │  │
-│  │  POST /admin/refresh-subscriptions                    │  │
 │  └───────────────────────────────────────────────────────┘  │
 └──────────────────────────┬──────────────────────────────────┘
                            │
-                     Redis Pub/Sub
-                   (Channel: "bars")
+                     Redis Stream
+                (Key: "market_data")
                            │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│              EDGE SERVERS (Future - Not Built Yet)          │
-│  - Subscribe to Redis pub/sub (real-time stream)            │
-│  - Read bar:today:* keys (snapshot on connect)              │
-│  - Query TimescaleDB (historical data)                      │
-│  - Client-facing WebSocket servers                          │
-│  - Front month detection logic                              │
-│  - User-friendly symbol mapping (ES → ESZ25)                │
-└─────────────────────────────────────────────────────────────┘
-                           │
-                       WebSocket
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│               FRONTEND (Future - Not Built Yet)             │
-│  - Real-time charts                                         │
-│  - Contract selection                                       │
-│  - Multi-ticker dashboard                                   │
-└─────────────────────────────────────────────────────────────┘
+           ┌───────────────┴───────────────┐
+           ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│        CLIENTS          │     │     WORKERS (Future)    │
+│ (Frontend / Edge / App) │     │   (ML / Backtesting)    │
+│                         │     │                         │
+│ - XREADGROUP market_data│     │ - XREADGROUP market_data│
+│ - Real-time updates     │     │ - Feature extraction    │
+│                         │     │ - History storage       │
+└─────────────────────────┘     └─────────────────────────┘
 ```
 
 ---
@@ -95,16 +79,19 @@
 The Hub server is production-ready with:
 
 1. **Real-Time Data Ingestion** ✅
+
    - Polygon WebSocket client with self-healing capabilities
    - Subscribes to US indices (ES, NQ, YM, RTY) + metals (GC, SI, HG, PL, PA, MGC)
    - Handles per-second aggregate data (`A` event type)
 
 2. **Smart Contract Management** ✅
+
    - Dynamic contract builders for quarterly (indices) and monthly (metals)
    - Asset class metadata for intelligent subscription tracking
    - Configurable contract counts (`SUBSCRIPTION_CONFIG`)
 
 3. **Automated Subscription Refresh** ✅
+
    - Monthly cron job (1st @ 00:05 ET)
    - Quarterly check for indices (Mar/Jun/Sep/Dec)
    - Monthly check for metals (every month)
@@ -112,13 +99,15 @@ The Hub server is production-ready with:
    - Status persistence across restarts
 
 4. **Dual Storage System** ✅
+
    - **flowStore (Memory):** Latest bars + 100-bar rolling history per symbol
-   - **Redis (Persistent + Pub/Sub):** 
+   - **Redis (Persistent + Pub/Sub):**
      - Keys: Today's bars + job status + metadata
      - Pub/Sub: Channel `bars` for real-time Edge streaming
    - Daily clear job (2 AM ET) with batched deletes (scales to 500+ tickers)
 
 5. **REST API** ✅
+
    - Health monitoring with job status
    - Bar queries (latest, today, per symbol)
    - Admin endpoints for manual operations
@@ -138,6 +127,7 @@ The Hub server is production-ready with:
 ### 1. Polygon WebSocket Client (`api/polygon/ws_client.ts`)
 
 **Capabilities:**
+
 - Connect to Polygon futures market
 - Subscribe/unsubscribe dynamically
 - Update subscriptions atomically (with retry)
@@ -146,6 +136,7 @@ The Hub server is production-ready with:
 - Health monitoring
 
 **Connection States:**
+
 - `DISCONNECTED` → `CONNECTING` → `CONNECTED` → `SUBSCRIBED`
 - Handles transitions gracefully
 - Saves subscription context for reconnects
@@ -153,30 +144,35 @@ The Hub server is production-ready with:
 ### 2. Contract Builders (`utils/cbs/`)
 
 **US Indices Builder** (`us_indices_cb.ts`):
+
 - Quarterly contracts: H (Mar), M (Jun), U (Sep), Z (Dec)
 - Current quarter + N future quarters
 - Example: `ESZ25, NQZ25, YMZ25, RTYZ25`
 
 **Metals Builder** (`metals_cb.ts`):
+
 - Monthly contracts: All 12 months (F, G, H, J, K, M, N, Q, U, V, X, Z)
 - Current month + N future months
 - Example: `GCX25, SIX25, HGX25, PLX25, PAX25, MGCX25`
 
 **Configuration** (`config/subscriptions.ts`):
+
 ```typescript
-US_INDICES_QUARTERS: 1  // Change to 2 for roll coverage
-METALS_MONTHS: 1         // Change to 2 for roll coverage
+US_INDICES_QUARTERS: 1; // Change to 2 for roll coverage
+METALS_MONTHS: 1; // Change to 2 for roll coverage
 ```
 
 ### 3. Data Stores
 
 **flowStore** (`data/flow_store.ts`):
+
 - Singleton pattern
 - In-memory storage
 - Methods: `setBar()`, `getLatest()`, `getAllLatest()`, `getHistory()`, `getSymbols()`
 - Keeps 100 bars per symbol (rolling window)
 
 **redisStore** (`data/redis_store.ts`):
+
 - Singleton pattern
 - Redis connection with retry strategy
 - Methods: `writeBar()`, `getLatest()`, `getTodayBars()`, `getStats()`, `clearTodayData()`
@@ -186,6 +182,7 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 ### 4. Jobs System
 
 **Daily Clear Job** (`jobs/clear_daily.ts`):
+
 - Schedule: 2 AM ET daily
 - Clears yesterday's data
 - Prevents duplicate clears (checks `meta:trading_date`)
@@ -193,6 +190,7 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 - Status persisted to Redis
 
 **Monthly Subscription Refresh** (`jobs/refresh_subscriptions.ts`):
+
 - Schedule: 1st of month @ 00:05 ET
 - Smart detection: Quarterly for indices, monthly for metals
 - Per-asset error handling
@@ -202,15 +200,18 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 ### 5. Hub REST API (`servers/hub/api.ts`)
 
 **Health & Monitoring:**
+
 - `GET /health` - System status, Redis stats, job statuses, symbol count
 
 **Data Access:**
+
 - `GET /bars/latest` - All latest bars from flowStore
 - `GET /bars/latest/:symbol` - Specific symbol's latest bar
 - `GET /bars/today/:symbol` - All today's bars from Redis
 - `GET /symbols` - List of subscribed symbols
 
 **Admin Operations:**
+
 - `GET /admin/subscriptions` - Inspect current WS subscriptions
 - `POST /admin/clear-redis` - Manual trigger for daily clear
 - `POST /admin/refresh-subscriptions` - Manual trigger for subscription refresh
@@ -218,6 +219,7 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 ### 6. Type System (`utils/types.ts`)
 
 **Key Types:**
+
 - `PolygonWsRequest` - Subscription request with asset class metadata
 - `PolygonAssetClass` - `"us_indices" | "metals"`
 - `Bar` - Normalized bar data structure
@@ -229,6 +231,7 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 ## Development Roadmap
 
 ### ✅ Phase 1: Hub Core Infrastructure (COMPLETE)
+
 - [x] Polygon WS client with self-healing
 - [x] Dual storage (flowStore + Redis)
 - [x] Dynamic contract builders
@@ -242,103 +245,31 @@ METALS_MONTHS: 1         // Change to 2 for roll coverage
 
 ---
 
-### 🔄 Phase 2: Multi-Asset Expansion (NEXT - 8-12 hours)
+### 🔜 Phase 2: TimescaleDB Integration (12-16 hours)
 
-**Goal:** Expand beyond indices + metals to cover more asset classes
-
-**Tasks:**
-1. Add contract builders for:
-   - Softs (KT, CJ, TT, YO) - various cycles
-   - Energies (CL, NG, RB, HO) - monthly
-   - Grains (ZC, ZS, ZW) - various cycles
-   - Treasuries (ZB, ZN, ZF, ZT) - quarterly
-
-2. Update `PolygonAssetClass` type with new classes
-
-3. Extend `SUBSCRIPTION_CONFIG` for new assets
-
-4. Add builders to refresh job logic
-
-5. Test subscription refresh for all asset classes
-
-**Deliverables:**
-- 4-6 new contract builder classes
-- Updated type system
-- Extended refresh job
-- Comprehensive testing
-
----
-
-### 🔄 Phase 3: Edge Server (8-12 hours total)
-
-**Goal:** Client-facing server with REST API, WebSocket streaming, and contract management
-
-**Status:** Phase 1 Complete ✅ | Phase 2 Next
+**Goal:** Store historical data for charting and ML.
 
 **Architecture:**
+
 ```
-Edge Server
-├─ Phase 1: Redis Integration ✅
-│   ├─ Connect to Redis Pub/Sub
-│   ├─ Load today's snapshot
-│   └─ In-memory bar cache
-├─ Phase 2: REST API (~2-3 hours)
-│   ├─ Health & monitoring endpoints
-│   ├─ Bar queries (latest, history)
-│   ├─ Symbol grouping by asset class
-│   └─ Contract grouping by root symbol
-├─ Phase 3: WebSocket Server (~4-6 hours)
-│   ├─ Client connection management
-│   ├─ Symbol subscription (default: all, can specify)
-│   ├─ Time-delayed streaming (configurable delay, e.g., 15 min)
-│   └─ Broadcast bars to subscribed clients
-└─ Phase 4: Front Month Detection (~2-3 hours)
-    ├─ Date-based front month (not volume-based)
-    ├─ Symbol mapping (ES → ESZ25)
-    ├─ Contract grouping for frontend dropdown
-    └─ Asset class organization
-```
-
-**Key Features:**
-- **Symbol Subscription:** Clients can subscribe to specific symbols or all (default)
-- **Time Delay:** Configurable delay (real-time or e.g., 15-min delayed stream)
-- **Contract Grouping:** Group contracts by root for frontend selection (ES → [ESZ25, ESH26, ...])
-- **Front Month by Date:** Use contract builder logic (not volume tracking)
-- **Asset Class Grouping:** Organize by US indices, metals, etc.
-
-**Roll Period Management:** On backburner (not implementing now)
-
-**Deliverables:**
-- ✅ Phase 1: Redis client + bar cache
-- 🔄 Phase 2: REST API
-- 🔜 Phase 3: WebSocket server
-- 🔜 Phase 4: Front month detection
-
----
-
-### 🔜 Phase 4: TimescaleDB Integration (12-16 hours)
-
-**Goal:** Store historical data for charting and ML
-
-**Architecture:**
-```
-Daily Job (3 AM ET)
-├─ Download Polygon flat files (1-min bars)
-├─ Parse and normalize
-├─ Bulk insert to TimescaleDB
-└─ Hypertable: bars(symbol, timestamp, o, h, l, c, v)
+Hub Server
+└─ Write to TimescaleDB (Hypertable)
+   ├─ time, symbol, o, h, l, c, v
+   └─ Retention policies
 ```
 
 **Tasks:**
-1. Set up TimescaleDB (Docker)
-2. Create schema with hypertables
-3. Daily download job (Polygon flat files API)
-4. Bulk insert script
-5. Query API (historical bars by range)
-6. Index optimization (symbol, timestamp)
-7. Retention policies (1 year? 5 years?)
+
+1.  Set up TimescaleDB (Docker)
+2.  Create schema with hypertables
+3.  Daily download job (Polygon flat files API)
+4.  Bulk insert script
+5.  Query API (historical bars by range)
+6.  Index optimization (symbol, timestamp)
+7.  Retention policies (1 year? 5 years?)
 
 **Deliverables:**
+
 - TimescaleDB schema
 - Daily download job
 - Historical query API
@@ -346,11 +277,12 @@ Daily Job (3 AM ET)
 
 ---
 
-### 🔜 Phase 5: ML Data Export (8-12 hours)
+### 🔜 Phase 3: ML Data Export (8-12 hours)
 
-**Goal:** Export data for ML training
+**Goal:** Export data for ML training.
 
 **Architecture:**
+
 ```
 Export Job (Weekly/On-Demand)
 ├─ Query TimescaleDB
@@ -360,14 +292,16 @@ Export Job (Weekly/On-Demand)
 ```
 
 **Tasks:**
-1. Feature engineering pipeline
-2. Export formats (Parquet, CSV)
-3. Configurable date ranges
-4. Symbol selection
-5. Export API endpoint
-6. Storage integration (S3 or local)
+
+1.  Feature engineering pipeline
+2.  Export formats (Parquet, CSV)
+3.  Configurable date ranges
+4.  Symbol selection
+5.  Export API endpoint
+6.  Storage integration (S3 or local)
 
 **Deliverables:**
+
 - Export job
 - Feature library
 - API endpoint
@@ -375,11 +309,12 @@ Export Job (Weekly/On-Demand)
 
 ---
 
-### 🔜 Phase 6: Frontend Dashboard (24-32 hours)
+### 🔜 Phase 4: Frontend Dashboard (24-32 hours)
 
-**Goal:** User-facing real-time dashboard
+**Goal:** User-facing real-time dashboard.
 
 **Architecture:**
+
 ```
 React/Next.js Frontend
 ├─ WebSocket client (connects to Edge)
@@ -391,16 +326,18 @@ React/Next.js Frontend
 ```
 
 **Tasks:**
-1. Set up Next.js project
-2. WebSocket client
-3. Real-time chart component
-4. Multi-ticker grid layout
-5. Contract selector UI
-6. Roll period indicators
-7. Responsive design
-8. Dark/light theme
+
+1.  Set up Next.js project
+2.  WebSocket client
+3.  Real-time chart component
+4.  Multi-ticker grid layout
+5.  Contract selector UI
+6.  Roll period indicators
+7.  Responsive design
+8.  Dark/light theme
 
 **Deliverables:**
+
 - Frontend application
 - Real-time charts
 - Multi-ticker dashboard
@@ -413,6 +350,7 @@ React/Next.js Frontend
 ### Technology Stack
 
 **Backend:**
+
 - **Runtime:** Node.js 22.x with TypeScript
 - **WebSocket:** Polygon.io client-js library
 - **Storage:** Redis (in-memory), TimescaleDB (future)
@@ -421,6 +359,7 @@ React/Next.js Frontend
 - **Testing:** Manual + integration tests (future)
 
 **Infrastructure:**
+
 - **Containerization:** Docker + Docker Compose
 - **Development:** WSL2 on Windows
 - **Package Manager:** npm
@@ -445,7 +384,7 @@ backend/
 │   │   └── refresh_subscriptions.ts  # Monthly refresh
 │   ├── servers/
 │   │   └── hub/
-│   │       ├── index.ts  
+│   │       ├── index.ts
 │   │       └── api/                   # Apis entry point
 │   │          └── api.ts              # REST API
 │   ├── utils/
@@ -473,6 +412,7 @@ backend/
 ### Data Flow
 
 **Real-Time Ingestion:**
+
 ```
 Polygon WS → ws_client.handleMessage()
            → aggregateToBar()
@@ -481,6 +421,7 @@ Polygon WS → ws_client.handleMessage()
 ```
 
 **Daily Clear (2 AM ET):**
+
 ```
 Cron trigger → dailyClearJob.runClear()
             → redisStore.clearTodayData()
@@ -491,6 +432,7 @@ Cron trigger → dailyClearJob.runClear()
 ```
 
 **Monthly Refresh (1st @ 00:05 ET):**
+
 ```
 Cron trigger → monthlySubscriptionJob.runRefresh()
             → shouldRefreshIndices() / shouldRefreshMetals()
@@ -523,12 +465,13 @@ HUB_REST_PORT=3001
 
 ```typescript
 export const SUBSCRIPTION_CONFIG = {
-  US_INDICES_QUARTERS: 1,  // 1 = current, 2 = current + next
-  METALS_MONTHS: 1,         // 1 = current, 2 = current + next
+  US_INDICES_QUARTERS: 1, // 1 = current, 2 = current + next
+  METALS_MONTHS: 1, // 1 = current, 2 = current + next
 } as const;
 ```
 
 **To subscribe to more contracts for roll coverage:**
+
 - Change `US_INDICES_QUARTERS` to `2`
 - Change `METALS_MONTHS` to `2`
 - Restart Hub
@@ -574,16 +517,19 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 ### Immediate (Phase 2 - Next 2 weeks)
 
 1. **Add Softs Contract Builder**
+
    - Research trading cycles for KT, CJ, TT, YO
    - Implement builder class
    - Add to refresh job
 
 2. **Add Energies Contract Builder**
+
    - Research CL, NG, RB, HO cycles
    - Implement builder class
    - Add to refresh job
 
 3. **Test Multi-Asset Refresh**
+
    - Verify quarterly detection for indices
    - Verify monthly detection for metals
    - Verify mixed cycles for other assets
@@ -596,11 +542,13 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 ### Medium-Term (Phase 3-4 - Next 1-2 months)
 
 1. **Hub WS Server**
+
    - Define protocol (JSON messages)
    - Implement pub/sub from flowStore
    - Connection management
 
 2. **Edge Server**
+
    - Front month algorithm (volume-based)
    - Roll detection
    - Symbol mapping
@@ -614,11 +562,13 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 ### Long-Term (Phase 5-7 - Next 3-6 months)
 
 1. **TimescaleDB**
+
    - Historical data pipeline
    - Query optimization
    - Retention policies
 
 2. **ML Export**
+
    - Feature engineering
    - Export formats
    - Storage integration
@@ -633,6 +583,7 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 ## Success Metrics
 
 ### Phase 1 (Current) ✅
+
 - [x] Hub runs 24/7 without crashes
 - [x] Self-healing WS reconnects automatically
 - [x] Subscriptions refresh monthly without intervention
@@ -641,17 +592,20 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 - [x] Status persists across restarts
 
 ### Phase 2 (Next)
+
 - [ ] Support 50+ futures symbols
 - [ ] All asset classes covered (indices, metals, softs, energies, grains, treasuries)
 - [ ] Subscription refresh handles mixed cycles
 - [ ] Performance validated with full symbol set
 
 ### Phase 3-4
+
 - [ ] Edge server detects front month correctly
 - [ ] Roll periods handled seamlessly
 - [ ] End-to-end latency < 500ms
 
 ### Phase 5-7
+
 - [ ] Historical data available for 1+ year
 - [ ] ML export generates clean datasets
 - [ ] Frontend dashboard updates in real-time
@@ -680,18 +634,22 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 ## Maintenance
 
 ### Daily
+
 - Monitor Hub logs for errors
 - Check `/health` endpoint for job status
 
 ### Weekly
+
 - Review Redis memory usage
 - Check flowStore symbol count
 
 ### Monthly
+
 - Verify subscription refresh ran successfully (check logs on 1st)
 - Review job status: `curl http://localhost:3001/health | jq '.subscriptionRefreshJob'`
 
 ### Quarterly
+
 - Verify indices rolled correctly (Mar/Jun/Sep/Dec)
 - Check contract symbols in `/admin/subscriptions`
 
@@ -705,4 +663,3 @@ See `docs/testing-subscription-refresh.md` for detailed testing scenarios.
 **Repository:** `/home/david/dev/mk3`
 
 For questions or issues, refer to documentation in `backend/docs/`.
-

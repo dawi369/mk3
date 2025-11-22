@@ -36,9 +36,20 @@ class RedisStore {
     multi.ltrim(`bar:today:${bar.symbol}`, -LIMITS.maxHubBars, -1);
     multi.incr("meta:bar_count");
 
+    // Write to Redis Stream (max len ~100k to prevent infinite growth)
+    multi.xadd(
+      "market_data",
+      "MAXLEN",
+      "~",
+      "100000",
+      "*",
+      "data",
+      JSON.stringify(bar)
+    );
+
     await multi.exec();
 
-    // Publish to Redis pub/sub channel for Edge servers
+    // Publish to Redis pub/sub channel for Edge servers (Legacy support)
     await this.redis.publish("bars", JSON.stringify(bar));
   }
 

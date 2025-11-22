@@ -1,6 +1,7 @@
 import { PolygonWSClient } from "@/api/polygon/ws_client.js";
 import { flowStore } from "@/servers/hub/data/flow_store.js";
 import { redisStore } from "@/servers/hub/data/redis_store.js";
+import { timescaleStore } from "@/servers/hub/data/timescale_store.js";
 import type { PolygonMarketType } from "@/types/polygon.types.js";
 import { startHubRESTApi } from "@/servers/hub/api/rest_client.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
@@ -25,6 +26,9 @@ async function startHubServer() {
 
     await polygonClient.subscribe(futuresUSIndicesSecondsRequest);
     await polygonClient.subscribe(futuresMetalsSecondsRequests);
+
+    // Initialize TimescaleDB (inactive)
+    await timescaleStore.init();
 
     // Load persisted job statuses
     await dailyClearJob.loadStatus();

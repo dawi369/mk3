@@ -16,6 +16,7 @@ import {
 } from "@/utils/polygon.utils.js";
 import { flowStore } from "@/servers/hub/data/flow_store.js";
 import { redisStore } from "@/servers/hub/data/redis_store.js";
+import { PolygonAggregateEventSchema } from "@/schemas/events.js";
 
 // Health status type
 interface WSHealth {
@@ -187,6 +188,13 @@ export class PolygonWSClient {
 
       // Handle aggregate events (bars)
       if (isAggregateEvent(m)) {
+        // Validate with Zod
+        const validation = PolygonAggregateEventSchema.safeParse(m);
+        if (!validation.success) {
+          console.error("Invalid aggregate event:", validation.error);
+          return;
+        }
+
         const bar = aggregateToBar(m);
         flowStore.setBar(bar.symbol, bar);
 
