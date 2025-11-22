@@ -11,6 +11,7 @@ import {
   Lock,
 } from "lucide-react";
 import Link from "next/link";
+import { MarketStatus } from "@/components/ui/market-status";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -44,15 +45,8 @@ export default function Home() {
           variants={stagger}
         >
           <div className="lg:col-span-7 space-y-8">
-            <motion.div
-              variants={fadeInUp}
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono uppercase tracking-wider"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              System Operational
+            <motion.div variants={fadeInUp}>
+              <MarketStatus />
             </motion.div>
 
             <motion.h1
@@ -72,13 +66,15 @@ export default function Home() {
               variants={fadeInUp}
               className="text-xl text-muted-foreground max-w-xl font-light leading-relaxed"
             >
-              Swordfish is the next-generation terminal for professional futures
-              traders.
+              Swordfish transforms institutional futures data into refined
+              insights, real-time signals, and a seamless trading
+              experience—giving every serious trader access to power once
+              reserved for the pros. With the
               <span className="text-foreground font-medium">
                 {" "}
-                Sub-millisecond latency
+                Best UI in Futures Trading
               </span>
-              , institutional-grade data, and intelligent insights.
+              , we makes professional-grade performance feel effortless.
             </motion.p>
 
             <motion.div variants={fadeInUp} className="flex flex-wrap gap-4">
@@ -88,9 +84,9 @@ export default function Home() {
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </Link>
-              <Link href="/about">
+              <Link href="/mission">
                 <button className="inline-flex h-12 items-center justify-center rounded-md border border-input bg-background px-8 font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
-                  Documentation
+                  Our Mission
                 </button>
               </Link>
             </motion.div>
@@ -100,21 +96,27 @@ export default function Home() {
               className="pt-8 grid grid-cols-3 gap-8 border-t border-border/50"
             >
               <div>
+                <div className="text-3xl font-bold font-space">50+</div>
+                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
+                  Global Futures Exchanges
+                </div>
+              </div>
+              <div>
                 <div className="text-3xl font-bold font-space">10ms</div>
                 <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
                   Latency
                 </div>
               </div>
-              <div>
-                <div className="text-3xl font-bold font-space">50+</div>
+              {/* <div>
+                <div className="text-3xl font-bold font-space">Full</div>
                 <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Markets
+                  Full L2/L3 Order Book
                 </div>
-              </div>
+              </div> */}
               <div>
-                <div className="text-3xl font-bold font-space">24/7</div>
+                <div className="text-3xl font-bold font-space">AI-Driven</div>
                 <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Uptime
+                  Edge
                 </div>
               </div>
             </motion.div>
@@ -133,7 +135,9 @@ export default function Home() {
                     <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500"></div>
                     <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500"></div>
                   </div>
-                  <div className="text-muted-foreground">ESZ25 • CME</div>
+                  <div className="text-muted-foreground">
+                    this is temp ESZ25 • CME
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -226,16 +230,15 @@ export default function Home() {
                 Global Coverage
               </h3>
               <p className="text-muted-foreground mb-8">
-                Access futures markets across CME, EUREX, and ICE. Unified API
-                for all asset classes.
+                Access futures markets across CME, CBOT, ICE?, COMEX, and NYMEX.
               </p>
               <div className="space-y-4 font-mono text-sm">
                 {[
                   "ES (S&P 500)",
-                  "NQ (Nasdaq)",
-                  "CL (Crude)",
+                  "ZC (Corn)",
+                  "BZ (Brent)?",
                   "GC (Gold)",
-                  "SI (Silver)",
+                  "CL (Crude)",
                 ].map((item, i) => (
                   <div
                     key={i}

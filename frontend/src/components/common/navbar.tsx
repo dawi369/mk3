@@ -77,11 +77,11 @@ export function Navbar() {
               <li className="row-span-3">
                 <NavigationMenuLink asChild>
                   <a
-                    className="flex h-full w-full flex-col justify-end rounded-md p-4 no-underline outline-hidden transition-all duration-200 select-none focus:shadow-md hover:bg-foreground/10 focus:bg-foreground/10 md:p-6"
+                    className="group flex h-full w-full flex-col justify-end rounded-md border border-white/5 bg-white/0 p-4 no-underline outline-none transition-all duration-500 select-none hover:border-white/10 hover:bg-white/5 md:p-6"
                     href="/terminal"
                   >
-                    <div className="mb-2 text-lg font-bold font-space text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
-                      <Terminal className="h-5 w-5" />
+                    <div className="mb-2 text-lg font-bold font-space text-foreground transition-colors flex items-center gap-2 group-hover:text-primary">
+                      <Terminal className="h-5 w-5 transition-colors duration-500 text-muted-foreground group-hover:text-primary" />
                       Terminal
                     </div>
                     <p className="text-muted-foreground text-sm leading-tight font-mono">
@@ -165,10 +165,12 @@ function ListItem({
       <NavigationMenuLink asChild>
         <Link
           href={href}
-          className="hover:bg-foreground/10 focus:bg-foreground/10"
+          className="group block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-all duration-500 hover:bg-white/5 focus:bg-accent focus:text-accent-foreground"
         >
-          <div className="text-sm leading-none font-medium flex items-center gap-2">
-            {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+          <div className="text-sm leading-none font-medium flex items-center gap-2 group-hover:text-primary transition-colors duration-500">
+            {Icon && (
+              <Icon className="h-4 w-4 text-muted-foreground transition-colors duration-500 group-hover:text-primary" />
+            )}
             {title}
           </div>
           <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
