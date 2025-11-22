@@ -4,7 +4,7 @@ import { redisStore } from "@/servers/hub/data/redis_store.js";
 import { HUB_REST_PORT } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
-import type { PolygonWSClient } from "@/api/polygon/ws_client.js";
+import type { PolygonWSClient } from "@/servers/hub/api/polygon/ws_client.js";
 
 const app = express();
 let polygonClient: PolygonWSClient | null = null;

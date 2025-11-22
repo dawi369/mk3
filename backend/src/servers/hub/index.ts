@@ -1,4 +1,4 @@
-import { PolygonWSClient } from "@/api/polygon/ws_client.js";
+import { PolygonWSClient } from "@/servers/hub/api/polygon/ws_client.js";
 import { flowStore } from "@/servers/hub/data/flow_store.js";
 import { redisStore } from "@/servers/hub/data/redis_store.js";
 import { timescaleStore } from "@/servers/hub/data/timescale_store.js";
@@ -6,9 +6,14 @@ import type { PolygonMarketType } from "@/types/polygon.types.js";
 import { startHubRESTApi } from "@/servers/hub/api/rest_client.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
+// import { historySyncJob } from "@/jobs/sync_history.js";
 import {
   futuresUSIndicesSecondsRequest,
-  futuresMetalsSecondsRequests,
+  futuresMetalsSecondsRequest,
+  futuresCurrencySecondsRequest,
+  futuresGrainsSecondsRequest,
+  futuresSoftsSecondsRequest,
+  futuresVolatilesSecondsRequest,
 } from "@/utils/consts.js";
 
 /**
@@ -25,7 +30,11 @@ async function startHubServer() {
     await polygonClient.connect(futuresMarket);
 
     await polygonClient.subscribe(futuresUSIndicesSecondsRequest);
-    await polygonClient.subscribe(futuresMetalsSecondsRequests);
+    await polygonClient.subscribe(futuresMetalsSecondsRequest);
+    await polygonClient.subscribe(futuresCurrencySecondsRequest);
+    await polygonClient.subscribe(futuresGrainsSecondsRequest);
+    await polygonClient.subscribe(futuresSoftsSecondsRequest);
+    await polygonClient.subscribe(futuresVolatilesSecondsRequest);
 
     // Initialize TimescaleDB (inactive)
     await timescaleStore.init();
@@ -37,6 +46,7 @@ async function startHubServer() {
     // Schedule jobs
     dailyClearJob.schedule();
     monthlySubscriptionJob.schedule(polygonClient);
+    // historySyncJob.schedule();
 
     // Start Hub REST API (pass polygon client for subscription management)
     await startHubRESTApi(polygonClient);

@@ -2,9 +2,15 @@
 
 // Polygon WebSocket protocol types
 
-export type PolygonMarketType = "futures" | "stocks" | "crypto";
+export type PolygonMarketType = "futures";
 
-export type PolygonAssetClass = "us_indices" | "metals";
+export type PolygonAssetClass =
+  | "us_indices"
+  | "metals"
+  | "currencies"
+  | "grains"
+  | "softs"
+  | "volatiles";
 
 export type MarketStatus = "open" | "closed" | "pre" | "post" | "halted";
 

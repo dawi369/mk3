@@ -112,6 +112,56 @@ class TimescaleStore {
   }
 
   /**
+   * Batch insert bars for efficient bulk loading
+   */
+  async insertBatch(bars: Bar[]) {
+    if (!this.isConnected || !this.pool || bars.length === 0) return;
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const query = `
+        INSERT INTO bars (symbol, open, high, low, close, volume, vwap, timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0))
+        ON CONFLICT (symbol, timestamp) DO UPDATE SET
+          open = EXCLUDED.open,
+          high = EXCLUDED.high,
+          low = EXCLUDED.low,
+          close = EXCLUDED.close,
+          volume = EXCLUDED.volume,
+          vwap = EXCLUDED.vwap;
+      `;
+
+      for (const bar of bars) {
+        const vwap =
+          bar.dollarVolume && bar.volume
+            ? bar.dollarVolume / bar.volume
+            : bar.close;
+        const values = [
+          bar.symbol,
+          bar.open,
+          bar.high,
+          bar.low,
+          bar.close,
+          bar.volume,
+          vwap,
+          bar.startTime,
+        ];
+        await client.query(query, values);
+      }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error(`Batch insert failed (${bars.length} bars):`, err);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get history with Read-Through Caching
    * 1. Split request into monthly chunks
    * 2. For past months: Check Redis -> If miss, Query DB & Cache

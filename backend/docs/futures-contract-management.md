@@ -33,13 +33,12 @@ Futures contracts expire and roll to new contracts. The system must handle:
 
 ### Historical Data Handling
 
-**Role:** TimescaleDB + Redis Cache
-
-- **Challenge:** Futures contracts expire, but users want continuous charts (e.g., "Gold" history for the last 5 years).
+- **Challenge:** Futures contracts expire, but charts need continuous history (e.g., "ES" continuous contract).
 - **Solution:**
-  - **Stitching:** The Hub stitches together expired contracts to form a continuous history.
-  - **Caching:** Stitched history is stored in Redis in compressed monthly chunks (e.g., `history:GC:2024-01`).
-  - **Efficiency:** Clients request "Gold", and the API serves the pre-stitched, compressed chunks from Redis.
+  - **TimescaleDB:** Stores individual contract history (e.g., `ESZ24`, `ESH25`).
+  - **Stitching:** Hub queries TimescaleDB for the relevant contracts to build a continuous series.
+  - **Caching:** Stitched monthly chunks are cached in Redis (`history:ES:2024-11`).
+  - **Updates:** Real-time data is written to TimescaleDB as it arrives. Daily sync ensures data completeness.
 
 ---
 

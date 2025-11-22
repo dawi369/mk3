@@ -95,13 +95,6 @@ export class PolygonWSClient {
       case "futures":
         this.ws = client.futures();
         break;
-      // here for the future of the app
-      case "stocks":
-        this.ws = client.stocks();
-        break;
-      case "crypto":
-        this.ws = client.crypto();
-        break;
       default:
         throw new Error(`Unsupported market type: ${marketType}`);
     }

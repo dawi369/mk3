@@ -20,6 +20,7 @@ function getEnvVarAsInt(key: string): number {
 }
 
 export const POLYGON_API_KEY = getEnvVar("POLYGON_API_KEY");
+export const POLYGON_API_URL = getEnvVar("POLYGON_API_URL");
 export const HUB_REST_PORT = getEnvVarAsInt("HUB_REST_PORT");
 export const REDIS_HOST = getEnvVar("REDIS_HOST");
 export const REDIS_PORT = getEnvVarAsInt("REDIS_PORT");

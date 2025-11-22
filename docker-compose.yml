@@ -14,6 +14,24 @@ services:
       timeout: 3s
       retries: 3
 
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    container_name: mk3-timescaledb
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -25,8 +43,11 @@ services:
       - NODE_ENV=production
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - DATABASE_URL=postgres://postgres:postgres@timescaledb:5432/postgres
     depends_on:
       redis:
+        condition: service_healthy
+      timescaledb:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
@@ -35,3 +56,4 @@ services:
 
 volumes:
   redis-data:
+  timescaledb-data:

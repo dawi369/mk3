@@ -137,20 +137,28 @@ The original plan included a dedicated Edge Server for WebSocket handling. This 
 
 ---
 
-## Phase 2: Historical Data Architecture (In Progress) 🚧
+## Phase 2: Historical Data Architecture (In Progress)
 
-### The "Read-Through Cache" Pattern
+### Storage Strategy
 
-To prevent TimescaleDB from being overwhelmed by heavy historical queries, we use Redis as a **Smart Caching Layer**.
+- **Real-time (Today):** Redis Streams & Lists.
+  - Source of Truth for "Today's" data.
+  - Cleared daily after market close.
+- **Historical (Yesterday+):** TimescaleDB (Postgres).
+  - Source of Truth for all past data.
+  - **Ingestion:** Hub writes to TimescaleDB asynchronously for every incoming bar (Real-time).
+  - **Reconciliation:** Daily Cron Job (optional) can fetch previous day's aggregates to ensure completeness.
 
-**The Flow:**
+### Caching Layer (Redis)
 
-1.  **Client Request:** `GET /history?symbol=ES&range=6M`
-2.  **Redis Check:** Check for monthly chunks `history:ES:2024-11`, `history:ES:2024-10`, etc.
-3.  **Cache Miss:**
-    - Query TimescaleDB for the missing month.
-    - **Compress** the result (Gzip/MessagePack).
-    - Store in Redis with `SET history:ES:2024-11 <compressed_blob>`.
+- **Read-Through Cache:**
+  - Clients request history -> Hub checks Redis `history:SYMBOL:YYYY-MM`.
+  - **Hit:** Return compressed data.
+  - **Miss:** Query TimescaleDB -> Compress (Gzip) -> Store in Redis -> Return.
+- **Retention:**
+  - Cache keys set to expire (e.g., 1 year) or LRU eviction.
+  - 1-minute resolution for all history.
+
 4.  **Response:** Combine chunks and send to client.
 
 **Key Benefits:**
