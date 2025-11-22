@@ -20,8 +20,12 @@ The dashboard is divided into 6 main sections, corresponding to the asset classe
 Each section functions as a self-contained module:
 
 - **Winners/Losers List**: A double-sided vertical list with a central divider.
-  - **Left**: Top 3 Winners (Green)
-  - **Right**: Top 3 Losers (Red)
+
+## Data Sources
+
+- **Live**: Redis Stream `market_data` (via Next.js Proxy).
+- **Today**: Redis List `bar:today:{symbol}`.
+- **History**: TimescaleDB.rs (Red)
 - **Ticker Details**: To the right of the list, displaying:
   - Volume
   - Open/High/Low/Close (OHLC)

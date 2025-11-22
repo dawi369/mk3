@@ -80,11 +80,13 @@
 **Responsibility:** Display data, handle user interactions
 
 **Components:**
+
 - **Feature Components** - `features/dashboard/`, `features/sentiment/`, `features/indicators/`
 - **Shared Components** - `components/ui/`, `components/charts/`, `components/layout/`
 - **Pages** - `app/main/page.tsx`
 
 **Key Principles:**
+
 - Components receive data via props or hooks
 - No direct API calls (use stores)
 - Minimal business logic
@@ -99,23 +101,27 @@
 **Stores (Zustand):**
 
 1. **Dashboard Store** (`lib/stores/dashboard-store.ts`)
+
    - Latest bars for all symbols
    - Contract metadata
    - Selected contracts
    - Asset class groupings
 
 2. **Sentiment Store** (`lib/stores/sentiment-store.ts`)
+
    - Volume metrics
    - Market breadth
    - Volatility calculations
    - Sentiment scores
 
 3. **Indicators Store** (`lib/stores/indicators-store.ts`)
+
    - Technical indicator values (RSI, MACD, etc.)
    - Indicator settings
    - Historical calculations
 
 4. **Connection Store** (`lib/stores/connection-store.ts`)
+
    - WebSocket connection state
    - Edge server health
    - Reconnection logic
@@ -127,6 +133,7 @@
    - Keyboard shortcuts state
 
 **Why Zustand?**
+
 - Simple, minimal API (like backend's clean patterns)
 - No boilerplate
 - React hooks integration
@@ -134,8 +141,6 @@
 - Small bundle size
 
 ---
-
-### Layer 3: Data Layer (API Integration)
 
 **Responsibility:** Communicate with Edge server, manage connections
 
@@ -146,21 +151,22 @@
 ```typescript
 class EdgeClient {
   // Health & monitoring
-  getHealth(): Promise<HealthResponse>
-  
+  getHealth(): Promise<HealthResponse>;
+
   // Symbol & contract queries
-  getSymbols(): Promise<string[]>
-  getSymbolsGrouped(): Promise<GroupedSymbols>
-  getContracts(root: string): Promise<ContractGroup>
-  
+  getSymbols(): Promise<string[]>;
+  getSymbolsGrouped(): Promise<GroupedSymbols>;
+  getContracts(root: string): Promise<ContractGroup>;
+
   // Bar queries
-  getLatestBars(): Promise<BarMap>
-  getLatestBar(symbol: string): Promise<Bar | null>
-  getBarHistory(symbol: string, limit?: number): Promise<Bar[]>
+  getLatestBars(): Promise<BarMap>;
+  getLatestBar(symbol: string): Promise<Bar | null>;
+  getBarHistory(symbol: string, limit?: number): Promise<Bar[]>;
 }
 ```
 
 **Usage:**
+
 - On app load: Fetch latest bars, symbols, contracts
 - Periodic health checks
 - Historical data for charts
@@ -175,24 +181,25 @@ class EdgeClient {
 ```typescript
 class EdgeWSClient {
   // Connection management
-  connect(): Promise<void>
-  disconnect(): void
-  
+  connect(): Promise<void>;
+  disconnect(): void;
+
   // Subscription management
-  subscribe(symbols: string[]): void
-  unsubscribe(symbols: string[]): void
-  setDelay(seconds: number): void
-  
+  subscribe(symbols: string[]): void;
+  unsubscribe(symbols: string[]): void;
+  setDelay(seconds: number): void;
+
   // Event handlers
-  onBar(callback: (bar: Bar) => void): void
-  onStatus(callback: (status: ConnectionStatus) => void): void
-  onError(callback: (error: Error) => void): void
+  onBar(callback: (bar: Bar) => void): void;
+  onStatus(callback: (status: ConnectionStatus) => void): void;
+  onError(callback: (error: Error) => void): void;
 }
 ```
 
 **Message Protocol** (matches Edge server):
 
 **Client → Server:**
+
 ```json
 // Subscribe to symbols
 { "action": "subscribe", "symbols": ["ESZ25", "NQZ25"] }
@@ -211,6 +218,7 @@ class EdgeWSClient {
 ```
 
 **Server → Client:**
+
 ```json
 // Welcome message
 { "type": "welcome", "clientId": "uuid", "message": "..." }
@@ -240,6 +248,7 @@ class EdgeWSClient {
 ```
 
 **Connection Handling:**
+
 - Auto-connect on app load
 - Auto-reconnect with exponential backoff
 - Heartbeat monitoring (ping/pong)
@@ -371,13 +380,13 @@ interface DashboardState {
   symbols: string[];
   symbolsByAssetClass: Record<string, string[]>;
   selectedSymbol: string | null;
-  
+
   // Actions
   setBars: (bars: BarMap) => void;
   updateBar: (symbol: string, bar: Bar) => void;
   setSymbols: (symbols: string[]) => void;
   selectSymbol: (symbol: string) => void;
-  
+
   // Computed
   getLatestBar: (symbol: string) => Bar | undefined;
   getSymbolsByClass: (assetClass: string) => string[];
@@ -388,19 +397,21 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   symbols: [],
   symbolsByAssetClass: {},
   selectedSymbol: null,
-  
+
   setBars: (bars) => set({ bars: new Map(Object.entries(bars)) }),
-  
-  updateBar: (symbol, bar) => set((state) => {
-    const newBars = new Map(state.bars);
-    newBars.set(symbol, bar);
-    return { bars: newBars };
-  }),
-  
+
+  updateBar: (symbol, bar) =>
+    set((state) => {
+      const newBars = new Map(state.bars);
+      newBars.set(symbol, bar);
+      return { bars: newBars };
+    }),
+
   // ... more actions
-  
+
   getLatestBar: (symbol) => get().bars.get(symbol),
-  getSymbolsByClass: (assetClass) => get().symbolsByAssetClass[assetClass] || [],
+  getSymbolsByClass: (assetClass) =>
+    get().symbolsByAssetClass[assetClass] || [],
 }));
 ```
 
@@ -411,12 +422,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 const { bars, updateBar } = useDashboardStore();
 
 // Subscribe to specific values (optimized)
-const selectedSymbol = useDashboardStore(state => state.selectedSymbol);
+const selectedSymbol = useDashboardStore((state) => state.selectedSymbol);
 
 // Subscribe with selector (only re-render when ES changes)
-const esBar = useDashboardStore(
-  state => state.bars.get('ESZ25')
-);
+const esBar = useDashboardStore((state) => state.bars.get("ESZ25"));
 ```
 
 ---
@@ -484,39 +493,41 @@ Response: {
 
 **Client Messages:**
 
-| Action | Payload | Purpose |
-|--------|---------|---------|
-| `subscribe` | `{ symbols: string[] }` | Subscribe to symbols |
-| `unsubscribe` | `{ symbols: string[] }` | Unsubscribe from symbols |
-| `setDelay` | `{ delaySeconds: number }` | Set time delay |
-| `pong` | - | Heartbeat response |
+| Action        | Payload                    | Purpose                  |
+| ------------- | -------------------------- | ------------------------ |
+| `subscribe`   | `{ symbols: string[] }`    | Subscribe to symbols     |
+| `unsubscribe` | `{ symbols: string[] }`    | Unsubscribe from symbols |
+| `setDelay`    | `{ delaySeconds: number }` | Set time delay           |
+| `pong`        | -                          | Heartbeat response       |
 
 **Server Messages:**
 
-| Type | Data | Purpose |
-|------|------|---------|
-| `welcome` | `{ clientId, message }` | Connection confirmation |
-| `bar` | `{ data: Bar }` | Real-time bar update |
-| `status` | `{ connected, subscriptions }` | Status update |
-| `error` | `{ message }` | Error notification |
-| `ping` | - | Heartbeat request |
+| Type      | Data                           | Purpose                 |
+| --------- | ------------------------------ | ----------------------- |
+| `welcome` | `{ clientId, message }`        | Connection confirmation |
+| `bar`     | `{ data: Bar }`                | Real-time bar update    |
+| `status`  | `{ connected, subscriptions }` | Status update           |
+| `error`   | `{ message }`                  | Error notification      |
+| `ping`    | -                              | Heartbeat request       |
 
 ---
 
 ### Connection Management Strategy
 
 **1. Initial Connection:**
+
 ```typescript
 // On app mount
 useEffect(() => {
   wsClient.connect();
-  wsClient.subscribe(['*']); // All symbols
-  
+  wsClient.subscribe(["*"]); // All symbols
+
   return () => wsClient.disconnect();
 }, []);
 ```
 
 **2. Reconnection Logic:**
+
 ```typescript
 // Exponential backoff (matches Hub/Edge pattern)
 const reconnect = () => {
@@ -526,6 +537,7 @@ const reconnect = () => {
 ```
 
 **3. Subscription Sync:**
+
 ```typescript
 // Preserve subscriptions across reconnects
 wsClient.onReconnect(() => {
@@ -535,9 +547,10 @@ wsClient.onReconnect(() => {
 ```
 
 **4. Heartbeat Monitoring:**
+
 ```typescript
 // Detect stale connections
-wsClient.onPing(() => wsClient.send({ action: 'pong' }));
+wsClient.onPing(() => wsClient.send({ action: "pong" }));
 
 // If no ping for 30s, assume dead connection
 const watchdog = setInterval(() => {
@@ -554,6 +567,7 @@ const watchdog = setInterval(() => {
 ### lightweight-charts Integration
 
 **Why lightweight-charts?**
+
 - TradingView's official library
 - High performance (60 FPS with 10,000+ bars)
 - Small bundle size (~50KB)
@@ -574,21 +588,24 @@ interface FuturesChartProps {
 
 export const FuturesChart = ({ symbol, bars, indicators, height = 400 }) => {
   const chartRef = useRef<IChartApi>();
-  const seriesRef = useRef<ISeriesApi<'Candlestick'>>();
-  
+  const seriesRef = useRef<ISeriesApi<"Candlestick">>();
+
   // Initialize chart
   useEffect(() => {
     chartRef.current = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height,
-      layout: { background: { color: '#000' }, textColor: '#fff' },
-      grid: { vertLines: { color: '#2B2B43' }, horzLines: { color: '#2B2B43' } },
+      layout: { background: { color: "#000" }, textColor: "#fff" },
+      grid: {
+        vertLines: { color: "#2B2B43" },
+        horzLines: { color: "#2B2B43" },
+      },
     });
-    
+
     seriesRef.current = chartRef.current.addCandlestickSeries();
     seriesRef.current.setData(bars);
   }, []);
-  
+
   // Update on new bar
   useEffect(() => {
     if (bars.length > 0) {
@@ -596,10 +613,10 @@ export const FuturesChart = ({ symbol, bars, indicators, height = 400 }) => {
       seriesRef.current?.update(latestBar);
     }
   }, [bars]);
-  
+
   // Add indicator overlays
   useEffect(() => {
-    indicators?.forEach(ind => {
+    indicators?.forEach((ind) => {
       const lineSeries = chartRef.current?.addLineSeries({
         color: ind.color,
         lineWidth: 2,
@@ -607,12 +624,13 @@ export const FuturesChart = ({ symbol, bars, indicators, height = 400 }) => {
       lineSeries?.setData(ind.data);
     });
   }, [indicators]);
-  
+
   return <div ref={containerRef} />;
 };
 ```
 
 **Performance Optimization:**
+
 - Use `update()` for real-time bars (not `setData()`)
 - Limit historical bars loaded (e.g., 1000 max)
 - Debounce resize events
@@ -627,6 +645,7 @@ export const FuturesChart = ({ symbol, bars, indicators, height = 400 }) => {
 **Purpose:** Historical data beyond Edge cache
 
 **Implementation:**
+
 ```
 Frontend REST Client
    ↓
@@ -640,12 +659,14 @@ Chart displays full history
 ```
 
 **New API Endpoint:**
+
 ```
 GET /bars/historical/:symbol?start=YYYY-MM-DD&end=YYYY-MM-DD&interval=1m
 Response: Bar[]
 ```
 
 **UI Changes:**
+
 - Date range picker in chart controls
 - Loading indicator for historical queries
 - Cache historical data in IndexedDB (browser storage)
@@ -655,12 +676,14 @@ Response: Bar[]
 ### 2. AI Features
 
 **Use Cases:**
+
 - Pattern recognition (head & shoulders, triangles)
 - Price prediction (next 15 min, 1 hour)
 - Anomaly detection (unusual volume spikes)
 - Smart alerts (ML-based triggers)
 
 **Architecture:**
+
 ```
 Frontend
    ↓
@@ -676,6 +699,7 @@ Display in UI (confidence scores, visualizations)
 ```
 
 **New Components:**
+
 - `features/ai/PatternRecognition`
 - `features/ai/PricePrediction`
 - `features/ai/SmartAlerts`
@@ -687,6 +711,7 @@ Display in UI (confidence scores, visualizations)
 **Purpose:** Test strategies against historical data
 
 **Architecture:**
+
 ```
 Frontend (Strategy Builder UI)
    ↓
@@ -704,12 +729,14 @@ Display in UI (equity curve, trade list, stats)
 ```
 
 **New Pages:**
+
 - `app/backtest/page.tsx`
 - Strategy builder interface
 - Results visualization
 - Performance metrics
 
 **New Components:**
+
 - `features/backtest/StrategyBuilder`
 - `features/backtest/ResultsChart`
 - `features/backtest/TradeList`
@@ -720,16 +747,19 @@ Display in UI (equity curve, trade list, stats)
 ### 4. Advanced Analytics
 
 **Volume Profile:**
+
 - Price levels by volume
 - High volume nodes (support/resistance)
 - Point of control
 
 **Correlation Analysis:**
+
 - Inter-contract correlations (ES vs NQ)
 - Spread relationships
 - Cointegration detection
 
 **Seasonality:**
+
 - Historical patterns by month/quarter
 - Roll period analytics
 - Expiry effects
@@ -741,16 +771,18 @@ Display in UI (equity curve, trade list, stats)
 ### Optimization Strategies
 
 **1. Selective Subscriptions:**
+
 ```typescript
 // Only subscribe to visible symbols
 const visibleSymbols = useMemo(() => {
-  return symbols.filter(s => isSymbolVisible(s, viewport));
+  return symbols.filter((s) => isSymbolVisible(s, viewport));
 }, [symbols, viewport]);
 
 wsClient.subscribe(visibleSymbols);
 ```
 
 **2. Debounced Updates:**
+
 ```typescript
 // Batch rapid updates (e.g., during high volume)
 const debouncedUpdate = useMemo(
@@ -760,6 +792,7 @@ const debouncedUpdate = useMemo(
 ```
 
 **3. Virtual Scrolling:**
+
 ```typescript
 // Large symbol lists
 <VirtualList
@@ -771,13 +804,15 @@ const debouncedUpdate = useMemo(
 ```
 
 **4. Code Splitting:**
+
 ```typescript
 // Lazy load sections
-const IndicatorsSection = lazy(() => import('@/features/indicators'));
-const SentimentSection = lazy(() => import('@/features/sentiment'));
+const IndicatorsSection = lazy(() => import("@/features/indicators"));
+const SentimentSection = lazy(() => import("@/features/sentiment"));
 ```
 
 **5. Memoization:**
+
 ```typescript
 // Expensive calculations
 const sentimentScore = useMemo(
@@ -791,12 +826,14 @@ const sentimentScore = useMemo(
 ## Technology Decisions
 
 ### Why Next.js?
+
 - Server components for fast initial load
 - App router for modern routing
 - Built-in optimization (fonts, images)
 - Easy deployment (Vercel, self-hosted)
 
 ### Why Zustand over Redux?
+
 - Simpler API (less boilerplate)
 - Smaller bundle size
 - No context provider needed
@@ -804,6 +841,7 @@ const sentimentScore = useMemo(
 - Matches backend's "less is more" philosophy
 
 ### Why lightweight-charts?
+
 - Official TradingView library
 - Best performance for real-time data
 - Futures-focused features
@@ -811,6 +849,7 @@ const sentimentScore = useMemo(
 - Active maintenance
 
 ### Why shadcn/ui?
+
 - Accessible by default (Radix UI)
 - Customizable (own our components)
 - Beautiful design out of the box
@@ -822,16 +861,19 @@ const sentimentScore = useMemo(
 ## Security Considerations
 
 ### WebSocket Connection
+
 - No authentication initially (localhost dev)
 - Future: JWT tokens
 - Rate limiting on Edge server
 
 ### API Calls
+
 - No sensitive data exposed
 - Public market data only
 - CORS configured on Edge server
 
 ### User Data
+
 - Local storage for preferences
 - No PII stored
 - Session state only
@@ -841,23 +883,25 @@ const sentimentScore = useMemo(
 ## Next Steps
 
 **Phase 1 (Weeks 1-2):**
+
 1. Implement EdgeClient (REST)
 2. Implement EdgeWSClient (WebSocket)
 3. Create Zustand stores
 4. Build base layout
 
 **Phase 2 (Weeks 3-4):**
+
 1. Dashboard section
 2. Real-time price grid
 3. Contract selector
 4. Mini charts
 
 **Phase 3 (Weeks 5-6):**
+
 1. Market sentiment section
 2. Indicators section
 3. Polish and optimization
 
 ---
 
-*Architecture built for performance, designed for scale.*
-
+_Architecture built for performance, designed for scale._
