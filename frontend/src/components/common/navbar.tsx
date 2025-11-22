@@ -7,6 +7,10 @@ import {
   CircleHelpIcon,
   CircleIcon,
   Fingerprint,
+  Terminal,
+  ChartLine,
+  Activity,
+  Sparkles,
 } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -76,7 +80,8 @@ export function Navbar() {
                     className="flex h-full w-full flex-col justify-end rounded-md p-4 no-underline outline-hidden transition-all duration-200 select-none focus:shadow-md hover:bg-foreground/10 focus:bg-foreground/10 md:p-6"
                     href="/terminal"
                   >
-                    <div className="mb-2 text-lg font-bold font-space text-foreground group-hover:text-primary transition-colors">
+                    <div className="mb-2 text-lg font-bold font-space text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
+                      <Terminal className="h-5 w-5" />
                       Terminal
                     </div>
                     <p className="text-muted-foreground text-sm leading-tight font-mono">
@@ -85,14 +90,20 @@ export function Navbar() {
                   </a>
                 </NavigationMenuLink>
               </li>
-              <ListItem href="/terminal" title="Indicators">
-                Actionable insights.
+              <ListItem href="/terminal" title="Indicators" icon={ChartLine}>
+                Actionable insights. Track technical signals and key metrics in
+                real-time.
               </ListItem>
-              <ListItem href="/terminal" title="Market Sentiment">
-                Feel the market.
+              <ListItem
+                href="/terminal"
+                title="Market Sentiment"
+                icon={Activity}
+              >
+                Feel the market. Understand the pulse of futures trading across
+                all asset classes.
               </ListItem>
-              <ListItem href="/ai-lab" title="AI Lab">
-                See what the data sees.
+              <ListItem href="/ai-lab" title="AI Lab" icon={Sparkles}>
+                See what the data sees. Powered by the latest systems.
               </ListItem>
             </ul>
           </NavigationMenuContent>
@@ -143,8 +154,12 @@ function ListItem({
   title,
   children,
   href,
+  icon: Icon,
   ...props
-}: React.ComponentPropsWithoutRef<"li"> & { href: string }) {
+}: React.ComponentPropsWithoutRef<"li"> & {
+  href: string;
+  icon?: React.ElementType;
+}) {
   return (
     <li {...props}>
       <NavigationMenuLink asChild>
@@ -152,7 +167,10 @@ function ListItem({
           href={href}
           className="hover:bg-foreground/10 focus:bg-foreground/10"
         >
-          <div className="text-sm leading-none font-medium">{title}</div>
+          <div className="text-sm leading-none font-medium flex items-center gap-2">
+            {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+            {title}
+          </div>
           <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
             {children}
           </p>
