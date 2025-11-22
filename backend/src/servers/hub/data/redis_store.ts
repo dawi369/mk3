@@ -11,6 +11,7 @@ class RedisStore {
       host: REDIS_HOST,
       port: REDIS_PORT,
       retryStrategy: (times) => {
+        // Exponential backoff with max delay of 2 seconds
         const delay = Math.min(times * 50, 2000);
         return delay;
       },
@@ -31,6 +32,7 @@ class RedisStore {
   async writeBar(bar: Bar): Promise<void> {
     const multi = this.redis.multi();
 
+    //supsub, legacy code, used for testing, xadd is the new way
     multi.set(`bar:latest:${bar.symbol}`, JSON.stringify(bar));
     multi.rpush(`bar:today:${bar.symbol}`, JSON.stringify(bar));
     multi.ltrim(`bar:today:${bar.symbol}`, -LIMITS.maxHubBars, -1);
@@ -41,7 +43,7 @@ class RedisStore {
       "market_data",
       "MAXLEN",
       "~",
-      "100000",
+      LIMITS.maxStreamLength.toString(),
       "*",
       "data",
       JSON.stringify(bar)
