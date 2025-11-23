@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -12,7 +12,7 @@ export function Header() {
 
   useMotionValueEvent(scrollY, "change", (latest) => {
     const previous = scrollY.getPrevious() ?? 0;
-    
+
     // Hide when scrolling down, show when scrolling up
     if (latest > previous && latest > 10) {
       setHidden(true);
@@ -22,11 +22,11 @@ export function Header() {
   });
 
   return (
-    <motion.header 
+    <motion.header
       className="sticky top-0 z-50 w-full text-foreground"
       variants={{
         visible: { y: 0 },
-        hidden: { y: "-100%" }
+        hidden: { y: "-100%" },
       }}
       animate={hidden ? "hidden" : "visible"}
       transition={{ duration: 0.3, ease: "easeInOut" }}
@@ -49,4 +49,3 @@ export function Header() {
     </motion.header>
   );
 }
-
