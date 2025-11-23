@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
@@ -33,6 +33,8 @@ import {
 export function AuthIndicator() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -57,6 +59,22 @@ export function AuthIndicator() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+  };
+
+  const handleMouseEnter = () => {
+    // Clear any pending close timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setDropdownOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    // Delay closing to allow mouse to move to dropdown content
+    closeTimeoutRef.current = setTimeout(() => {
+      setDropdownOpen(false);
+    }, 150);
   };
 
   if (loading) {
@@ -85,8 +103,16 @@ export function AuthIndicator() {
   }
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger className={navigationMenuTriggerStyle()}>
+    <DropdownMenu
+      open={dropdownOpen}
+      onOpenChange={setDropdownOpen}
+      modal={false}
+    >
+      <DropdownMenuTrigger
+        className={`${navigationMenuTriggerStyle()} group focus:ring-0 focus:outline-none focus-visible:ring-0`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <motion.div
           className="flex items-center gap-2"
           initial={{ opacity: 0, y: -5 }}
@@ -102,10 +128,15 @@ export function AuthIndicator() {
           <span className="text-sm font-medium max-w-[100px] truncate hidden sm:inline-block">
             {user.email?.split("@")[0]}
           </span>
-          <ChevronDown className="w-3 h-3 opacity-50 ml-1" />
+          <ChevronDown className="w-3 h-3 opacity-50 ml-1 transition duration-300 group-data-[state=open]:rotate-180" />
         </motion.div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 p-2">
+      <DropdownMenuContent
+        align="end"
+        className="w-56 p-2"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">My Account</p>
