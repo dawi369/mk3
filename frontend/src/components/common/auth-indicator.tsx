@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Fingerprint,
   Loader2,
@@ -14,6 +15,9 @@ import {
   Key,
   Sparkles,
   ChevronDown,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -29,13 +33,23 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
+import {
+  getUserProfile,
+  updateDisplayName,
+  ensureUserProfile,
+  type UserProfile,
+} from "@/lib/supabase/profiles";
 
 export function AuthIndicator() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const supabase = createClient();
+  const router = useRouter();
 
   useEffect(() => {
     const getUser = async () => {
@@ -43,6 +57,22 @@ export function AuthIndicator() {
         data: { user },
       } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        // Ensure profile exists and fetch it
+        const isNewUser = await ensureUserProfile(
+          user.id,
+          user.email || undefined
+        );
+        const userProfile = await getUserProfile(user.id);
+        setProfile(userProfile);
+
+        // Redirect new users to onboarding
+        if (isNewUser) {
+          router.push("/onboarding");
+        }
+      }
+
       setLoading(false);
     };
 
@@ -50,8 +80,24 @@ export function AuthIndicator() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const isNewUser = await ensureUserProfile(
+          session.user.id,
+          session.user.email || undefined
+        );
+        const userProfile = await getUserProfile(session.user.id);
+        setProfile(userProfile);
+
+        // Redirect new users to onboarding
+        if (isNewUser) {
+          router.push("/onboarding");
+        }
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -75,6 +121,44 @@ export function AuthIndicator() {
     closeTimeoutRef.current = setTimeout(() => {
       setDropdownOpen(false);
     }, 150);
+  };
+
+  const getDisplayName = (user: User, profile: UserProfile | null): string => {
+    // Priority: profile.display_name > OAuth first name > "Trader"
+    if (profile?.display_name) {
+      return profile.display_name.split(" ")[0];
+    }
+
+    // Extract first name from OAuth metadata
+    if (user.user_metadata?.name) {
+      return user.user_metadata.name.split(" ")[0];
+    }
+    if (user.user_metadata?.full_name) {
+      return user.user_metadata.full_name.split(" ")[0];
+    }
+
+    return "Trader";
+  };
+
+  const handleEditName = () => {
+    setEditedName(profile?.display_name || getDisplayName(user!, profile));
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!user || !editedName.trim()) return;
+
+    const success = await updateDisplayName(user.id, editedName.trim());
+    if (success) {
+      const updated = await getUserProfile(user.id);
+      setProfile(updated);
+      setIsEditingName(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingName(false);
+    setEditedName("");
   };
 
   if (loading) {
@@ -115,9 +199,8 @@ export function AuthIndicator() {
       >
         <motion.div
           className="flex items-center gap-2"
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          whileHover={{ scale: 1.02 }}
+          transition={{ duration: 0.2 }}
         >
           <div className="relative flex items-center justify-center">
             <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -126,7 +209,7 @@ export function AuthIndicator() {
             <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border-2 border-background"></span>
           </div>
           <span className="text-sm font-medium max-w-[100px] truncate hidden sm:inline-block">
-            {user.email?.split("@")[0]}
+            {getDisplayName(user, profile)}
           </span>
           <ChevronDown className="w-3 h-3 opacity-50 ml-1 transition duration-300 group-data-[state=open]:rotate-180" />
         </motion.div>
@@ -139,7 +222,49 @@ export function AuthIndicator() {
       >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">My Account</p>
+            {isEditingName ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveName();
+                    if (e.key === "Escape") handleCancelEdit();
+                  }}
+                  className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="Display name"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveName}
+                  className="p-1 hover:bg-accent rounded"
+                  title="Save"
+                >
+                  <Check className="h-3 w-3 text-green-500" />
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-1 hover:bg-accent rounded"
+                  title="Cancel"
+                >
+                  <X className="h-3 w-3 text-red-500" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium leading-none">
+                  {getDisplayName(user, profile)}
+                </p>
+                <button
+                  onClick={handleEditName}
+                  className="p-1 hover:bg-accent rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Edit name"
+                >
+                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
+            )}
             <p className="text-xs leading-snug text-muted-foreground truncate">
               {user.email}
             </p>
