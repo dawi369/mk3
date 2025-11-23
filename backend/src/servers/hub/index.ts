@@ -24,6 +24,9 @@ async function startHubServer() {
   try {
     console.log("Starting Hub server...");
 
+    // Initialize TimescaleDB
+    await timescaleStore.init();
+
     const polygonClient = new PolygonWSClient();
     const futuresMarket: PolygonMarketType = "futures";
 
@@ -35,9 +38,6 @@ async function startHubServer() {
     await polygonClient.subscribe(futuresGrainsSecondsRequest);
     await polygonClient.subscribe(futuresSoftsSecondsRequest);
     await polygonClient.subscribe(futuresVolatilesSecondsRequest);
-
-    // Initialize TimescaleDB (inactive)
-    await timescaleStore.init();
 
     // Load persisted job statuses
     await dailyClearJob.loadStatus();

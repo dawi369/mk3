@@ -23,6 +23,7 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
+import { AuthIndicator } from "@/components/common/auth-indicator";
 
 const components: { title: string; href: string; description: string }[] = [
   {
@@ -132,14 +133,7 @@ export function Navbar() {
         </NavigationMenuItem>
 
         <NavigationMenuItem>
-          <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-            <Link href="/login">
-              <span className="inline-flex items-center gap-2">
-                <Fingerprint className="w-4 h-4" />
-                Login
-              </span>
-            </Link>
-          </NavigationMenuLink>
+          <AuthIndicator />
         </NavigationMenuItem>
 
         {/* <li className="flex items-center">

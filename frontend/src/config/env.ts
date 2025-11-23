@@ -1,24 +1,20 @@
-import dotenv from "dotenv";
+export const NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL as string;
 
-dotenv.config();
+export const NEXT_PUBLIC_SUPABASE_URL = process.env
+  .NEXT_PUBLIC_SUPABASE_URL as string;
 
-function getEnvVar(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${key}`);
+export const NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env
+  .NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+
+// Optional: Validate existence
+if (typeof window !== "undefined") {
+  if (!NEXT_PUBLIC_SITE_URL) {
+    console.error("Missing NEXT_PUBLIC_SITE_URL");
   }
-  return value;
-}
-
-function getEnvVarAsInt(key: string): number {
-  const value = getEnvVar(key);
-  const parsed = parseInt(value);
-  if (isNaN(parsed)) {
-    throw new Error(`Environment variable ${key} must be a valid number`);
+  if (!NEXT_PUBLIC_SUPABASE_URL) {
+    console.error("Missing NEXT_PUBLIC_SUPABASE_URL");
   }
-  return parsed;
+  if (!NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    console.error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  }
 }
-
-export const CLIENT_REST_PORT = getEnvVarAsInt("CLIENT_REST_PORT");
-export const CLIENT_WS_PORT = getEnvVarAsInt("CLIENT_WS_PORT");
-export const NEXT_PUBLIC_SITE_URL = getEnvVar("NEXT_PUBLIC_SITE_URL");

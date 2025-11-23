@@ -6,12 +6,14 @@ import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import type { PolygonWSClient } from "@/servers/hub/api/polygon/ws_client.js";
 
+import { requireAuth } from "@/middleware/auth.js";
+
 const app = express();
 let polygonClient: PolygonWSClient | null = null;
 
 app.use(express.json());
 
-app.get("/health", async (req, res) => {
+app.get("/health", async (_req, res) => {
   const redisStats = await redisStore.getStats();
   const symbols = flowStore.getSymbols();
   const clearJobStatus = dailyClearJob.getStatus();
@@ -28,7 +30,7 @@ app.get("/health", async (req, res) => {
   });
 });
 
-app.get("/bars/latest", (req, res) => {
+app.get("/bars/latest", (_req, res) => {
   const bars = flowStore.getAllLatest();
   res.json({ bars, count: bars.length });
 });
@@ -47,18 +49,19 @@ app.get("/bars/today/:symbol", async (req, res) => {
   res.json({ symbol: req.params.symbol, bars, count: bars.length });
 });
 
-app.get("/symbols", (req, res) => {
+app.get("/symbols", (_req, res) => {
   const symbols = flowStore.getSymbols();
   res.json({ symbols, count: symbols.length });
 });
 
-app.post("/admin/clear-redis", async (req, res) => {
+// Protected routes
+app.post("/admin/clear-redis", requireAuth, async (_req, res) => {
   await dailyClearJob.runClear();
   const status = dailyClearJob.getStatus();
   res.json({ message: "Manual clear triggered", status });
 });
 
-app.post("/admin/refresh-subscriptions", async (req, res) => {
+app.post("/admin/refresh-subscriptions", requireAuth, async (_req, res) => {
   try {
     await monthlySubscriptionJob.runRefresh();
     const status = monthlySubscriptionJob.getStatus();
@@ -74,7 +77,7 @@ app.post("/admin/refresh-subscriptions", async (req, res) => {
   }
 });
 
-app.get("/admin/subscriptions", (req, res) => {
+app.get("/admin/subscriptions", requireAuth, (_req, res) => {
   if (!polygonClient) {
     res.status(503).json({ error: "Polygon client not initialized" });
     return;
