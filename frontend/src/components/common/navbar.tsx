@@ -67,7 +67,7 @@ export function Navbar() {
   const isMobile = useIsMobile();
 
   return (
-    <NavigationMenu viewport={isMobile}>
+    <NavigationMenu viewport={!isMobile}>
       <NavigationMenuList className="flex-wrap">
         <NavigationMenuItem>
           <NavigationMenuTrigger className="opacity-60 hover:opacity-100 transition-opacity">
