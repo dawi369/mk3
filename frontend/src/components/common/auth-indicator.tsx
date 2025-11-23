@@ -1,10 +1,6 @@
-"use client";
-
-import { useEffect, useState, useRef } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { useState, useRef, useEffect } from "react";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Fingerprint,
   Loader2,
@@ -13,7 +9,7 @@ import {
   CreditCard,
   Settings,
   Key,
-  Sparkles,
+  Lightbulb,
   ChevronDown,
   Pencil,
   Check,
@@ -32,79 +28,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuGroup,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
-import {
-  getUserProfile,
-  updateDisplayName,
-  ensureUserProfile,
-  type UserProfile,
-} from "@/lib/supabase/profiles";
+import { Input } from "@/components/ui/input";
+import { updateDisplayName, type UserProfile } from "@/lib/supabase/profiles";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/providers/auth-provider";
+
+const getDisplayName = (user: User, profile: UserProfile | null): string => {
+  // Priority: profile.display_name > OAuth first name > "Trader"
+  if (profile?.display_name) {
+    return profile.display_name.split(" ")[0];
+  }
+
+  // Extract first name from OAuth metadata
+  if (user.user_metadata?.name) {
+    return user.user_metadata.name.split(" ")[0];
+  }
+  if (user.user_metadata?.full_name) {
+    return user.user_metadata.full_name.split(" ")[0];
+  }
+
+  return "Trader";
+};
 
 export function AuthIndicator() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, loading, signOut, refreshProfile, updateProfile } =
+    useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [featureRequest, setFeatureRequest] = useState("");
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const supabase = createClient();
-  const router = useRouter();
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        // Ensure profile exists and fetch it
-        const isNewUser = await ensureUserProfile(
-          user.id,
-          user.email || undefined
-        );
-        const userProfile = await getUserProfile(user.id);
-        setProfile(userProfile);
-
-        // Redirect new users to onboarding
-        if (isNewUser) {
-          router.push("/onboarding");
-        }
-      }
-
-      setLoading(false);
-    };
-
-    getUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const isNewUser = await ensureUserProfile(
-          session.user.id,
-          session.user.email || undefined
-        );
-        const userProfile = await getUserProfile(session.user.id);
-        setProfile(userProfile);
-
-        // Redirect new users to onboarding
-        if (isNewUser) {
-          router.push("/onboarding");
-        }
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    if (dropdownOpen && user) {
+      setEditedName(profile?.display_name || getDisplayName(user, profile));
+    }
+  }, [dropdownOpen, user, profile]);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
   };
 
   const handleMouseEnter = () => {
@@ -123,42 +88,36 @@ export function AuthIndicator() {
     }, 150);
   };
 
-  const getDisplayName = (user: User, profile: UserProfile | null): string => {
-    // Priority: profile.display_name > OAuth first name > "Trader"
-    if (profile?.display_name) {
-      return profile.display_name.split(" ")[0];
-    }
-
-    // Extract first name from OAuth metadata
-    if (user.user_metadata?.name) {
-      return user.user_metadata.name.split(" ")[0];
-    }
-    if (user.user_metadata?.full_name) {
-      return user.user_metadata.full_name.split(" ")[0];
-    }
-
-    return "Trader";
-  };
-
-  const handleEditName = () => {
-    setEditedName(profile?.display_name || getDisplayName(user!, profile));
-    setIsEditingName(true);
-  };
-
-  const handleSaveName = async () => {
+  const handleSaveName = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!user || !editedName.trim()) return;
 
-    const success = await updateDisplayName(user.id, editedName.trim());
+    const newName = editedName.trim();
+    const oldName = profile?.display_name;
+
+    // Optimistic update
+    updateProfile({ display_name: newName });
+    setDropdownOpen(false);
+
+    const success = await updateDisplayName(user.id, newName);
     if (success) {
-      const updated = await getUserProfile(user.id);
-      setProfile(updated);
-      setIsEditingName(false);
+      await refreshProfile();
+    } else {
+      // Revert on failure
+      if (oldName) {
+        updateProfile({ display_name: oldName });
+      }
+      await refreshProfile();
     }
   };
 
-  const handleCancelEdit = () => {
-    setIsEditingName(false);
-    setEditedName("");
+  const handleFeatureRequestSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!featureRequest.trim()) return;
+    // In a real app, you'd send this to an API
+    console.log("Feature Request Submitted:", featureRequest);
+    setFeatureRequest("");
+    setDropdownOpen(false);
   };
 
   if (loading) {
@@ -171,7 +130,13 @@ export function AuthIndicator() {
 
   if (!user) {
     return (
-      <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+      <NavigationMenuLink
+        asChild
+        className={cn(
+          navigationMenuTriggerStyle(),
+          "focus:outline-none focus-visible:ring-0 focus-visible:outline-none"
+        )}
+      >
         <Link href="/login">
           <motion.span
             className="inline-flex items-center gap-2"
@@ -193,7 +158,10 @@ export function AuthIndicator() {
       modal={false}
     >
       <DropdownMenuTrigger
-        className={`${navigationMenuTriggerStyle()} group focus:ring-0 focus:outline-none focus-visible:ring-0`}
+        className={cn(
+          navigationMenuTriggerStyle(),
+          "group focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none"
+        )}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
@@ -222,49 +190,9 @@ export function AuthIndicator() {
       >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            {isEditingName ? (
-              <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={editedName}
-                  onChange={(e) => setEditedName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSaveName();
-                    if (e.key === "Escape") handleCancelEdit();
-                  }}
-                  className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="Display name"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveName}
-                  className="p-1 hover:bg-accent rounded"
-                  title="Save"
-                >
-                  <Check className="h-3 w-3 text-green-500" />
-                </button>
-                <button
-                  onClick={handleCancelEdit}
-                  className="p-1 hover:bg-accent rounded"
-                  title="Cancel"
-                >
-                  <X className="h-3 w-3 text-red-500" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium leading-none">
-                  {getDisplayName(user, profile)}
-                </p>
-                <button
-                  onClick={handleEditName}
-                  className="p-1 hover:bg-accent rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Edit name"
-                >
-                  <Pencil className="h-3 w-3 text-muted-foreground" />
-                </button>
-              </div>
-            )}
+            <p className="text-sm font-medium leading-none">
+              {getDisplayName(user, profile)}
+            </p>
             <p className="text-xs leading-snug text-muted-foreground truncate">
               {user.email}
             </p>
@@ -272,28 +200,85 @@ export function AuthIndicator() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem className="cursor-pointer group">
-            <UserIcon className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-            <span>Profile</span>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="cursor-pointer group">
+              <UserIcon className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span>Profile</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="p-2 w-64">
+              <form onSubmit={handleSaveName} className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-muted-foreground px-1">
+                  Display Name
+                </span>
+                <Input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  placeholder="Your name"
+                  className="h-8"
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-7 px-3 w-full"
+                >
+                  Save Changes
+                </button>
+              </form>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem asChild>
+            <Link
+              href="/billing"
+              className="cursor-pointer group w-full flex items-center"
+            >
+              <CreditCard className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span>Billing</span>
+            </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer group">
-            <CreditCard className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-            <span>Billing</span>
+          <DropdownMenuItem asChild>
+            <Link
+              href="/settings"
+              className="cursor-pointer group w-full flex items-center"
+            >
+              <Settings className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span>Settings</span>
+            </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer group">
-            <Settings className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-            <span>Settings</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="cursor-pointer group">
+          {/* <DropdownMenuItem className="cursor-pointer group">
             <Key className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
             <span>API Keys</span>
-          </DropdownMenuItem>
+          </DropdownMenuItem> */}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer group">
-          <Sparkles className="mr-2 h-4 w-4 text-indigo-400 group-hover:text-indigo-500 transition-colors" />
-          <span>Feature Request</span>
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="cursor-pointer group">
+            <Lightbulb className="mr-2 h-4 w-4 text-indigo-400 group-hover:text-indigo-500 transition-colors" />
+            <span>Feature Request</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="p-2 w-64">
+            <form
+              onSubmit={handleFeatureRequestSubmit}
+              className="flex flex-col gap-2"
+            >
+              <span className="text-xs font-medium text-muted-foreground px-1">
+                Share your feedback
+              </span>
+              <Input
+                value={featureRequest}
+                onChange={(e) => setFeatureRequest(e.target.value)}
+                placeholder="I want..."
+                className="h-8"
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-7 px-3 w-full"
+              >
+                Submit
+              </button>
+            </form>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}

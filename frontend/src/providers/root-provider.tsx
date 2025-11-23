@@ -1,6 +1,7 @@
 "use client";
 
 import { ThemeProvider } from "@/providers/theme-provider";
+import { AuthProvider } from "@/providers/auth-provider";
 // import { TooltipProvider } from "@/components/ui/tooltip"; // Uncomment when Tooltip is available
 
 export function RootProvider({ children }: { children: React.ReactNode }) {
@@ -11,9 +12,11 @@ export function RootProvider({ children }: { children: React.ReactNode }) {
       enableSystem={false}
       disableTransitionOnChange
     >
-      {/* <TooltipProvider> */}
-      {children}
-      {/* </TooltipProvider> */}
+      <AuthProvider>
+        {/* <TooltipProvider> */}
+        {children}
+        {/* </TooltipProvider> */}
+      </AuthProvider>
     </ThemeProvider>
   );
 }
