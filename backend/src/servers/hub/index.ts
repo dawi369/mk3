@@ -39,6 +39,9 @@ async function startHubServer() {
     await polygonClient.subscribe(futuresSoftsSecondsRequest);
     await polygonClient.subscribe(futuresVolatilesSecondsRequest);
 
+    //wait commond, 1 second
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+
     // Load persisted job statuses
     await dailyClearJob.loadStatus();
     await monthlySubscriptionJob.loadStatus();
