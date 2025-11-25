@@ -6,7 +6,7 @@ import type {
   PolygonWsRequest,
 } from "@/types/polygon.types.js";
 import type { RefreshJobStatus, RefreshDetails } from "@/types/common.types.js";
-import { quarterlyBuilder } from "@/utils/cbs/quarterly_cb.js";
+import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 
 class MonthlySubscriptionJob {
@@ -48,19 +48,6 @@ class MonthlySubscriptionJob {
     }
   }
 
-  private shouldRefreshIndices(): boolean {
-    const now = new Date();
-    const month = now.getMonth() + 1; // Jan = 1
-    return [3, 6, 9, 12].includes(month); // Mar, Jun, Sep, Dec
-  }
-
-  private shouldRefreshMetals(): boolean {
-    // Metals roll quarterly, check quarterly months
-    const now = new Date();
-    const month = now.getMonth() + 1; // Jan = 1
-    return [3, 6, 9, 12].includes(month); // Mar, Jun, Sep, Dec
-  }
-
   private findSubscriptionByAssetClass(
     subscriptions: PolygonWsRequest[],
     assetClass: PolygonAssetClass,
@@ -69,6 +56,25 @@ class MonthlySubscriptionJob {
     return subscriptions.find(
       (sub) => sub.assetClass === assetClass && sub.ev === eventType
     );
+  }
+
+  private getSubscriptionCount(assetClass: PolygonAssetClass): number {
+    switch (assetClass) {
+      case "us_indices":
+        return SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS;
+      case "metals":
+        return SUBSCRIPTION_CONFIG.METALS_QUARTERS;
+      case "currencies":
+        return SUBSCRIPTION_CONFIG.CURRENCY_QUARTERS;
+      case "grains":
+        return SUBSCRIPTION_CONFIG.GRAINS_MONTHS;
+      case "softs":
+        return SUBSCRIPTION_CONFIG.SOFTS_MONTHS;
+      case "volatiles":
+        return SUBSCRIPTION_CONFIG.VOLATILES_MONTHS;
+      default:
+        return 1;
+    }
   }
 
   private async refreshAssetClass(
@@ -89,21 +95,13 @@ class MonthlySubscriptionJob {
         throw new Error("WS client not initialized");
       }
 
-      // Build new request based on asset class
-      let newRequest: PolygonWsRequest;
-      if (assetClass === "us_indices") {
-        newRequest = quarterlyBuilder.buildQuarterlyRequest(
-          assetClass,
-          eventType,
-          SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS
-        );
-      } else {
-        newRequest = quarterlyBuilder.buildQuarterlyRequest(
-          assetClass,
-          eventType,
-          SUBSCRIPTION_CONFIG.METALS_QUARTERS
-        );
-      }
+      // Build new request based on asset class and config
+      const count = this.getSubscriptionCount(assetClass);
+      const newRequest = scheduleBuilder.buildRequest(
+        assetClass,
+        eventType,
+        count
+      );
 
       details.newSymbols = newRequest.symbols;
 
@@ -166,25 +164,24 @@ class MonthlySubscriptionJob {
     this.status.lastRefreshDetails = [];
 
     const refreshTasks: Promise<RefreshDetails>[] = [];
+    const assetClasses: PolygonAssetClass[] = [
+      "us_indices",
+      "metals",
+      "currencies",
+      "grains",
+      "softs",
+      "volatiles",
+    ];
 
-    // Check US indices (quarterly)
-    if (this.shouldRefreshIndices()) {
-      console.log("US Indices: Refresh needed (quarterly month)");
-      refreshTasks.push(this.refreshAssetClass("us_indices", "A"));
-      // Uncomment when subscribing to minute data:
-      // refreshTasks.push(this.refreshAssetClass('us_indices', 'AM'));
-    } else {
-      console.log("US Indices: No refresh needed (not a quarterly month)");
-    }
+    for (const assetClass of assetClasses) {
+      // Check if we should even try to refresh this asset class
+      // For now, we try all of them. If the builder returns empty symbols (e.g. no schedule),
+      // it handles it gracefully (returns empty list).
+      // However, we might want to skip if count is 0?
+      // But let's assume config is > 0.
 
-    // Check metals (quarterly)
-    if (this.shouldRefreshMetals()) {
-      console.log("Metals: Refresh needed (quarterly month)");
-      refreshTasks.push(this.refreshAssetClass("metals", "A"));
-      // Uncomment when subscribing to minute data:
-      // refreshTasks.push(this.refreshAssetClass('metals', 'AM'));
-    } else {
-      console.log("Metals: No refresh needed (not a quarterly month)");
+      refreshTasks.push(this.refreshAssetClass(assetClass, "A"));
+      // refreshTasks.push(this.refreshAssetClass(assetClass, "AM"));
     }
 
     // Execute all refreshes

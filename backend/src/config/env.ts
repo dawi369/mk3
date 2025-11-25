@@ -26,3 +26,4 @@ export const REDIS_HOST = getEnvVar("REDIS_HOST");
 export const REDIS_PORT = getEnvVarAsInt("REDIS_PORT");
 export const DATABASE_URL = getEnvVar("DATABASE_URL");
 export const SUPABASE_JWT_SECRET = getEnvVar("SUPABASE_JWT_SECRET");
+export const HUB_API_KEY = getEnvVar("HUB_API_KEY");

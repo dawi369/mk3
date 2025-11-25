@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { SUPABASE_JWT_SECRET } from "@/config/env.js";
+import { SUPABASE_JWT_SECRET, HUB_API_KEY } from "@/config/env.js";
 
 // Extend Express Request type to include user
 declare global {
@@ -30,6 +30,14 @@ export const requireAuth = (
     return;
   }
 
+  // Option 1: Check if it's the static API key (for development)
+  if (token === HUB_API_KEY) {
+    req.user = { type: "api_key", role: "admin" };
+    next();
+    return;
+  }
+
+  // Option 2: Verify JWT token (for production/Supabase auth)
   try {
     const decoded = jwt.verify(token, SUPABASE_JWT_SECRET);
     req.user = decoded;
