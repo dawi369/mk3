@@ -1,7 +1,4 @@
-import type {
-  PolygonWsRequest,
-  PolygonAssetClass,
-} from "@/types/polygon.types.js";
+import type { PolygonWsRequest, PolygonAssetClass } from "@/types/polygon.types.js";
 import { Tickers } from "@/utils/tickers.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 import { contractProvider } from "@/utils/contract_provider.js";
@@ -22,30 +19,36 @@ class ScheduleContractBuilder {
     this.tickers = new Tickers();
   }
 
-  async buildRequestAsync(
-    assetClass: PolygonAssetClass,
-    eventType: "A" | "AM"
-  ): Promise<PolygonWsRequest> {
+  async buildRequestAsync(assetClass: PolygonAssetClass, eventType: "A" | "AM"): Promise<PolygonWsRequest> {
     const tickerRoots = this.tickers.listCodes(assetClass as any);
     const symbols: string[] = [];
 
-    console.log(`Building async request for ${assetClass}...`);
+    console.log(`[ScheduleBuilder] Building async request for ${assetClass}...`);
+    console.log(`[ScheduleBuilder] Ticker roots for ${assetClass}:`, tickerRoots);
 
     // Determine limit based on asset class
     const limit = LIMITS_MAP[assetClass] || 1;
-    console.log(`Limit for ${assetClass}: ${limit}`);
+    console.log(`[ScheduleBuilder] Limit for ${assetClass}: ${limit}`);
 
-    for (const root of tickerRoots) {
+    for (let i = 0; i < tickerRoots.length; i++) {
+      const root = tickerRoots[i];
+      if (!root) continue;
+
+      console.log(`[ScheduleBuilder] Processing ticker ${i + 1}/${tickerRoots.length}: ${root}`);
+
       // We fetch all active contracts for this root
+      console.log(`[ScheduleBuilder] Fetching contracts for ${root}...`);
       const contracts = await contractProvider.fetchActiveContracts(root);
+      console.log(`[ScheduleBuilder] Fetched ${contracts.length} contracts for ${root}`);
 
       if (contracts.length === 0) {
-        console.warn(`No active contracts found for ${root}`);
+        console.warn(`[ScheduleBuilder] No active contracts found for ${root}`);
         continue;
       }
 
       // Apply limit
       const limited = contracts.slice(0, limit);
+      console.log(`[ScheduleBuilder] Applied limit, using ${limited.length} contracts for ${root}:`, limited);
       symbols.push(...limited);
     }
 
