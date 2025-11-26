@@ -1,10 +1,10 @@
 import type {
   PolygonWsRequest,
   PolygonAssetClass,
-} from "../../types/polygon.types.js";
-import { Tickers } from "../tickers.js";
-import { SUBSCRIPTION_CONFIG } from "../../config/subscriptions.js";
-import { contractProvider } from "../contract_provider.js";
+} from "@/types/polygon.types.js";
+import { Tickers } from "@/utils/tickers.js";
+import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
+import { contractProvider } from "@/utils/contract_provider.js";
 
 const LIMITS_MAP: Record<PolygonAssetClass, number> = {
   us_indices: SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS,

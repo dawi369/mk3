@@ -1,7 +1,7 @@
 import pg from "pg";
 import { promisify } from "util";
 import { gzip, unzip } from "zlib";
-import { redisStore } from "@/servers/hub/data/redis_store.js";
+import { redisStore } from "@/server/data/redis_store.js";
 import type { Bar } from "@/types/common.types.js";
 
 const gzipAsync = promisify(gzip);

@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { timescaleStore } from "@/servers/hub/data/timescale_store.js";
+import { timescaleStore } from "@/server/data/timescale_store.js";
 import { POLYGON_API_KEY } from "@/config/env.js";
 import type { Bar } from "@/types/common.types.js";
 import { POLYGON_API_URL } from "@/config/env.js";

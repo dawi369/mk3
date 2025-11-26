@@ -1,10 +1,5 @@
-// import type {
-//   PolygonWsRequest,
-//   PolygonAssetClass,
-// } from "../types/polygon.types.js";
 import { POLYGON_API_KEY } from "@/config/env.js";
-
-const BASE_URL = "https://api.massive.com/futures/vX/contracts";
+import { POLYGON_CONTRACTS_URL } from "@/utils/consts.js";
 
 interface Contract {
   ticker: string;
@@ -29,7 +24,7 @@ export class ContractProvider {
     const contractsMap = new Map<string, Contract>();
     let nextUrl:
       | string
-      | null = `${BASE_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
+      | null = `${POLYGON_CONTRACTS_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
 
     try {
       while (nextUrl) {

@@ -1,5 +1,5 @@
-import { timescaleStore } from "@/servers/hub/data/timescale_store.js";
-import { redisStore } from "@/servers/hub/data/redis_store.js";
+import { timescaleStore } from "@/server/data/timescale_store.js";
+import { redisStore } from "@/server/data/redis_store.js";
 import type { Bar } from "@/types/common.types.js";
 
 async function runTest() {

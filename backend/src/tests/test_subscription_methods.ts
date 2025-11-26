@@ -1,4 +1,4 @@
-import { PolygonWSClient } from "@/servers/hub/api/polygon/ws_client.js";
+import { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
 import type {
   PolygonMarketType,
   PolygonWsRequest,
