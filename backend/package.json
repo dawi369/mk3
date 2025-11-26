@@ -9,6 +9,9 @@
     "start": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src",
     "run:server": "NODE_OPTIONS='--enable-source-maps --trace-warnings' tsx src/server/index.ts"
   },
+  "prettier": {
+    "printWidth": 180
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

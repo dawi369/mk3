@@ -2,15 +2,25 @@
 
 // Polygon WebSocket protocol types
 
+// Health status type
+export interface WSHealth {
+  connected: boolean;
+  lastMessageTime: number | null;
+  subscriptionCount: number;
+  latencyMs: number | null;
+}
+
+export enum ConnectionState {
+  DISCONNECTED = "disconnected",
+  CONNECTING = "connecting",
+  CONNECTED = "connected",
+  SUBSCRIBED = "subscribed",
+  RECONNECTING = "reconnecting",
+}
+
 export type PolygonMarketType = "futures";
 
-export type PolygonAssetClass =
-  | "us_indices"
-  | "metals"
-  | "currencies"
-  | "grains"
-  | "softs"
-  | "volatiles";
+export type PolygonAssetClass = "us_indices" | "metals" | "currencies" | "grains" | "softs" | "volatiles";
 
 export type MarketStatus = "open" | "closed" | "pre" | "post" | "halted";
 
@@ -63,8 +73,4 @@ export interface PolygonTradeEvent {
   t: number; // timestamp (ms)
 }
 
-export type PolygonRealtimeMessage =
-  | PolygonStatusMessage
-  | PolygonAggregateEvent
-  | PolygonQuoteEvent
-  | PolygonTradeEvent;
+export type PolygonRealtimeMessage = PolygonStatusMessage | PolygonAggregateEvent | PolygonQuoteEvent | PolygonTradeEvent;

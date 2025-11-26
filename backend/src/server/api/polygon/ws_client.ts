@@ -1,60 +1,15 @@
 import { websocketClient } from "@polygon.io/client-js";
 import { POLYGON_API_KEY } from "@/config/env.js";
 import { POLYGON_WS_URL } from "@/utils/consts.js";
-import type {
-  PolygonWsRequest,
-  PolygonMarketType,
-  PolygonStatusMessage,
-} from "@/types/polygon.types.js";
-import {
-  buildSubscribeParams,
-  isAggregateEvent,
-  isStatusMessage,
-  isQuoteEvent,
-  isTradeEvent,
-  aggregateToBar,
-} from "@/utils/polygon.utils.js";
+import type { PolygonWsRequest, PolygonMarketType, PolygonStatusMessage } from "@/types/polygon.types.js";
+import { buildSubscribeParams, isAggregateEvent, isStatusMessage, isQuoteEvent, isTradeEvent, aggregateToBar } from "@/utils/polygon.utils.js";
 import { flowStore } from "@/server/data/flow_store.js";
 import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import { PolygonAggregateEventSchema } from "@/schemas/events.js";
-
-// Health status type
-interface WSHealth {
-  connected: boolean;
-  lastMessageTime: number | null;
-  subscriptionCount: number;
-  latencyMs: number | null;
-}
-
-enum ConnectionState {
-  DISCONNECTED = "disconnected",
-  CONNECTING = "connecting",
-  CONNECTED = "connected",
-  SUBSCRIBED = "subscribed",
-  RECONNECTING = "reconnecting",
-}
-
-function isMarketHours(): { isOpen: boolean; reason?: string } {
-  const now = new Date();
-  const et = new Date(
-    now.toLocaleString("en-US", { timeZone: "America/New_York" })
-  );
-  const day = et.getDay();
-  const hour = et.getHours();
-
-  // Weekend
-  if (day === 0 || day === 6) {
-    return { isOpen: false, reason: "Weekend" };
-  }
-
-  // Daily futures reset: 5pm-6pm ET (no trading)
-  if (hour === 17) {
-    return { isOpen: false, reason: "Daily settlement period (5pm-6pm ET)" };
-  }
-
-  return { isOpen: true };
-}
+import { ConnectionState } from "@/types/polygon.types.js";
+import type { WSHealth } from "@/types/polygon.types.js";
+import { isMarketHours } from "@/utils/polygon.utils.js";
 
 export class PolygonWSClient {
   private ws: any = null;
@@ -83,9 +38,7 @@ export class PolygonWSClient {
 
     const marketStatus = isMarketHours();
     if (!marketStatus.isOpen) {
-      console.warn(
-        `⚠️  Market closed: ${marketStatus.reason}. No live data expected.`
-      );
+      console.warn(`⚠️  Market closed: ${marketStatus.reason}. No live data expected.`);
     }
 
     const client = websocketClient(POLYGON_API_KEY, POLYGON_WS_URL);
@@ -207,9 +160,7 @@ export class PolygonWSClient {
 
       // Handle quote events (top of book)
       if (isQuoteEvent(m)) {
-        console.log(
-          `Quote: ${m.sym} - Bid: ${m.bp}x${m.bs}, Ask: ${m.ap}x${m.as}`
-        );
+        console.log(`Quote: ${m.sym} - Bid: ${m.bp}x${m.bs}, Ask: ${m.ap}x${m.as}`);
         return;
       }
 
@@ -228,13 +179,7 @@ export class PolygonWSClient {
 
   async subscribe(request: PolygonWsRequest): Promise<void> {
     // Save subscription for reconnects (deduplicate)
-    if (
-      !this.subscriptions.find(
-        (s) =>
-          s.ev === request.ev &&
-          JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
-      )
-    ) {
+    if (!this.subscriptions.find((s) => s.ev === request.ev && JSON.stringify(s.symbols) === JSON.stringify(request.symbols))) {
       this.subscriptions.push(request);
     }
 
@@ -263,13 +208,7 @@ export class PolygonWSClient {
     if (!this.ws || this.state === ConnectionState.DISCONNECTED) {
       console.log("Cannot unsubscribe: not connected");
       // Still remove from local tracking
-      this.subscriptions = this.subscriptions.filter(
-        (s) =>
-          !(
-            s.ev === request.ev &&
-            JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
-          )
-      );
+      this.subscriptions = this.subscriptions.filter((s) => !(s.ev === request.ev && JSON.stringify(s.symbols) === JSON.stringify(request.symbols)));
       return;
     }
 
@@ -292,25 +231,13 @@ export class PolygonWSClient {
     await unsubscribePromise;
 
     // Remove from tracked subscriptions
-    this.subscriptions = this.subscriptions.filter(
-      (s) =>
-        !(
-          s.ev === request.ev &&
-          JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
-        )
-    );
+    this.subscriptions = this.subscriptions.filter((s) => !(s.ev === request.ev && JSON.stringify(s.symbols) === JSON.stringify(request.symbols)));
 
     // Update subscription count
-    this.health.subscriptionCount = this.subscriptions.reduce(
-      (total, sub) => total + sub.symbols.length,
-      0
-    );
+    this.health.subscriptionCount = this.subscriptions.reduce((total, sub) => total + sub.symbols.length, 0);
   }
 
-  async updateSubscription(
-    old: PolygonWsRequest,
-    newRequest: PolygonWsRequest
-  ): Promise<void> {
+  async updateSubscription(old: PolygonWsRequest, newRequest: PolygonWsRequest): Promise<void> {
     const oldSymbols = old.symbols.sort().join(",");
     const newSymbols = newRequest.symbols.sort().join(",");
 
@@ -319,9 +246,7 @@ export class PolygonWSClient {
       return;
     }
 
-    console.log(
-      `Updating subscription: ${old.symbols.length} symbols → ${newRequest.symbols.length} symbols`
-    );
+    console.log(`Updating subscription: ${old.symbols.length} symbols → ${newRequest.symbols.length} symbols`);
 
     // Unsubscribe from old
     await this.unsubscribe(old);
@@ -334,15 +259,10 @@ export class PolygonWSClient {
         console.log(`Subscription updated successfully`);
         return;
       } catch (err) {
-        console.error(
-          `Subscribe attempt ${attempt}/${maxRetries} failed:`,
-          err
-        );
+        console.error(`Subscribe attempt ${attempt}/${maxRetries} failed:`, err);
 
         if (attempt === maxRetries) {
-          throw new Error(
-            `Failed to subscribe after ${maxRetries} attempts: ${err}`
-          );
+          throw new Error(`Failed to subscribe after ${maxRetries} attempts: ${err}`);
         }
 
         // Wait before retry (exponential backoff)
@@ -386,9 +306,7 @@ export class PolygonWSClient {
     try {
       const start = Date.now();
 
-      const response = await fetch(
-        `https://api.polygon.io/v3/reference/tickers?active=true&limit=1&apiKey=${POLYGON_API_KEY}`
-      );
+      const response = await fetch(`https://api.polygon.io/v3/reference/tickers?active=true&limit=1&apiKey=${POLYGON_API_KEY}`);
 
       //   const response = await fetch(`https://massive.com/`);
       //   if (response.ok || response.status === 301 || response.status === 302) {
@@ -410,10 +328,7 @@ export class PolygonWSClient {
       return;
     }
 
-    if (
-      this.state === ConnectionState.SUBSCRIBED ||
-      this.state === ConnectionState.CONNECTED
-    ) {
+    if (this.state === ConnectionState.SUBSCRIBED || this.state === ConnectionState.CONNECTED) {
       return;
     }
 
@@ -421,9 +336,7 @@ export class PolygonWSClient {
 
     const delay = Math.min(500 * Math.pow(2, this.reconnectAttempts), 20_000);
 
-    console.log(
-      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`
-    );
+    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`);
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;

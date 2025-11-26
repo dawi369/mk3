@@ -8,6 +8,7 @@ import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 // import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
+// import { POLYGON_ASSET_CLASS_LIST } from "@/utils/consts.js";
 
 /**
  * Main Hub server startup
@@ -28,21 +29,14 @@ async function startHubServer() {
     // Build requests dynamically using API
     console.log("Building subscription requests...");
 
-    const usIndicesReq = await scheduleBuilder.buildRequestAsync(
-      "us_indices",
-      "A"
-    );
-    await polygonClient.subscribe(usIndicesReq);
+    // const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
+    const metalsReq = await scheduleBuilder.buildRequestAsync("metals", "A");
 
-    // We can do others in parallel or sequence
-    // const classes: any[] = [
-    //   "metals",
-    //   "currencies",
-    //   "grains",
-    //   "softs",
-    //   "volatiles",
-    // ];
-    // for (const cls of classes) {
+    // await polygonClient.subscribe(usIndicesReq);
+    await polygonClient.subscribe(metalsReq);
+
+    // All in parallel
+    // for (const cls of POLYGON_ASSET_CLASS_LIST) {
     //   const req = await scheduleBuilder.buildRequestAsync(cls, "A");
     //   await polygonClient.subscribe(req);
     // }

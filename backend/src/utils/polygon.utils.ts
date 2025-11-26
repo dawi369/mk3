@@ -1,10 +1,4 @@
-import type {
-  PolygonWsRequest,
-  PolygonAggregateEvent,
-  PolygonQuoteEvent,
-  PolygonTradeEvent,
-  PolygonStatusMessage,
-} from "@/types/polygon.types.js";
+import type { PolygonWsRequest, PolygonAggregateEvent, PolygonQuoteEvent, PolygonTradeEvent, PolygonStatusMessage } from "@/types/polygon.types.js";
 
 import type { Bar } from "@/types/common.types.js";
 
@@ -49,4 +43,23 @@ export function toDate(epochMs: number): Date {
 // Returns comma-separated params like "A.ESZ5,A.NQZ5"
 export function buildSubscribeParams(req: PolygonWsRequest): string {
   return req.symbols.map((s) => `${req.ev}.${s}`).join(",");
+}
+
+export function isMarketHours(): { isOpen: boolean; reason?: string } {
+  const now = new Date();
+  const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const day = et.getDay();
+  const hour = et.getHours();
+
+  // Weekend
+  if (day === 0 || day === 6) {
+    return { isOpen: false, reason: "Weekend" };
+  }
+
+  // Daily futures reset: 5pm-6pm ET (no trading)
+  if (hour === 17) {
+    return { isOpen: false, reason: "Daily settlement period (5pm-6pm ET)" };
+  }
+
+  return { isOpen: true };
 }
