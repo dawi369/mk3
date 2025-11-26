@@ -7,14 +7,7 @@ import { startHubRESTApi } from "@/servers/hub/api/rest_client.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 // import { historySyncJob } from "@/jobs/sync_history.js";
-import {
-  futuresUSIndicesSecondsRequest,
-  futuresMetalsSecondsRequest,
-  futuresCurrencySecondsRequest,
-  futuresGrainsSecondsRequest,
-  futuresSoftsSecondsRequest,
-  futuresVolatilesSecondsRequest,
-} from "@/utils/consts.js";
+import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
 /**
  * Main Hub server startup
@@ -32,12 +25,27 @@ async function startHubServer() {
 
     await polygonClient.connect(futuresMarket);
 
-    await polygonClient.subscribe(futuresUSIndicesSecondsRequest);
-    await polygonClient.subscribe(futuresMetalsSecondsRequest);
-    await polygonClient.subscribe(futuresCurrencySecondsRequest);
-    await polygonClient.subscribe(futuresGrainsSecondsRequest);
-    await polygonClient.subscribe(futuresSoftsSecondsRequest);
-    await polygonClient.subscribe(futuresVolatilesSecondsRequest);
+    // Build requests dynamically using API
+    console.log("Building subscription requests...");
+
+    const usIndicesReq = await scheduleBuilder.buildRequestAsync(
+      "us_indices",
+      "A"
+    );
+    await polygonClient.subscribe(usIndicesReq);
+
+    // We can do others in parallel or sequence
+    // const classes: any[] = [
+    //   "metals",
+    //   "currencies",
+    //   "grains",
+    //   "softs",
+    //   "volatiles",
+    // ];
+    // for (const cls of classes) {
+    //   const req = await scheduleBuilder.buildRequestAsync(cls, "A");
+    //   await polygonClient.subscribe(req);
+    // }
 
     //wait commond, 1 second
     await new Promise((resolve) => setTimeout(resolve, 1_000));

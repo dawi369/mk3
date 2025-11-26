@@ -7,7 +7,6 @@ import type {
 } from "@/types/polygon.types.js";
 import type { RefreshJobStatus, RefreshDetails } from "@/types/common.types.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
-import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 
 class MonthlySubscriptionJob {
   private wsClient: PolygonWSClient | null = null;
@@ -58,25 +57,6 @@ class MonthlySubscriptionJob {
     );
   }
 
-  private getSubscriptionCount(assetClass: PolygonAssetClass): number {
-    switch (assetClass) {
-      case "us_indices":
-        return SUBSCRIPTION_CONFIG.US_INDICES_QUARTERS;
-      case "metals":
-        return SUBSCRIPTION_CONFIG.METALS_QUARTERS;
-      case "currencies":
-        return SUBSCRIPTION_CONFIG.CURRENCY_QUARTERS;
-      case "grains":
-        return SUBSCRIPTION_CONFIG.GRAINS_MONTHS;
-      case "softs":
-        return SUBSCRIPTION_CONFIG.SOFTS_MONTHS;
-      case "volatiles":
-        return SUBSCRIPTION_CONFIG.VOLATILES_MONTHS;
-      default:
-        return 1;
-    }
-  }
-
   private async refreshAssetClass(
     assetClass: PolygonAssetClass,
     eventType: "A" | "AM"
@@ -96,11 +76,10 @@ class MonthlySubscriptionJob {
       }
 
       // Build new request based on asset class and config
-      const count = this.getSubscriptionCount(assetClass);
-      const newRequest = scheduleBuilder.buildRequest(
+      // Build new request based on asset class and config
+      const newRequest = await scheduleBuilder.buildRequestAsync(
         assetClass,
-        eventType,
-        count
+        eventType
       );
 
       details.newSymbols = newRequest.symbols;

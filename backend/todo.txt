@@ -1,1 +1,3 @@
 account for holidays
+
+explore automated ways to determine contract expiration dates and active contracts
