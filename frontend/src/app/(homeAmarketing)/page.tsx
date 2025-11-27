@@ -11,7 +11,8 @@ import {
   Lock,
 } from "lucide-react";
 import Link from "next/link";
-import { MarketStatus } from "@/components/ui/market-status";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { TextLoop } from "@/components/ui/text-loop";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -85,20 +86,18 @@ export default function Home() {
           variants={stagger}
         >
           <div className="lg:col-span-7 space-y-8">
-            <motion.div variants={fadeInUp}>
-              <MarketStatus />
-            </motion.div>
-
             <motion.h1
               variants={fadeInUp}
               className="text-6xl md:text-8xl font-bold tracking-tighter font-space text-foreground leading-[0.9]"
             >
-              <ScrambleTitle delay={200}>FUTURES.</ScrambleTitle>
+              <ScrambleTitle delay={200}>FUTURES</ScrambleTitle>
               <br />
-              <ScrambleTitle delay={400}>FOCUSED.</ScrambleTitle>
+              <ScrambleTitle delay={400}>TOOLS</ScrambleTitle>
+              <br />
+              <ScrambleTitle delay={600}>NEED</ScrambleTitle>
               <br />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-primary/50">
-                <ScrambleTitle delay={600}>FAST.</ScrambleTitle>
+                <ScrambleTitle delay={800}>CHANGE.</ScrambleTitle>
               </span>
             </motion.h1>
 
@@ -106,15 +105,21 @@ export default function Home() {
               variants={fadeInUp}
               className="text-xl text-muted-foreground max-w-xl font-light leading-relaxed"
             >
-              Swordfish transforms institutional futures data into refined
-              insights, real-time signals, and a seamless trading
-              experience—giving every serious trader access to power once
-              reserved for the pros. With the
+              <span className="text-foreground font-medium">
+                Stop trading with tools built for the past.
+              </span>{" "}
+              Swordfish delivers institutional-grade futures data, real-time
+              signals, and refined insights in an interface designed for
               <span className="text-foreground font-medium">
                 {" "}
-                Best UI in Futures Trading
+                enhanced intelligence.
+              </span>{" "}
+              Power, precision, and the
+              <span className="text-foreground font-medium">
+                {" "}
+                Best UI in the Game
               </span>
-              , we makes professional-grade performance feel effortless.
+              —now at your fingertips.
             </motion.p>
 
             <motion.div variants={fadeInUp} className="flex flex-wrap gap-4">
@@ -136,23 +141,17 @@ export default function Home() {
               className="pt-8 grid grid-cols-3 gap-8 border-t border-border/50"
             >
               <div>
-                <div className="text-3xl font-bold font-space">50+</div>
+                <div className="text-3xl font-bold font-space">100+</div>
                 <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Global Futures Exchanges
+                  Global Futures Products
                 </div>
               </div>
               <div>
-                <div className="text-3xl font-bold font-space">10ms</div>
-                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Latency
-                </div>
-              </div>
-              {/* <div>
                 <div className="text-3xl font-bold font-space">Full</div>
                 <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Full L2/L3 Order Book
+                  L1/L2 Order Book
                 </div>
-              </div> */}
+              </div>
               <div>
                 <div className="text-3xl font-bold font-space">AI-Driven</div>
                 <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
@@ -176,7 +175,7 @@ export default function Home() {
                     <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500"></div>
                   </div>
                   <div className="text-muted-foreground">
-                    this is temp ESZ25 • CME
+                    ESZ25 • CME • LIVE
                   </div>
                 </div>
 
@@ -227,100 +226,44 @@ export default function Home() {
         >
           <motion.div variants={fadeInUp} className="mb-16">
             <h2 className="text-4xl md:text-5xl font-bold font-space mb-6">
-              INTELLIGENCE{" "}
-              <span className="text-muted-foreground">BUILT IN.</span>
+              <TextLoop interval={3} className="text-foreground">
+                <span>
+                  <span className="text-muted-foreground">SEE THE MARKET </span>
+                  CLEARLY.
+                </span>
+                <span>
+                  <span className="text-muted-foreground">TRADE WITH </span>
+                  PRECISION.
+                </span>
+                <span>
+                  <span className="text-muted-foreground">THINK </span>
+                  FASTER.
+                </span>
+                <span>
+                  <span className="text-muted-foreground">STAY </span>
+                  AHEAD.
+                </span>
+              </TextLoop>
             </h2>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Large Card */}
-            <motion.div
-              variants={fadeInUp}
-              className="md:col-span-2 p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
-            >
-              <div className="h-full flex flex-col justify-between">
-                <div className="mb-8">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                    <Activity className="w-6 h-6 text-primary" />
+          <motion.div variants={fadeInUp} className="w-full">
+            <div className="rounded-xl overflow-hidden border border-border bg-card/30 backdrop-blur-sm p-2">
+              <AspectRatio
+                ratio={16 / 9}
+                className="bg-muted/20 rounded-lg flex items-center justify-center"
+              >
+                <div className="text-muted-foreground flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <div className="w-0 h-0 border-t-10 border-t-transparent border-l-20 border-l-primary border-b-10 border-b-transparent ml-1" />
                   </div>
-                  <h3 className="text-2xl font-bold font-space mb-3">
-                    Real-time Analytics
-                  </h3>
-                  <p className="text-muted-foreground max-w-md">
-                    Process thousands of data points per second with our
-                    advanced aggregation engine. Visualize market depth and
-                    order flow in real-time.
-                  </p>
+                  <span className="font-space font-medium tracking-widest uppercase text-sm">
+                    Platform Demo
+                  </span>
                 </div>
-                <div className="w-full h-32 bg-linear-to-r from-primary/5 to-transparent rounded-lg border border-primary/10 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(68,68,68,.2)_50%,transparent_75%,transparent_100%)] bg-size-[250%_250%,100%_100%] animate-[shimmer_3s_infinite]"></div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Tall Card */}
-            <motion.div
-              variants={fadeInUp}
-              className="md:row-span-2 p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
-            >
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Globe className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-2xl font-bold font-space mb-3">
-                Global Coverage
-              </h3>
-              <p className="text-muted-foreground mb-8">
-                Access futures markets across CME, CBOT, ICE?, COMEX, and NYMEX.
-              </p>
-              <div className="space-y-4 font-mono text-sm">
-                {[
-                  "ES (S&P 500)",
-                  "ZC (Corn)",
-                  "BZ (Brent)?",
-                  "GC (Gold)",
-                  "CL (Crude)",
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between py-2 border-b border-border/50"
-                  >
-                    <span className="text-muted-foreground">{item}</span>
-                    <span className="text-green-500">● Active</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Small Card 1 */}
-            <motion.div
-              variants={fadeInUp}
-              className="p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
-            >
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Zap className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold font-space mb-2">Low Latency</h3>
-              <p className="text-muted-foreground text-sm">
-                Direct market access with sub-millisecond execution times.
-              </p>
-            </motion.div>
-
-            {/* Small Card 2 */}
-            <motion.div
-              variants={fadeInUp}
-              className="p-8 rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-colors group"
-            >
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Lock className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold font-space mb-2">
-                Enterprise Security
-              </h3>
-              <p className="text-muted-foreground text-sm">
-                Bank-grade encryption and secure authentication protocols.
-              </p>
-            </motion.div>
-          </div>
+              </AspectRatio>
+            </div>
+          </motion.div>
         </motion.div>
       </section>
 
@@ -337,19 +280,18 @@ export default function Home() {
             className="text-5xl md:text-7xl font-bold font-space tracking-tight"
             variants={fadeInUp}
           >
-            READY TO <span className="text-primary">DIVE IN?</span>
+            START TRADING <span className="text-primary">SMARTER.</span>
           </motion.h2>
           <motion.p
             className="text-xl text-muted-foreground max-w-2xl mx-auto"
             variants={fadeInUp}
           >
-            Join the elite traders who trust Swordfish for their daily
-            operations.
+            Join the new wave of futures traders using Swordfish.
           </motion.p>
           <motion.div variants={fadeInUp}>
-            <Link href="/login">
+            <Link href="/terminal">
               <button className="inline-flex h-14 items-center justify-center rounded-full bg-foreground px-10 font-medium text-background transition-transform hover:scale-105 active:scale-95">
-                Get Started Now
+                Launch Terminal
               </button>
             </Link>
           </motion.div>
