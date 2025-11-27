@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/client";
 export interface UserProfile {
   id: string;
   display_name: string | null;
+  tier: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -10,14 +11,12 @@ export interface UserProfile {
 /**
  * Fetch user profile from profiles table
  */
-export async function getUserProfile(
-  userId: string
-): Promise<UserProfile | null> {
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   const supabase = createClient();
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, created_at, updated_at")
+    .select("id, display_name, tier, created_at, updated_at")
     .eq("id", userId)
     .single();
 
@@ -38,10 +37,7 @@ export async function getUserProfile(
 /**
  * Update user's display name in profiles table
  */
-export async function updateDisplayName(
-  userId: string,
-  displayName: string
-): Promise<boolean> {
+export async function updateDisplayName(userId: string, displayName: string): Promise<boolean> {
   const supabase = createClient();
 
   const { error } = await supabase
@@ -62,10 +58,7 @@ export async function updateDisplayName(
  * Silently fails if table doesn't exist
  * @returns true if profile was newly created, false if it already existed or on error
  */
-export async function ensureUserProfile(
-  userId: string,
-  email?: string
-): Promise<boolean> {
+export async function ensureUserProfile(userId: string, email?: string): Promise<boolean> {
   const supabase = createClient();
 
   try {
@@ -94,9 +87,7 @@ export async function ensureUserProfile(
         profileData.email = email;
       }
 
-      const { error: insertError } = await supabase
-        .from("profiles")
-        .insert(profileData);
+      const { error: insertError } = await supabase.from("profiles").insert(profileData);
 
       if (insertError) {
         // 23505 = duplicate key, which means profile already exists (race condition)
@@ -108,9 +99,7 @@ export async function ensureUserProfile(
         console.error("Error creating profile - Full error:", insertError);
         console.error("Error code:", insertError.code);
         console.error("Error message:", insertError.message);
-        console.error(
-          "This might be due to RLS policies. Check Supabase RLS settings."
-        );
+        console.error("This might be due to RLS policies. Check Supabase RLS settings.");
         return false;
       } else {
         console.log("Profile created successfully for user:", userId);

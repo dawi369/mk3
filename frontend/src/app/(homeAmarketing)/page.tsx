@@ -1,72 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  TrendingUp,
-  Zap,
-  BarChart3,
-  ArrowRight,
-  Activity,
-  Globe,
-  Lock,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { TextLoop } from "@/components/ui/text-loop";
+import { ScrambleTitle } from "@/components/home/scramble-title";
+import { TerminalPreviewCard } from "@/components/home/terminal-preview-card";
+import { StatsDisplay } from "@/components/home/stats-display";
+import { PlatformDemoSection } from "@/components/home/platform-demo-section";
+import { ANIMATION_CONFIG, SCRAMBLE_DELAYS } from "@/app/(homeAmarketing)/constants";
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
-};
-
-const stagger = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-import { TextScramble } from "@/components/ui/text-scramble";
-import { useState, useEffect } from "react";
-
-function ScrambleTitle({
-  children,
-  className,
-  delay = 0,
-}: {
-  children: string;
-  className?: string;
-  delay?: number;
-}) {
-  const [trigger, setTrigger] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setTrigger(true);
-    }, delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
-
-  return (
-    <TextScramble
-      className={className}
-      as="span"
-      trigger={trigger}
-      loop={isHovering}
-      onHoverStart={() => {
-        setTrigger(true);
-        setIsHovering(true);
-      }}
-      onHoverEnd={() => setIsHovering(false)}
-      onScrambleComplete={() => setTrigger(false)}
-    >
-      {children}
-    </TextScramble>
-  );
-}
+const { fadeInUp, stagger } = ANIMATION_CONFIG;
 
 export default function Home() {
   return (
@@ -90,14 +34,14 @@ export default function Home() {
               variants={fadeInUp}
               className="text-6xl md:text-8xl font-bold tracking-tighter font-space text-foreground leading-[0.9]"
             >
-              <ScrambleTitle delay={200}>FUTURES</ScrambleTitle>
+              <ScrambleTitle delay={SCRAMBLE_DELAYS.futures}>FUTURES</ScrambleTitle>
               <br />
-              <ScrambleTitle delay={400}>TOOLS</ScrambleTitle>
+              <ScrambleTitle delay={SCRAMBLE_DELAYS.tools}>TOOLS</ScrambleTitle>
               <br />
-              <ScrambleTitle delay={600}>NEED</ScrambleTitle>
+              <ScrambleTitle delay={SCRAMBLE_DELAYS.need}>NEED</ScrambleTitle>
               <br />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-primary/50">
-                <ScrambleTitle delay={800}>CHANGE.</ScrambleTitle>
+                <ScrambleTitle delay={SCRAMBLE_DELAYS.change}>CHANGE.</ScrambleTitle>
               </span>
             </motion.h1>
 
@@ -108,17 +52,11 @@ export default function Home() {
               <span className="text-foreground font-medium">
                 Stop trading with tools built for the past.
               </span>{" "}
-              Swordfish delivers institutional-grade futures data, real-time
-              signals, and refined insights in an interface designed for
-              <span className="text-foreground font-medium">
-                {" "}
-                enhanced intelligence.
-              </span>{" "}
-              Power, precision, and the
-              <span className="text-foreground font-medium">
-                {" "}
-                Best UI in the Game
-              </span>
+              Swordfish delivers institutional-grade futures data, real-time signals, and refined
+              insights in an interface designed for
+              <span className="text-foreground font-medium"> enhanced intelligence.</span> Power,
+              precision, and the
+              <span className="text-foreground font-medium"> Best UI in the Game</span>
               —now at your fingertips.
             </motion.p>
 
@@ -136,81 +74,11 @@ export default function Home() {
               </Link>
             </motion.div>
 
-            <motion.div
-              variants={fadeInUp}
-              className="pt-8 grid grid-cols-3 gap-8 border-t border-border/50"
-            >
-              <div>
-                <div className="text-3xl font-bold font-space">100+</div>
-                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Global Futures Products
-                </div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold font-space">Full</div>
-                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  L1/L2 Order Book
-                </div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold font-space">AI-Driven</div>
-                <div className="text-xs text-muted-foreground font-mono uppercase mt-1">
-                  Edge
-                </div>
-              </div>
-            </motion.div>
+            <StatsDisplay variants={fadeInUp} />
           </div>
 
           <div className="lg:col-span-5 relative">
-            <motion.div
-              variants={fadeInUp}
-              className="relative rounded-xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-2xl"
-            >
-              {/* Abstract Trading UI */}
-              <div className="space-y-4 font-mono text-sm">
-                <div className="flex justify-between items-center border-b border-border pb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500"></div>
-                  </div>
-                  <div className="text-muted-foreground">
-                    ESZ25 • CME • LIVE
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <div className="text-xs text-muted-foreground">BID</div>
-                    <div className="text-2xl text-green-500 font-bold">
-                      4501.25
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Vol: 125
-                    </div>
-                  </div>
-                  <div className="space-y-2 text-right">
-                    <div className="text-xs text-muted-foreground">ASK</div>
-                    <div className="text-2xl text-red-500 font-bold">
-                      4501.50
-                    </div>
-                    <div className="text-xs text-muted-foreground">Vol: 84</div>
-                  </div>
-                </div>
-
-                <div className="h-32 flex items-end gap-1 pt-4 border-t border-border/50 opacity-50">
-                  {[
-                    40, 65, 45, 80, 55, 70, 40, 60, 50, 75, 60, 85, 70, 90, 65,
-                  ].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 bg-primary/20 hover:bg-primary/40 transition-colors rounded-t-sm"
-                      style={{ height: `${h}%` }}
-                    ></div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
+            <TerminalPreviewCard variants={fadeInUp} />
           </div>
         </motion.div>
       </section>
@@ -247,23 +115,7 @@ export default function Home() {
             </h2>
           </motion.div>
 
-          <motion.div variants={fadeInUp} className="w-full">
-            <div className="rounded-xl overflow-hidden border border-border bg-card/30 backdrop-blur-sm p-2">
-              <AspectRatio
-                ratio={16 / 9}
-                className="bg-muted/20 rounded-lg flex items-center justify-center"
-              >
-                <div className="text-muted-foreground flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <div className="w-0 h-0 border-t-10 border-t-transparent border-l-20 border-l-primary border-b-10 border-b-transparent ml-1" />
-                  </div>
-                  <span className="font-space font-medium tracking-widest uppercase text-sm">
-                    Platform Demo
-                  </span>
-                </div>
-              </AspectRatio>
-            </div>
-          </motion.div>
+          <PlatformDemoSection variants={fadeInUp} />
         </motion.div>
       </section>
 
@@ -282,10 +134,7 @@ export default function Home() {
           >
             START TRADING <span className="text-primary">SMARTER.</span>
           </motion.h2>
-          <motion.p
-            className="text-xl text-muted-foreground max-w-2xl mx-auto"
-            variants={fadeInUp}
-          >
+          <motion.p className="text-xl text-muted-foreground max-w-2xl mx-auto" variants={fadeInUp}>
             Join the new wave of futures traders using Swordfish.
           </motion.p>
           <motion.div variants={fadeInUp}>
