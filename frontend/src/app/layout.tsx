@@ -22,7 +22,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   metadataBase: new URL(NEXT_PUBLIC_SITE_URL),
   title: {
-    default: "Swordfish: Futures Intelligence",
+    default: "Swordfish - Futures Intelligence",
     template: "%s | Swordfish",
   },
   description: "Futures. Focused. Fast",
@@ -51,39 +51,39 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://swordfish.trade",
-    title: "Swordfish: Futures Terminal",
+    title: "Swordfish - Futures Intelligence",
     description:
       "Next-generation futures trading terminal. Sub-millisecond latency, institutional-grade data, and intelligent insights for professional traders.",
     siteName: "Swordfish",
     images: [
       {
-        url: "/og-image.png",
+        url: "/mk3LogoTransparentnBackground.png",
         width: 1200,
         height: 630,
-        alt: "Swordfish Futures Terminal",
+        alt: "Swordfish Futures Intelligence",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Swordfish: Futures Terminal",
+    title: "Swordfish - Futures Intelligence",
     description: "Futures. Focused. Fast",
     creator: "@devDawi",
-    images: ["/assets/images/fishLogo.png"],
+    images: ["/mk3LogoTransparentnBackground.png"],
   },
   icons: {
     icon: [
       // Light mode
       {
-        url: "/mk3Logo.svg",
-        type: "image/svg+xml",
+        url: "/mk3LogoTransparentnBackground.png",
+        type: "image/png",
         sizes: "any",
         media: "(prefers-color-scheme: light)",
       },
       // Dark mode
       {
-        url: "/mk3LogoTransparent.svg",
-        type: "image/svg+xml",
+        url: "/mk3LogoTransparentnBackground.png",
+        type: "image/png",
         sizes: "any",
         media: "(prefers-color-scheme: dark)",
       },

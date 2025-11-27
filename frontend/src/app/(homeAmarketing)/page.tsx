@@ -27,6 +27,46 @@ const stagger = {
   },
 };
 
+import { TextScramble } from "@/components/ui/text-scramble";
+import { useState, useEffect } from "react";
+
+function ScrambleTitle({
+  children,
+  className,
+  delay = 0,
+}: {
+  children: string;
+  className?: string;
+  delay?: number;
+}) {
+  const [trigger, setTrigger] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTrigger(true);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [delay]);
+
+  return (
+    <TextScramble
+      className={className}
+      as="span"
+      trigger={trigger}
+      loop={isHovering}
+      onHoverStart={() => {
+        setTrigger(true);
+        setIsHovering(true);
+      }}
+      onHoverEnd={() => setIsHovering(false)}
+      onScrambleComplete={() => setTrigger(false)}
+    >
+      {children}
+    </TextScramble>
+  );
+}
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-background overflow-hidden selection:bg-primary/20">
@@ -53,12 +93,12 @@ export default function Home() {
               variants={fadeInUp}
               className="text-6xl md:text-8xl font-bold tracking-tighter font-space text-foreground leading-[0.9]"
             >
-              FUTURES.
+              <ScrambleTitle delay={200}>FUTURES.</ScrambleTitle>
               <br />
-              FOCUSED.
+              <ScrambleTitle delay={400}>FOCUSED.</ScrambleTitle>
               <br />
               <span className="text-transparent bg-clip-text bg-linear-to-r from-primary to-primary/50">
-                FAST.
+                <ScrambleTitle delay={600}>FAST.</ScrambleTitle>
               </span>
             </motion.h1>
 
