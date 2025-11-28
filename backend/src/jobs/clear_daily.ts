@@ -1,4 +1,4 @@
-import cron from "node-cron";
+import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
 
 interface ClearJobStatus {
@@ -25,9 +25,7 @@ class DailyClearJob {
         this.status = JSON.parse(saved);
         console.log(
           `Loaded clear job status: ${this.status.totalRuns} runs, last: ${
-            this.status.lastRunTime
-              ? new Date(this.status.lastRunTime).toISOString()
-              : "never"
+            this.status.lastRunTime ? new Date(this.status.lastRunTime).toISOString() : "never"
           }`
         );
       }
@@ -38,10 +36,7 @@ class DailyClearJob {
 
   private async saveStatus(): Promise<void> {
     try {
-      await redisStore.redis.set(
-        "job:clear:status",
-        JSON.stringify(this.status)
-      );
+      await redisStore.redis.set("job:clear:status", JSON.stringify(this.status));
     } catch (err) {
       console.error("Failed to save clear job status:", err);
     }
@@ -81,14 +76,14 @@ class DailyClearJob {
   }
 
   schedule(): void {
-    cron.schedule(
+    new CronJob(
       "0 2 * * *",
       async () => {
         await this.runClear();
       },
-      {
-        timezone: "America/New_York",
-      }
+      null,
+      true,
+      "America/New_York"
     );
 
     console.log("Daily clear job scheduled (2 AM ET)");

@@ -1,7 +1,7 @@
 // no need to import dotenv
 
 function getEnvVar(key: string): string {
-  const value = Bun.env[key] ?? process.env[key];
+  const value = Bun.env[key];
   if (!value) {
     throw new Error(`Missing required environment variable: ${key}`);
   }

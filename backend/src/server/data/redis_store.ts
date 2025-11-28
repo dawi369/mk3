@@ -18,8 +18,13 @@ class RedisStore {
     });
 
     this.redis.on("connect", () => console.log("Redis connected"));
-    this.redis.on("error", (err) => {
+    this.redis.on("error", (err: any) => {
       console.error("Redis error:", err);
+      if (err.code === "ECONNREFUSED") {
+        console.error(
+          "❌ Redis connection refused. Is the 'redis' container running? (docker compose up -d redis)"
+        );
+      }
       console.error("Fatal: Redis connection failed. Exiting...");
       process.exit(1);
     });

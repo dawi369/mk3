@@ -1,10 +1,7 @@
-import cron from "node-cron";
+import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
 import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
-import type {
-  PolygonAssetClass,
-  PolygonWsRequest,
-} from "@/types/polygon.types.js";
+import type { PolygonAssetClass, PolygonWsRequest } from "@/types/polygon.types.js";
 import type { RefreshJobStatus, RefreshDetails } from "@/types/common.types.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
@@ -25,9 +22,7 @@ class MonthlySubscriptionJob {
         this.status = JSON.parse(saved);
         console.log(
           `Loaded refresh job status: ${this.status.totalRuns} runs, last: ${
-            this.status.lastRunTime
-              ? new Date(this.status.lastRunTime).toISOString()
-              : "never"
+            this.status.lastRunTime ? new Date(this.status.lastRunTime).toISOString() : "never"
           }`
         );
       }
@@ -38,10 +33,7 @@ class MonthlySubscriptionJob {
 
   private async saveStatus(): Promise<void> {
     try {
-      await redisStore.redis.set(
-        "job:refresh:status",
-        JSON.stringify(this.status)
-      );
+      await redisStore.redis.set("job:refresh:status", JSON.stringify(this.status));
     } catch (err) {
       console.error("Failed to save refresh job status:", err);
     }
@@ -52,9 +44,7 @@ class MonthlySubscriptionJob {
     assetClass: PolygonAssetClass,
     eventType: "A" | "AM"
   ): PolygonWsRequest | undefined {
-    return subscriptions.find(
-      (sub) => sub.assetClass === assetClass && sub.ev === eventType
-    );
+    return subscriptions.find((sub) => sub.assetClass === assetClass && sub.ev === eventType);
   }
 
   private async refreshAssetClass(
@@ -77,10 +67,7 @@ class MonthlySubscriptionJob {
 
       // Build new request based on asset class and config
       // Build new request based on asset class and config
-      const newRequest = await scheduleBuilder.buildRequestAsync(
-        assetClass,
-        eventType
-      );
+      const newRequest = await scheduleBuilder.buildRequestAsync(assetClass, eventType);
 
       details.newSymbols = newRequest.symbols;
 
@@ -104,9 +91,7 @@ class MonthlySubscriptionJob {
 
         if (oldStr !== newStr) {
           details.changed = true;
-          console.log(
-            `[${assetClass}/${eventType}] Symbols changed, updating subscription...`
-          );
+          console.log(`[${assetClass}/${eventType}] Symbols changed, updating subscription...`);
           console.log(`  Old: ${currentSub.symbols.join(", ")}`);
           console.log(`  New: ${newRequest.symbols.join(", ")}`);
 
@@ -119,9 +104,7 @@ class MonthlySubscriptionJob {
       } else {
         // No existing subscription, just subscribe
         details.changed = true;
-        console.log(
-          `[${assetClass}/${eventType}] No existing subscription, subscribing...`
-        );
+        console.log(`[${assetClass}/${eventType}] No existing subscription, subscribing...`);
         await this.wsClient.subscribe(newRequest);
         details.success = true;
       }
@@ -190,9 +173,7 @@ class MonthlySubscriptionJob {
     // Summary
     const changedCount = results.filter((r) => r.changed).length;
     const successCount = results.filter((r) => r.success).length;
-    console.log(
-      `Summary: ${successCount}/${results.length} successful, ${changedCount} changed`
-    );
+    console.log(`Summary: ${successCount}/${results.length} successful, ${changedCount} changed`);
     console.log("-----------------------------------\n");
     console.log("");
   }
@@ -205,19 +186,17 @@ class MonthlySubscriptionJob {
     this.wsClient = wsClient;
 
     // Run at 00:05 ET on the 1st of every month
-    cron.schedule(
+    new CronJob(
       "5 0 1 * *",
       async () => {
         await this.runRefresh();
       },
-      {
-        timezone: "America/New_York",
-      }
+      null,
+      true,
+      "America/New_York"
     );
 
-    console.log(
-      "Monthly subscription refresh job scheduled (1st of month @ 00:05 ET)"
-    );
+    console.log("Monthly subscription refresh job scheduled (1st of month @ 00:05 ET)");
   }
 }
 

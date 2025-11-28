@@ -3,6 +3,7 @@ import { promisify } from "util";
 import { gzip, unzip } from "zlib";
 import { redisStore } from "@/server/data/redis_store.js";
 import type { Bar } from "@/types/common.types.js";
+import { DATABASE_URL } from "@/config/env.js";
 
 const gzipAsync = promisify(gzip);
 const unzipAsync = promisify(unzip);
@@ -14,13 +15,13 @@ class TimescaleStore {
   constructor() {}
 
   async init() {
-    if (!process.env.DATABASE_URL) {
+    if (!DATABASE_URL) {
       console.warn("DATABASE_URL not set, skipping TimescaleDB init");
       return;
     }
 
     try {
-      this.sql = postgres(process.env.DATABASE_URL, {
+      this.sql = postgres(DATABASE_URL, {
         max: 20, // Max connections
         idle_timeout: 30, // Idle timeout in seconds
       });
@@ -63,9 +64,15 @@ class TimescaleStore {
 
       this.isConnected = true;
       console.log("TimescaleDB schema initialized");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to initialize TimescaleDB:", err);
-      // Don't crash, just stay inactive
+      if (err.code === "ECONNREFUSED") {
+        console.error(
+          "❌ TimescaleDB connection refused. Is the 'timescaledb' container running? (docker compose up -d timescaledb)"
+        );
+      }
+      console.error("Fatal: TimescaleDB connection failed. Exiting...");
+      process.exit(1);
     }
   }
 
