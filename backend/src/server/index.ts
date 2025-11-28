@@ -8,7 +8,7 @@ import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 // import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
-// import { POLYGON_ASSET_CLASS_LIST } from "@/utils/consts.js";
+import { POLYGON_ASSET_CLASS_LIST } from "@/utils/consts.js";
 
 /**
  * Main Hub server startup
@@ -30,16 +30,24 @@ async function startHubServer() {
     console.log("Building subscription requests...");
 
     // const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
-    const metalsReq = await scheduleBuilder.buildRequestAsync("metals", "A");
+    // const metalsReq = await scheduleBuilder.buildRequestAsync("metals", "A");
+    // const currenciesReq = await scheduleBuilder.buildRequestAsync("currencies", "A");
+    // const grainsReq = await scheduleBuilder.buildRequestAsync("grains", "A");
+    // const softsReq = await scheduleBuilder.buildRequestAsync("softs", "A");
+    // const volatilesReq = await scheduleBuilder.buildRequestAsync("volatiles", "A");
 
     // await polygonClient.subscribe(usIndicesReq);
-    await polygonClient.subscribe(metalsReq);
+    // await polygonClient.subscribe(metalsReq);
+    // await polygonClient.subscribe(currenciesReq);
+    // await polygonClient.subscribe(grainsReq);
+    // await polygonClient.subscribe(softsReq);
+    // await polygonClient.subscribe(volatilesReq);
 
     // All in parallel
-    // for (const cls of POLYGON_ASSET_CLASS_LIST) {
-    //   const req = await scheduleBuilder.buildRequestAsync(cls, "A");
-    //   await polygonClient.subscribe(req);
-    // }
+    for (const cls of POLYGON_ASSET_CLASS_LIST) {
+      const req = await scheduleBuilder.buildRequestAsync(cls, "A");
+      await polygonClient.subscribe(req);
+    }
 
     // Brief pause before continuing
     await Bun.sleep(1000);

@@ -30,7 +30,7 @@ export class ContractProvider {
       while (nextUrl) {
         pageCount++;
         console.log(`[ContractProvider] Fetching page ${pageCount} for ${root}...`);
-        console.log(`[ContractProvider] URL: ${nextUrl.replace(this.apiKey, "REDACTED")}`);
+        // console.log(`[ContractProvider] URL: ${nextUrl.replace(this.apiKey, "REDACTED")}`);
 
         const response = await fetch(nextUrl, {
           headers: {
@@ -39,7 +39,7 @@ export class ContractProvider {
           },
         });
 
-        console.log(`[ContractProvider] Response status for ${root}: ${response.status}`);
+        // console.log(`[ContractProvider] Response status for ${root}: ${response.status}`);
 
         if (!response.ok) {
           console.error(`[ContractProvider] Failed to fetch contracts for ${root}: ${response.status} ${response.statusText}`);
