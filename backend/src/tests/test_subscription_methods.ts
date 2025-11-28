@@ -39,7 +39,7 @@ try {
 
   // Wait a moment for data
   console.log("5. Waiting 5 seconds for data...");
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  await Bun.sleep(5000);
   console.log("✓ Wait complete\n");
 
   // Test unsubscribe

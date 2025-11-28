@@ -13,14 +13,18 @@ const LIMITS_MAP: Record<PolygonAssetClass, number> = {
 };
 
 class ScheduleContractBuilder {
-  private tickers: Tickers;
+  private tickers: Tickers | null = null;
 
-  constructor() {
-    this.tickers = new Tickers();
+  private async getTickers(): Promise<Tickers> {
+    if (!this.tickers) {
+      this.tickers = await Tickers.create();
+    }
+    return this.tickers;
   }
 
   async buildRequestAsync(assetClass: PolygonAssetClass, eventType: "A" | "AM"): Promise<PolygonWsRequest> {
-    const tickerRoots = this.tickers.listCodes(assetClass as any);
+    const tickers = await this.getTickers();
+    const tickerRoots = tickers.listCodes(assetClass as any);
     const symbols: string[] = [];
 
     console.log(`[ScheduleBuilder] Building async request for ${assetClass}...`);

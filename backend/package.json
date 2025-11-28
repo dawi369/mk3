@@ -9,17 +9,14 @@
     "run:server": "bun src/server/index.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/jsonwebtoken": "^9.0.10"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@polygon.io/client-js": "^8.2.0",
     "cron": "^4.3.4",
     "ioredis": "^5.8.2",
-    "jsonwebtoken": "^9.0.2",
     "postgres": "^3.4.7",
     "zod": "^4.1.13"
   }

@@ -26,6 +26,9 @@ class TimescaleStore {
         idle_timeout: 30, // Idle timeout in seconds
       });
 
+      // Suppress NOTICE messages (like "relation already exists") at session level
+      await this.sql`SET client_min_messages TO WARNING`;
+
       // Test connection
       await this.sql`SELECT 1`;
       console.log("Connected to TimescaleDB");

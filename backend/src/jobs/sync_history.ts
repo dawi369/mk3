@@ -1,4 +1,6 @@
-import cron from "node-cron";
+//do this later
+
+import { CronJob } from "cron";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import { POLYGON_API_KEY } from "@/config/env.js";
 import type { Bar } from "@/types/common.types.js";
@@ -92,9 +94,8 @@ export class HistorySyncJob {
 
     // 3. Iterate and Sync
     for (const symbol of symbols) {
-      // Rate limit protection (Polygon: 5 req/min for free, but we assume paid/higher limits)
-      // Adding a small delay just in case
-      await new Promise((r) => setTimeout(r, 200));
+      // Rate limit protection - small delay between requests
+      await Bun.sleep(200);
 
       const bars = await fetchAggregates(symbol, dateStr);
       if (bars.length > 0) {

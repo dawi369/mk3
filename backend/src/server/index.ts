@@ -41,8 +41,8 @@ async function startHubServer() {
     //   await polygonClient.subscribe(req);
     // }
 
-    //wait commond, 1 second
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    // Brief pause before continuing
+    await Bun.sleep(1000);
 
     // Load persisted job statuses
     await dailyClearJob.loadStatus();
@@ -69,7 +69,7 @@ async function startHubServer() {
       console.log("Stats:", stats);
 
       console.log("-----------------------------------\n");
-    }, 5_000);
+    }, 5000);
   } catch (err) {
     console.error("Hub server startup failed:", err);
     console.error("Retrying in 10 seconds...");

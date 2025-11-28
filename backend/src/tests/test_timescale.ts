@@ -29,8 +29,8 @@ async function runTest() {
   console.log("Inserting test bar:", testBar);
   await timescaleStore.insertBar(testBar);
 
-  // Wait a bit for DB consistency (though insert is awaited)
-  await new Promise((r) => setTimeout(r, 1000));
+  // Wait a bit for DB consistency
+  await Bun.sleep(1000);
 
   console.log("Querying history (First run - DB hit)...");
   const start = Date.now();

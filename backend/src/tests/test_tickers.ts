@@ -1,6 +1,7 @@
 import { Tickers } from "@/utils/tickers.js";
 
-const tickers = new Tickers();
+async function main() {
+  const tickers = await Tickers.create();
 
 console.log(tickers.all);
 
@@ -33,3 +34,6 @@ console.log(
   "XCME tickers:",
   xcmeTickers.map((t) => t.product_code)
 );
+}
+
+main();

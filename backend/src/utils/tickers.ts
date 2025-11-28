@@ -1,4 +1,3 @@
-import fs from 'fs';
 // Purpose: Dynamically load and access tickers by asset class, with one-liner access by product_code/ticker, e.g. tickers.grains.ZC or tickers.all.ES
 
 interface TickerEntry {
@@ -37,60 +36,91 @@ const TICKER_FILES: { [key in AssetClass]: string } = {
   currencies: '/home/david/dev/mk3/backend/tickers/currencies.json'
 };
 
-function loadJsonWithFallback(filepath: string): TickerEntry[] {
+async function loadJson(filepath: string): Promise<TickerEntry[]> {
   try {
-    const content = fs.readFileSync(filepath, 'utf8');
-    if (!content.trim()) return [];
-    return JSON.parse(content);
+    const file = Bun.file(filepath);
+    const exists = await file.exists();
+    if (!exists) return [];
+    return await file.json();
   } catch (err) {
-    // Purpose: Make sure error is meaningful to developer
     throw new Error(`Failed to load tickers from ${filepath}: ${err}`);
   }
 }
 
 function groupBy(arr: TickerEntry[], codeFields: string[]): TickerGroup {
   const map: TickerGroup = {};
-  arr.forEach(entry => {
+  for (const entry of arr) {
     for (const key of codeFields) {
       if (entry[key]) {
         map[entry[key]] = entry;
         break;
       }
     }
-  });
+  }
   return map;
 }
 
-function listCodes(group: TickerGroup): string[] {
-  return Object.keys(group);
-}
-
-function hasCode(group: TickerGroup, code: string): boolean {
-  return code in group;
-}
-
-function getCode(group: TickerGroup, code: string): TickerEntry | undefined {
-  return group[code];
-}
-
 export class Tickers {
-  grains: TickerGroup;
-  volatiles: TickerGroup;
-  us_indices: TickerGroup;
-  softs: TickerGroup;
-  metals: TickerGroup;
-  currencies: TickerGroup;
-  all: TickerGroup;
+  grains: TickerGroup = {};
+  volatiles: TickerGroup = {};
+  us_indices: TickerGroup = {};
+  softs: TickerGroup = {};
+  metals: TickerGroup = {};
+  currencies: TickerGroup = {};
+  all: TickerGroup = {};
 
-  constructor() {
-    this.grains = groupBy(loadJsonWithFallback(TICKER_FILES.grains), ["product_code"]);
-    this.volatiles = groupBy(loadJsonWithFallback(TICKER_FILES.volatiles), ["product_code"]);
-    this.us_indices = groupBy(loadJsonWithFallback(TICKER_FILES.us_indices), ["product_code"]);
-    this.softs = groupBy(loadJsonWithFallback(TICKER_FILES.softs), ["product_code"]);
-    this.metals = groupBy(loadJsonWithFallback(TICKER_FILES.metals), ["product_code"]);
-    this.currencies = groupBy(loadJsonWithFallback(TICKER_FILES.currencies), ["product_code"]);
+  private constructor() {}
 
-    // Purpose: Merge all asset classes into one lookup by code (last key wins in conflict)
+  // Async factory - the Bun-native way to create Tickers
+  static async create(): Promise<Tickers> {
+    const tickers = new Tickers();
+
+    const [grains, volatiles, us_indices, softs, metals, currencies] = await Promise.all([
+      loadJson(TICKER_FILES.grains),
+      loadJson(TICKER_FILES.volatiles),
+      loadJson(TICKER_FILES.us_indices),
+      loadJson(TICKER_FILES.softs),
+      loadJson(TICKER_FILES.metals),
+      loadJson(TICKER_FILES.currencies),
+    ]);
+
+    tickers.grains = groupBy(grains, ["product_code"]);
+    tickers.volatiles = groupBy(volatiles, ["product_code"]);
+    tickers.us_indices = groupBy(us_indices, ["product_code"]);
+    tickers.softs = groupBy(softs, ["product_code"]);
+    tickers.metals = groupBy(metals, ["product_code"]);
+    tickers.currencies = groupBy(currencies, ["product_code"]);
+
+    tickers.all = {
+      ...tickers.grains,
+      ...tickers.volatiles,
+      ...tickers.us_indices,
+      ...tickers.softs,
+      ...tickers.metals,
+      ...tickers.currencies
+    };
+
+    return tickers;
+  }
+
+  // Reload all tickers (useful for hot-reload scenarios)
+  async reload(): Promise<void> {
+    const [grains, volatiles, us_indices, softs, metals, currencies] = await Promise.all([
+      loadJson(TICKER_FILES.grains),
+      loadJson(TICKER_FILES.volatiles),
+      loadJson(TICKER_FILES.us_indices),
+      loadJson(TICKER_FILES.softs),
+      loadJson(TICKER_FILES.metals),
+      loadJson(TICKER_FILES.currencies),
+    ]);
+
+    this.grains = groupBy(grains, ["product_code"]);
+    this.volatiles = groupBy(volatiles, ["product_code"]);
+    this.us_indices = groupBy(us_indices, ["product_code"]);
+    this.softs = groupBy(softs, ["product_code"]);
+    this.metals = groupBy(metals, ["product_code"]);
+    this.currencies = groupBy(currencies, ["product_code"]);
+
     this.all = {
       ...this.grains,
       ...this.volatiles,
@@ -101,22 +131,22 @@ export class Tickers {
     };
   }
 
-  // Purpose: List all product codes for a specific asset class
+  // List all product codes for a specific asset class
   listCodes(assetClass: AssetClass): string[] {
-    return listCodes(this[assetClass]);
+    return Object.keys(this[assetClass]);
   }
 
-  // Purpose: Check if a product code exists in a specific asset class
+  // Check if a product code exists in a specific asset class
   hasCode(assetClass: AssetClass, code: string): boolean {
-    return hasCode(this[assetClass], code);
+    return code in this[assetClass];
   }
 
-  // Purpose: Get a ticker entry from a specific asset class, returns undefined if not found
+  // Get a ticker entry from a specific asset class
   getCode(assetClass: AssetClass, code: string): TickerEntry | undefined {
-    return getCode(this[assetClass], code);
+    return this[assetClass][code];
   }
 
-  // Purpose: Get all tickers for a specific sector (e.g., "crude_oil", "precious", "livestock")
+  // Get all tickers for a specific sector (e.g., "crude_oil", "precious", "livestock")
   getBySector(sector: string): TickerEntry[] {
     const result: TickerEntry[] = [];
     for (const ticker of Object.values(this.all)) {
@@ -127,7 +157,7 @@ export class Tickers {
     return result;
   }
 
-  // Purpose: Get all tickers for a specific trading venue (e.g., "XCME", "XNYM")
+  // Get all tickers for a specific trading venue (e.g., "XCME", "XNYM")
   getByVenue(venue: string): TickerEntry[] {
     const result: TickerEntry[] = [];
     for (const ticker of Object.values(this.all)) {
@@ -138,9 +168,3 @@ export class Tickers {
     return result;
   }
 }
-
-// Usage example (not executable here):
-// const tickers = new Tickers();
-// console.log(tickers.grains.ZC);     // Specific grain by product_code
-// console.log(tickers.softs.KC);      // Soft ticker by code
-// console.log(tickers.all.ES);        // Any asset by code
