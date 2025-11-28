@@ -1,4 +1,4 @@
-import postgres from "postgres";
+import pg from "../../../node_modules/@types/pg/index.js";
 import { promisify } from "util";
 import { gzip, unzip } from "zlib";
 import { redisStore } from "@/server/data/redis_store.js";
@@ -7,8 +7,10 @@ import type { Bar } from "@/types/common.types.js";
 const gzipAsync = promisify(gzip);
 const unzipAsync = promisify(unzip);
 
+const { Pool } = pg;
+
 class TimescaleStore {
-  private sql: postgres.Sql | null = null;
+  private pool: pg.Pool | null = null;
   private isConnected = false;
 
   constructor() {}
@@ -20,17 +22,18 @@ class TimescaleStore {
     }
 
     try {
-      this.sql = postgres(process.env.DATABASE_URL, {
-        max: 20, // Max connections
-        idle_timeout: 30, // Idle timeout in seconds
+      this.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        max: 20, // Max clients in pool
+        idleTimeoutMillis: 30000,
       });
 
       // Test connection
-      await this.sql`SELECT 1`;
+      const client = await this.pool.connect();
       console.log("Connected to TimescaleDB");
 
       // Initialize Schema
-      await this.sql`
+      await client.query(`
         CREATE TABLE IF NOT EXISTS bars (
           symbol TEXT NOT NULL,
           open DOUBLE PRECISION NOT NULL,
@@ -42,11 +45,11 @@ class TimescaleStore {
           timestamp TIMESTAMPTZ NOT NULL,
           UNIQUE (symbol, timestamp)
         );
-      `;
+      `);
 
       // Convert to hypertable (if not already)
       // We use a DO block to avoid errors if it's already a hypertable
-      await this.sql`
+      await client.query(`
         DO $$
         BEGIN
           IF NOT EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'bars') THEN
@@ -54,13 +57,14 @@ class TimescaleStore {
           END IF;
         END
         $$;
-      `;
+      `);
 
       // Create index on symbol for faster queries
-      await this.sql`
+      await client.query(`
         CREATE INDEX IF NOT EXISTS idx_bars_symbol_time ON bars (symbol, timestamp DESC);
-      `;
+      `);
 
+      client.release();
       this.isConnected = true;
       console.log("TimescaleDB schema initialized");
     } catch (err) {
@@ -70,23 +74,26 @@ class TimescaleStore {
   }
 
   async insertBar(bar: Bar) {
-    if (!this.isConnected || !this.sql) return;
+    if (!this.isConnected || !this.pool) return;
+
+    const query = `
+      INSERT INTO bars (symbol, open, high, low, close, volume, vwap, timestamp)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0))
+      ON CONFLICT (symbol, timestamp) DO UPDATE SET
+        open = EXCLUDED.open,
+        high = EXCLUDED.high,
+        low = EXCLUDED.low,
+        close = EXCLUDED.close,
+        volume = EXCLUDED.volume,
+        vwap = EXCLUDED.vwap;
+    `;
 
     const vwap = bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close;
-    const timestamp = new Date(bar.startTime);
+
+    const values = [bar.symbol, bar.open, bar.high, bar.low, bar.close, bar.volume, vwap, bar.startTime];
 
     try {
-      await this.sql`
-        INSERT INTO bars (symbol, open, high, low, close, volume, vwap, timestamp)
-        VALUES (${bar.symbol}, ${bar.open}, ${bar.high}, ${bar.low}, ${bar.close}, ${bar.volume}, ${vwap}, ${timestamp})
-        ON CONFLICT (symbol, timestamp) DO UPDATE SET
-          open = EXCLUDED.open,
-          high = EXCLUDED.high,
-          low = EXCLUDED.low,
-          close = EXCLUDED.close,
-          volume = EXCLUDED.volume,
-          vwap = EXCLUDED.vwap;
-      `;
+      await this.pool.query(query, values);
     } catch (err) {
       console.error(`Failed to insert bar for ${bar.symbol}:`, err);
     }
@@ -96,22 +103,15 @@ class TimescaleStore {
    * Batch insert bars for efficient bulk loading
    */
   async insertBatch(bars: Bar[]) {
-    if (!this.isConnected || !this.sql || bars.length === 0) return;
+    if (!this.isConnected || !this.pool || bars.length === 0) return;
 
+    const client = await this.pool.connect();
     try {
-      const data = bars.map((bar) => ({
-        symbol: bar.symbol,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume,
-        vwap: bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close,
-        timestamp: new Date(bar.startTime),
-      }));
+      await client.query("BEGIN");
 
-      await this.sql`
-        INSERT INTO bars ${this.sql(data)}
+      const query = `
+        INSERT INTO bars (symbol, open, high, low, close, volume, vwap, timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, to_timestamp($8 / 1000.0))
         ON CONFLICT (symbol, timestamp) DO UPDATE SET
           open = EXCLUDED.open,
           high = EXCLUDED.high,
@@ -120,9 +120,20 @@ class TimescaleStore {
           volume = EXCLUDED.volume,
           vwap = EXCLUDED.vwap;
       `;
+
+      for (const bar of bars) {
+        const vwap = bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close;
+        const values = [bar.symbol, bar.open, bar.high, bar.low, bar.close, bar.volume, vwap, bar.startTime];
+        await client.query(query, values);
+      }
+
+      await client.query("COMMIT");
     } catch (err) {
+      await client.query("ROLLBACK");
       console.error(`Batch insert failed (${bars.length} bars):`, err);
       throw err;
+    } finally {
+      client.release();
     }
   }
 
@@ -134,7 +145,7 @@ class TimescaleStore {
    * 4. Combine and filter
    */
   async getHistory(symbol: string, startMs: number, endMs: number): Promise<Bar[]> {
-    if (!this.isConnected || !this.sql) return [];
+    if (!this.isConnected || !this.pool) return [];
 
     const startDate = new Date(startMs);
     const endDate = new Date(endMs);
@@ -148,14 +159,9 @@ class TimescaleStore {
     let iterYear = startDate.getUTCFullYear();
     let iterMonth = startDate.getUTCMonth();
 
-    while (
-      iterYear < endDate.getUTCFullYear() ||
-      (iterYear === endDate.getUTCFullYear() && iterMonth <= endDate.getUTCMonth())
-    ) {
+    while (iterYear < endDate.getUTCFullYear() || (iterYear === endDate.getUTCFullYear() && iterMonth <= endDate.getUTCMonth())) {
       const isCurrentMonth = iterYear === currentYear && iterMonth === currentMonth;
-      const monthKey = `history:${symbol}:${iterYear}-${(iterMonth + 1)
-        .toString()
-        .padStart(2, "0")}`;
+      const monthKey = `history:${symbol}:${iterYear}-${(iterMonth + 1).toString().padStart(2, "0")}`;
 
       let monthBars: Bar[] = [];
 
@@ -177,38 +183,39 @@ class TimescaleStore {
       // If not in cache (or is current month), query DB
       if (monthBars.length === 0) {
         // Calculate month start/end
-        const monthStart = new Date(Date.UTC(iterYear, iterMonth, 1));
-        const monthEnd = new Date(Date.UTC(iterYear, iterMonth + 1, 0, 23, 59, 59, 999));
+        const monthStart = new Date(Date.UTC(iterYear, iterMonth, 1)).getTime();
+        const monthEnd = new Date(Date.UTC(iterYear, iterMonth + 1, 0, 23, 59, 59, 999)).getTime();
+
+        const query = `
+          SELECT 
+            symbol,
+            open,
+            high,
+            low,
+            close,
+            volume,
+            vwap,
+            extract(epoch from timestamp) * 1000 as timestamp
+          FROM bars
+          WHERE symbol = $1 
+          AND timestamp >= to_timestamp($2 / 1000.0)
+          AND timestamp <= to_timestamp($3 / 1000.0)
+          ORDER BY timestamp ASC;
+        `;
 
         try {
-          const result = await this.sql`
-            SELECT 
-              symbol,
-              open,
-              high,
-              low,
-              close,
-              volume,
-              vwap,
-              extract(epoch from timestamp) * 1000 as timestamp
-            FROM bars
-            WHERE symbol = ${symbol} 
-            AND timestamp >= ${monthStart}
-            AND timestamp <= ${monthEnd}
-            ORDER BY timestamp ASC;
-          `;
-
-          monthBars = result.map((row) => {
+          const result = await this.pool.query(query, [symbol, monthStart, monthEnd]);
+          monthBars = result.rows.map((row) => {
             const startTime = Number(row.timestamp);
             return {
-              symbol: row.symbol as string,
-              open: row.open as number,
-              high: row.high as number,
-              low: row.low as number,
-              close: row.close as number,
-              volume: row.volume as number,
+              symbol: row.symbol,
+              open: row.open,
+              high: row.high,
+              low: row.low,
+              close: row.close,
+              volume: row.volume,
               trades: 0, // Not stored in DB currently
-              dollarVolume: (row.volume as number) * (row.vwap as number),
+              dollarVolume: row.volume * row.vwap,
               startTime: startTime,
               endTime: startTime + 60000, // Assume 1-minute bars
             };
@@ -243,8 +250,8 @@ class TimescaleStore {
   }
 
   async close() {
-    if (this.sql) {
-      await this.sql.end();
+    if (this.pool) {
+      await this.pool.end();
     }
   }
 }

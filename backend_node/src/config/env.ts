@@ -1,7 +1,9 @@
-// no need to import dotenv
+import dotenv from "dotenv";
+
+dotenv.config();
 
 function getEnvVar(key: string): string {
-  const value = Bun.env[key] ?? process.env[key];
+  const value = process.env[key];
   if (!value) {
     throw new Error(`Missing required environment variable: ${key}`);
   }
@@ -10,7 +12,7 @@ function getEnvVar(key: string): string {
 
 function getEnvVarAsInt(key: string): number {
   const value = getEnvVar(key);
-  const parsed = parseInt(value, 10);
+  const parsed = parseInt(value);
   if (isNaN(parsed)) {
     throw new Error(`Environment variable ${key} must be a valid number`);
   }

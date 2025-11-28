@@ -87,7 +87,10 @@ app.get("/admin/subscriptions", requireAuth, (_req, res) => {
   res.json({
     subscriptions,
     count: subscriptions.length,
-    totalSymbols: subscriptions.reduce((sum, sub) => sum + sub.symbols.length, 0),
+    totalSymbols: subscriptions.reduce(
+      (sum, sub) => sum + sub.symbols.length,
+      0
+    ),
   });
 });
 

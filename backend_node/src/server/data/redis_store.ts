@@ -110,7 +110,11 @@ class RedisStore {
       return { cleared: 0, newDate: today };
     }
 
-    console.log(`Clearing Redis data (last clear: ${lastClear || "never"}, new date: ${today})`);
+    console.log(
+      `Clearing Redis data (last clear: ${
+        lastClear || "never"
+      }, new date: ${today})`
+    );
 
     const todayKeys = await this.scanKeys("bar:today:*");
     const latestKeys = await this.scanKeys("bar:latest:*");
