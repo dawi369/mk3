@@ -25,6 +25,7 @@ import { updateDisplayName, type UserProfile } from "@/lib/supabase/profiles";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/common/theme-toggle";
 
 const getDisplayName = (user: User, profile: UserProfile | null): string => {
   if (profile?.display_name) {
@@ -218,6 +219,14 @@ export function AuthIndicator() {
                       {isSendingRequest ? <Loader2 className="h-3 w-3 animate-spin" /> : "Send"}
                     </button>
                   </form>
+                </div>
+
+                {/* Theme Toggle */}
+                <div className="pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors">
+                    <span className="text-sm font-medium">Theme</span>
+                    <ThemeToggle />
+                  </div>
                 </div>
 
                 {/* Sign Out */}
