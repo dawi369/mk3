@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
@@ -31,6 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
   const router = useRouter();
+  const userRef = useRef<User | null>(null);
+  const initializedRef = useRef(false);
 
   const fetchProfile = useCallback(
     async (userId: string, email?: string) => {
@@ -80,27 +83,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, router]);
 
   useEffect(() => {
+    // Prevent multiple initializations
+    if (initializedRef.current) {
+      return;
+    }
+
     const initAuth = async () => {
       try {
+        // First, try to get the session from cookies to restore it
         const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (error) {
-          // console.error("Error fetching initial user:", error);
-          // Don't log error for no session, just set null
+        // If we have a session, use it to restore the user
+        // Otherwise, try getUser() which will attempt to refresh
+        let currentUser: User | null = null;
+
+        if (session?.user) {
+          currentUser = session.user;
+        } else {
+          // If no session, try getUser() which may refresh from cookies
+          const {
+            data: { user },
+            error,
+          } = await supabase.auth.getUser();
+
+          if (!error && user) {
+            currentUser = user;
+          }
         }
 
-        setUser(user);
+        userRef.current = currentUser;
+        setUser(currentUser);
 
-        if (user) {
-          await fetchProfile(user.id, user.email || undefined);
+        if (currentUser) {
+          await fetchProfile(currentUser.id, currentUser.email || undefined);
         }
       } catch (error) {
         console.error("Unexpected error in auth init:", error);
+        // Ensure loading state is resolved even on error
+        userRef.current = null;
+        setUser(null);
       } finally {
         setLoading(false);
+        initializedRef.current = true;
       }
     };
 
@@ -111,8 +137,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user ?? null;
 
+      // Handle INITIAL_SESSION event - this fires on first load with existing session
+      if (event === "INITIAL_SESSION") {
+        if (currentUser && currentUser.id !== userRef.current?.id) {
+          userRef.current = currentUser;
+          setUser(currentUser);
+          setLoading(true);
+          await fetchProfile(currentUser.id, currentUser.email || undefined);
+          setLoading(false);
+        } else if (!currentUser && userRef.current) {
+          // Session was cleared
+          userRef.current = null;
+          setUser(null);
+          setProfile(null);
+        }
+        return;
+      }
+
       // Only update if user changed to avoid unnecessary profile fetches
-      if (currentUser?.id !== user?.id) {
+      if (currentUser?.id !== userRef.current?.id) {
+        userRef.current = currentUser;
         setUser(currentUser);
         if (currentUser) {
           setLoading(true); // Briefly show loading while profile fetches on switch
@@ -127,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, fetchProfile, user?.id]);
+  }, [supabase, fetchProfile]);
 
   return (
     <AuthContext.Provider

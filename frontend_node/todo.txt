@@ -1,3 +1,0 @@
-some routes need to be protected so they cannot be accessed by non-logged in users
-
-maybe use sheet for dropdown menus

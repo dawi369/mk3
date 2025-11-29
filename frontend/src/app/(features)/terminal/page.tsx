@@ -1,98 +1,52 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { AssetClassSection } from "@/components/terminal/asset-class-section";
-import { SentimentPanel } from "@/components/terminal/sentiment-panel";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { useAuth } from "@/providers/auth-provider";
+import { TerminalDock, TerminalViewType } from "@/components/terminal/terminal-dock";
+import { TerminalView } from "@/components/terminal/view-terminal";
+import { IndicatorsView } from "@/components/terminal/view-indicators";
+import { SentimentView } from "@/components/terminal/view-sentiment";
+import { AiLabView } from "@/components/terminal/view-ai-lab";
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
-};
+const VALID_VIEWS: TerminalViewType[] = ["terminal", "indicators", "sentiment", "ai-lab"];
 
-const stagger = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-// Configuration for the 6 asset class sections
-const assetSections = [
-  {
-    title: "US Indices",
-    tickers: ["ES", "NQ", "YM", "RTY", "MES", "MNQ"],
-  },
-  {
-    title: "Currencies",
-    tickers: ["6E", "6B", "6J", "6A", "6C", "6S"],
-  },
-  {
-    title: "Grains",
-    tickers: ["ZC", "ZW", "ZS", "ZM", "ZL", "ZO"],
-  },
-  {
-    title: "Metals",
-    tickers: ["GC", "SI", "HG", "PL", "PA", "MGC"],
-  },
-  {
-    title: "Softs",
-    tickers: ["SB", "KC", "CC", "CT", "OJ", "LSU"],
-  },
-  {
-    title: "Volatiles",
-    tickers: ["VX", "BTC", "ETH", "MBT", "MET", "RBOB"],
-  },
-];
+function isValidView(view: string | null): view is TerminalViewType {
+  return view !== null && VALID_VIEWS.includes(view as TerminalViewType);
+}
 
 function TerminalPageContent() {
-  const { profile } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const viewParam = searchParams.get("view");
+  const initialView = isValidView(viewParam) ? viewParam : "terminal";
+  const [activeView, setActiveView] = useState<TerminalViewType>(initialView);
+
+  // Sync URL when view changes from dock
+  const handleViewChange = (view: TerminalViewType) => {
+    setActiveView(view);
+    router.replace(`/terminal?view=${view}`, { scroll: false });
+  };
+
+  // Sync state when URL changes (e.g., from browser back/forward or direct navigation)
+  useEffect(() => {
+    if (isValidView(viewParam) && viewParam !== activeView) {
+      setActiveView(viewParam);
+    }
+  }, [viewParam, activeView]);
 
   return (
-    <div className="p-6 pt-24 pb-12">
-      <div className="max-w-[1600px] mx-auto relative z-10">
-        <motion.div initial="initial" animate="animate" variants={stagger} className="space-y-8">
-          {/* Header */}
-          <motion.div variants={fadeInUp} className="flex items-end justify-between mb-8">
-            <div>
-              <h1 className="text-4xl font-bold font-space tracking-tight">Market Overview</h1>
-              <p className="text-muted-foreground mt-2">Real-time global market intelligence.</p>
-              {/* Tier Display - Placeholder */}
-              {profile?.tier && (
-                <p className="text-sm font-mono mt-2 text-primary">
-                  Tier: <span className="font-bold">{profile.tier}</span>
-                </p>
-              )}
-            </div>
-            <div className="text-sm font-mono text-muted-foreground">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-              Connected
-            </div>
-          </motion.div>
-
-          {/* Sentiment Panel */}
-          <motion.div variants={fadeInUp}>
-            <SentimentPanel />
-          </motion.div>
-
-          {/* Asset Class Grid */}
-          <motion.div
-            variants={fadeInUp}
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-          >
-            {assetSections.map((section) => (
-              <AssetClassSection
-                key={section.title}
-                title={section.title}
-                tickers={section.tickers}
-              />
-            ))}
-          </motion.div>
-        </motion.div>
+    <div className="relative h-full w-full overflow-hidden bg-background">
+      {/* Main Content Area */}
+      <div className="h-full w-full overflow-y-auto scrollbar-hide">
+        {activeView === "terminal" && <TerminalView />}
+        {activeView === "indicators" && <IndicatorsView />}
+        {activeView === "sentiment" && <SentimentView />}
+        {activeView === "ai-lab" && <AiLabView />}
       </div>
+
+      {/* Dock */}
+      <TerminalDock activeView={activeView} onSelect={handleViewChange} />
     </div>
   );
 }
@@ -100,7 +54,18 @@ function TerminalPageContent() {
 export default function TerminalPage() {
   return (
     <ProtectedRoute>
-      <TerminalPageContent />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+              <p className="mt-4 text-muted-foreground">Loading...</p>
+            </div>
+          </div>
+        }
+      >
+        <TerminalPageContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 
-export default function TerminalLayout({ children }: { children: React.ReactNode }) {
+export default function BacktestingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden flex-col">
       <header className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">

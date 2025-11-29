@@ -65,7 +65,7 @@ NEXT_PUBLIC_ENABLE_BACKTESTING=false
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3010](http://localhost:3010)
 
 ### Build
 
@@ -73,6 +73,122 @@ Open [http://localhost:3000](http://localhost:3000)
 npm run build
 npm run start
 ```
+
+Open [http://localhost:3010](http://localhost:3010)
+
+### Troubleshooting
+
+#### Firefox SSL Error (SSL_ERROR_RX_RECORD_TOO_LONG)
+
+If you see "SSL received a record that exceeded the maximum permissible length" in Firefox:
+
+**Cause:** Firefox is trying to connect via HTTPS, but the server only serves HTTP. This happens when Firefox has cached an HSTS (HTTP Strict Transport Security) policy for `localhost:3010`.
+
+**Solution:**
+
+1. **Clear Firefox HSTS cache:**
+   - Type `about:config` in the address bar
+   - Search for `security.tls.insecure_fallback_hosts`
+   - Add `localhost` to the list (comma-separated)
+   - Or search for `dom.security.https_only_mode` and set it to `false` for localhost
+
+2. **Alternative - Use HTTP explicitly:**
+   - Make sure you're accessing `http://localhost:3010` (not `https://`)
+   - If Firefox auto-completes to HTTPS, clear the address bar and type `http://` manually
+
+3. **Quick fix - Private window:**
+   - Open a private/incognito window in Firefox
+   - Navigate to `http://localhost:3010`
+
+**Note:** Chrome works fine because it's less strict about HSTS for localhost. Firefox enforces HSTS more strictly, which is why you see this error.
+
+---
+
+## Deployment & HTTPS
+
+### HTTPS in Production
+
+**Yes, you'll have proper HTTPS when you deploy** - but it depends on your deployment method:
+
+#### Option 1: Platform-as-a-Service (Automatic HTTPS)
+
+**Vercel, Netlify, Railway, etc.**
+- ✅ **Automatic HTTPS** - These platforms provide SSL certificates automatically
+- ✅ **Zero configuration** - Just deploy, HTTPS works out of the box
+- ✅ **Auto-renewal** - Certificates are managed for you
+
+**Your code is already ready:**
+- The auth callback route (`src/app/auth/callback/route.ts`) already expects HTTPS in production
+- It uses `x-forwarded-host` header to construct HTTPS URLs
+
+#### Option 2: Self-Hosted (Reverse Proxy Required)
+
+**Docker, VPS, or bare metal**
+
+You'll need a reverse proxy to handle SSL termination:
+
+**Nginx Example:**
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+**Caddy (Automatic HTTPS):**
+```caddy
+yourdomain.com {
+    reverse_proxy localhost:3010
+}
+```
+Caddy automatically obtains and renews Let's Encrypt certificates.
+
+**Traefik (Docker):**
+```yaml
+services:
+  frontend:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`yourdomain.com`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+```
+
+### Important Notes
+
+1. **Next.js doesn't handle HTTPS directly** - It runs on HTTP internally, even in production
+2. **SSL termination happens at the reverse proxy** - The proxy handles HTTPS and forwards HTTP to Next.js
+3. **Your code already handles this** - The auth callback checks `x-forwarded-host` and uses HTTPS URLs in production
+4. **Environment variables** - Make sure `NODE_ENV=production` is set in production
+
+### Recommended Deployment Options
+
+1. **Vercel** (Easiest) - Automatic HTTPS, zero config
+2. **Railway/Render** - Automatic HTTPS, simple setup
+3. **Self-hosted with Caddy** - Automatic Let's Encrypt, minimal config
+4. **Self-hosted with Nginx** - Full control, manual certificate management
 
 ---
 
