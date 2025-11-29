@@ -35,8 +35,7 @@ const components: { title: string; href: string; description: string }[] = [
   {
     title: "Hover Card",
     href: "/docs/primitives/hover-card",
-    description:
-      "For sighted users to preview content available behind a link.",
+    description: "For sighted users to preview content available behind a link.",
   },
   {
     title: "Progress",
@@ -67,10 +66,13 @@ export function Navbar() {
   const isMobile = useIsMobile();
 
   return (
-    <NavigationMenu viewport={!isMobile}>
+    <NavigationMenu viewport={!isMobile} suppressHydrationWarning>
       <NavigationMenuList className="flex-wrap">
         <NavigationMenuItem>
-          <NavigationMenuTrigger className="opacity-60 hover:opacity-100 transition-opacity">
+          <NavigationMenuTrigger
+            className="opacity-60 hover:opacity-100 transition-opacity"
+            suppressHydrationWarning
+          >
             Features
           </NavigationMenuTrigger>
           <NavigationMenuContent>
@@ -92,16 +94,10 @@ export function Navbar() {
                 </NavigationMenuLink>
               </li>
               <ListItem href="/terminal" title="Indicators" icon={ChartLine}>
-                Actionable insights. Track technical signals and key metrics in
-                real-time.
+                Actionable insights. Track technical signals and key metrics in real-time.
               </ListItem>
-              <ListItem
-                href="/terminal"
-                title="Market Sentiment"
-                icon={Activity}
-              >
-                Feel the market. Understand the pulse of futures trading across
-                all asset classes.
+              <ListItem href="/terminal" title="Market Sentiment" icon={Activity}>
+                Feel the market. Understand the pulse of futures trading across all asset classes.
               </ListItem>
               <ListItem href="/ai-lab" title="AI Lab" icon={Sparkles}>
                 See what the data sees. Powered by the latest systems.
@@ -112,10 +108,7 @@ export function Navbar() {
 
         <NavigationMenuItem>
           <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-            <Link
-              href="/mission"
-              className="opacity-60 hover:opacity-100 transition-opacity"
-            >
+            <Link href="/mission" className="opacity-60 hover:opacity-100 transition-opacity">
               Mission
             </Link>
           </NavigationMenuLink>
@@ -123,10 +116,7 @@ export function Navbar() {
 
         <NavigationMenuItem>
           <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-            <Link
-              href="/pricing"
-              className="opacity-60 hover:opacity-100 transition-opacity"
-            >
+            <Link href="/pricing" className="opacity-60 hover:opacity-100 transition-opacity">
               Pricing
             </Link>
           </NavigationMenuLink>
@@ -167,9 +157,7 @@ function ListItem({
             )}
             {title}
           </div>
-          <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
-            {children}
-          </p>
+          <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">{children}</p>
         </Link>
       </NavigationMenuLink>
     </li>

@@ -1,20 +1,21 @@
-export const NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL as string;
-
-export const NEXT_PUBLIC_SUPABASE_URL = process.env
-  .NEXT_PUBLIC_SUPABASE_URL as string;
-
-export const NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env
-  .NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-
-// Optional: Validate existence
-if (typeof window !== "undefined") {
-  if (!NEXT_PUBLIC_SITE_URL) {
-    console.error("Missing NEXT_PUBLIC_SITE_URL");
+function requireEnv(name: string, value: string | undefined): string {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
   }
-  if (!NEXT_PUBLIC_SUPABASE_URL) {
-    console.error("Missing NEXT_PUBLIC_SUPABASE_URL");
-  }
-  if (!NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
+  return value;
 }
+
+export const NEXT_PUBLIC_SITE_URL = requireEnv(
+  "NEXT_PUBLIC_SITE_URL",
+  process.env.NEXT_PUBLIC_SITE_URL
+);
+
+export const NEXT_PUBLIC_SUPABASE_URL = requireEnv(
+  "NEXT_PUBLIC_SUPABASE_URL",
+  process.env.NEXT_PUBLIC_SUPABASE_URL
+);
+
+export const NEXT_PUBLIC_SUPABASE_ANON_KEY = requireEnv(
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);

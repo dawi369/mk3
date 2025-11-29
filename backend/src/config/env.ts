@@ -1,5 +1,3 @@
-// no need to import dotenv
-
 function getEnvVar(key: string): string {
   const value = Bun.env[key];
   if (!value) {

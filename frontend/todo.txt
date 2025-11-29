@@ -2,4 +2,9 @@ some routes need to be protected so they cannot be accessed by non-logged in use
 
 maybe use sheet for dropdown menus
 
-check what to make dev dependencies for frontend and backenddd
+check what to make dev dependencies for frontend and backend
+
+get navbar and profile dropdown off radix and into shadcn, uninstall radix ui after
+
+investigate where i should use use edge runtime and why the swordfish logo renders late
+
