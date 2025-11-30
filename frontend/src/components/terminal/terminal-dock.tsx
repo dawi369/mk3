@@ -46,7 +46,7 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
     // Start extended, then retract after a delay
     const timer = setTimeout(() => {
       setForceVisible(false);
-    }, 200);
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 

@@ -20,6 +20,8 @@ export interface AssetClassData {
   nextMonth: string;
   winners: MarketMover[];
   losers: MarketMover[];
+  rvol: number; // Relative Volume (e.g., 1.2 = 120% of average)
+  sentiment: number; // 0-100 (50 neutral, >50 bullish, <50 bearish)
 }
 
 const generateStats = (price: number): AssetStats => ({
@@ -36,6 +38,8 @@ export const mockTerminalData: AssetClassData[] = [
     title: "US Indices",
     activeMonth: "DEC 25",
     nextMonth: "MAR 26",
+    rvol: 1.45,
+    sentiment: 65,
     winners: [
       { ticker: "YMZ5", change: 0.15, price: 35920.0, stats: generateStats(35920.0) },
       { ticker: "RTYZ5", change: 0.1, price: 1819.9, stats: generateStats(1819.9) },
@@ -52,6 +56,8 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Metals",
     activeMonth: "DEC 25",
     nextMonth: "FEB 26",
+    rvol: 0.85,
+    sentiment: 55,
     winners: [
       { ticker: "GCZ5", change: 1.1, price: 2001.5, stats: generateStats(2001.5) },
       { ticker: "SIZ5", change: 0.95, price: 24.5, stats: generateStats(24.5) },
@@ -68,6 +74,8 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Energies",
     activeMonth: "JAN 26",
     nextMonth: "FEB 26",
+    rvol: 2.1,
+    sentiment: 80,
     winners: [
       { ticker: "CLF6", change: 2.5, price: 77.1, stats: generateStats(77.1) },
       { ticker: "NGF6", change: 1.8, price: 2.95, stats: generateStats(2.95) },
@@ -84,6 +92,8 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Grains",
     activeMonth: "DEC 25",
     nextMonth: "MAR 26",
+    rvol: 0.6,
+    sentiment: 40,
     winners: [
       { ticker: "ZCZ5", change: 1.5, price: 492.0, stats: generateStats(492.0) },
       { ticker: "ZWZ5", change: 1.1, price: 580.5, stats: generateStats(580.5) },
@@ -100,6 +110,8 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Currencies",
     activeMonth: "DEC 25",
     nextMonth: "MAR 26",
+    rvol: 1.05,
+    sentiment: 48,
     winners: [
       { ticker: "6EZ5", change: 0.45, price: 1.091, stats: generateStats(1.091) },
       { ticker: "6BZ5", change: 0.3, price: 1.255, stats: generateStats(1.255) },
@@ -116,6 +128,8 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Volatiles",
     activeMonth: "DEC 25",
     nextMonth: "JAN 26",
+    rvol: 3.5,
+    sentiment: 20,
     winners: [
       { ticker: "VIX", change: 5.2, price: 15.1, stats: generateStats(15.1) },
       { ticker: "KCZ5", change: 2.1, price: 165.5, stats: generateStats(165.5) },
