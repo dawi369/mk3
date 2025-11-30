@@ -46,7 +46,7 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
     // Start extended, then retract after a delay
     const timer = setTimeout(() => {
       setForceVisible(false);
-    }, 400);
+    }, 200);
     return () => clearTimeout(timer);
   }, []);
 
@@ -56,19 +56,25 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
       const windowWidth = window.innerWidth;
       const centerX = windowWidth / 2;
 
-      // Calculate distance from the bottom center of the screen
-      const dx = e.clientX - centerX;
-      const dy = e.clientY - windowHeight;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      // Dock-shaped trigger area dimensions (matching the visual indicator)
+      const dockWidth = 320;
+      const dockHeight = 180;
 
-      // Threshold for the "invisible half ellipse" - made smaller and flatter
-      // Using a simple distance check creates a circular trigger area
-      // centered at (centerX, windowHeight)
-      if (distance < 150) {
-        setIsHovered(true);
-      } else {
-        setIsHovered(false);
-      }
+      // Calculate the bounds of the trigger area
+      // The visual dock is at bottom: 0, translate-y-[50%], so it's centered on the bottom edge
+      const dockLeft = centerX - dockWidth / 2;
+      const dockRight = centerX + dockWidth / 2;
+      const dockTop = windowHeight - dockHeight / 2;
+      const dockBottom = windowHeight + dockHeight / 2;
+
+      // Check if mouse is within the rectangular dock-shaped bounds
+      const isInBounds =
+        e.clientX >= dockLeft &&
+        e.clientX <= dockRight &&
+        e.clientY >= dockTop &&
+        e.clientY <= dockBottom;
+
+      setIsHovered(isInBounds);
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -79,8 +85,8 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
 
   return (
     <>
-      {/* Trigger Area - invisible half ellipse - smaller and flatter */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[480px] h-[50px] translate-y-[90%] bg-transparent rounded-full pointer-events-none blur-xl z-40" />
+      {/* Trigger Area - visible dock-shaped outline */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[320px] h-[180px] translate-y-[50%] bg-transparent rounded-full pointer-events-none z-40" />
 
       <motion.div
         className="absolute bottom-2 left-1/2 max-w-full -translate-x-1/2 z-50"

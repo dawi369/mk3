@@ -1,13 +1,17 @@
 "use client";
 
+import { TerminalCard } from "./terminal-card";
+import { mockTerminalData } from "./mock-data";
+
 export function TerminalView() {
   return (
-    <div className="p-8 pt-24 h-full overflow-auto pb-32">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <header className="text-center mb-12">
-          <h1 className="text-4xl font-semibold text-foreground mb-2">Terminal</h1>
-          <p className="text-muted-foreground">Temp.</p>
-        </header>
+    <div className="h-full w-full p-6 overflow-y-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1920px] mx-auto h-full content-start">
+        {mockTerminalData.map((data) => (
+          <div key={data.id} className="aspect-video min-h-[300px]">
+            <TerminalCard data={data} onClick={() => console.log(`Clicked ${data.title}`)} />
+          </div>
+        ))}
       </div>
     </div>
   );
