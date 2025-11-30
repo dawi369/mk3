@@ -46,7 +46,7 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
     // Start extended, then retract after a delay
     const timer = setTimeout(() => {
       setForceVisible(false);
-    }, 800);
+    }, 400);
     return () => clearTimeout(timer);
   }, []);
 
@@ -61,10 +61,10 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
       const dy = e.clientY - windowHeight;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // Threshold for the "invisible half ellipse"
+      // Threshold for the "invisible half ellipse" - made smaller and flatter
       // Using a simple distance check creates a circular trigger area
       // centered at (centerX, windowHeight)
-      if (distance < 300) {
+      if (distance < 150) {
         setIsHovered(true);
       } else {
         setIsHovered(false);
@@ -79,14 +79,14 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
 
   return (
     <>
-      {/* Debug Trigger Area - Semi-transparent white half ellipse */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] translate-y-1/2 bg-white/5 rounded-full pointer-events-none blur-xl z-40" />
+      {/* Trigger Area - invisible half ellipse - smaller and flatter */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[480px] h-[50px] translate-y-[90%] bg-transparent rounded-full pointer-events-none blur-xl z-40" />
 
       <motion.div
-        className="absolute bottom-6 left-1/2 max-w-full -translate-x-1/2 z-50"
+        className="absolute bottom-2 left-1/2 max-w-full -translate-x-1/2 z-50"
         initial={{ y: 0 }}
         animate={{ y: isVisible ? 0 : "85%" }}
-        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        transition={{ type: "spring", damping: 25, stiffness: 250 }}
       >
         <Dock className="items-end pb-3">
           {data.map((item) => (
