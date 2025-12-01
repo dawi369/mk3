@@ -1,5 +1,9 @@
 import { POLYGON_API_KEY } from "@/config/env.js";
-import { POLYGON_CONTRACTS_URL } from "@/utils/consts.js";
+import {
+  POLYGON_CONTRACTS_URL,
+  MAX_PAGES_PER_TICKER,
+  MAX_UNIQUE_CONTRACTS,
+} from "@/utils/consts.js";
 
 interface Contract {
   ticker: string;
@@ -23,11 +27,21 @@ export class ContractProvider {
   async fetchActiveContracts(root: string): Promise<string[]> {
     console.log(`[ContractProvider] Starting fetch for ${root}`);
     const contractsMap = new Map<string, Contract>();
-    let nextUrl: string | null = `${POLYGON_CONTRACTS_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
+    let nextUrl:
+      | string
+      | null = `${POLYGON_CONTRACTS_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
     let pageCount = 0;
+    const now = new Date();
 
     try {
-      while (nextUrl) {
+      while (nextUrl && pageCount < MAX_PAGES_PER_TICKER) {
+        if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) {
+          console.log(
+            `[ContractProvider] Reached max unique contracts (${MAX_UNIQUE_CONTRACTS}) for ${root}. Stopping search.`
+          );
+          break;
+        }
+
         pageCount++;
         console.log(`[ContractProvider] Fetching page ${pageCount} for ${root}...`);
         // console.log(`[ContractProvider] URL: ${nextUrl.replace(this.apiKey, "REDACTED")}`);
@@ -42,16 +56,27 @@ export class ContractProvider {
         // console.log(`[ContractProvider] Response status for ${root}: ${response.status}`);
 
         if (!response.ok) {
-          console.error(`[ContractProvider] Failed to fetch contracts for ${root}: ${response.status} ${response.statusText}`);
+          console.error(
+            `[ContractProvider] Failed to fetch contracts for ${root}: ${response.status} ${response.statusText}`
+          );
           break;
         }
 
         const data: any = await response.json();
         const results = Array.isArray(data) ? data : data.results || [];
-        console.log(`[ContractProvider] Received ${results.length} results for ${root} (page ${pageCount})`);
+        console.log(
+          `[ContractProvider] Received ${results.length} results for ${root} (page ${pageCount})`
+        );
 
         for (const item of results) {
           if (item.active !== false && item.type === "single") {
+            // Check expiration immediately
+            const lastTradeDate = new Date(item.last_trade_date);
+            if (lastTradeDate < now) {
+              // console.log(`[ContractProvider] Skipping expired contract ${item.ticker}`);
+              continue;
+            }
+
             // Deduplicate by ticker
             if (!contractsMap.has(item.ticker)) {
               contractsMap.set(item.ticker, {
@@ -60,13 +85,21 @@ export class ContractProvider {
                 last_trade_date: item.last_trade_date,
                 active: item.active,
               });
+
+              if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) {
+                break;
+              }
             }
           }
         }
 
         nextUrl = data.next_url;
-        console.log(`[ContractProvider] Next URL for ${root}: ${nextUrl ? "exists" : "null (done)"}`);
-        console.log(`[ContractProvider] Total unique contracts so far for ${root}: ${contractsMap.size}`);
+        console.log(
+          `[ContractProvider] Next URL for ${root}: ${nextUrl ? "exists" : "null (done)"}`
+        );
+        console.log(
+          `[ContractProvider] Total unique contracts so far for ${root}: ${contractsMap.size}`
+        );
 
         // If next_url doesn't have apiKey and we rely on query param, we might need to append it.
         // But we are using Header auth now, so it should be fine.
@@ -80,26 +113,13 @@ export class ContractProvider {
     const contracts = Array.from(contractsMap.values());
     console.log(`[ContractProvider] Total unique contracts for ${root}: ${contracts.length}`);
 
-    // Filter out expired contracts (last_trade_date in the past)
-    const now = new Date();
-    const activeContracts = contracts.filter((c) => {
-      const lastTradeDate = new Date(c.last_trade_date);
-      const isActive = lastTradeDate >= now;
-      if (!isActive) {
-        console.log(`[ContractProvider] Filtering out expired contract ${c.ticker} (last trade: ${c.last_trade_date})`);
-      }
-      return isActive;
-    });
-
-    console.log(`[ContractProvider] Active contracts after expiration filter for ${root}: ${activeContracts.length}`);
-
     // Sort by last_trade_date
-    activeContracts.sort((a, b) => {
+    contracts.sort((a, b) => {
       return new Date(a.last_trade_date).getTime() - new Date(b.last_trade_date).getTime();
     });
 
-    const tickers = activeContracts.map((c) => c.ticker);
-    console.log(`[ContractProvider] Returning ${tickers.length} tickers for ${root}:`, tickers.slice(0, 5));
+    const tickers = contracts.map((c) => c.ticker);
+    console.log(`[ContractProvider] Returning ${tickers.length} tickers for ${root}:`, tickers);
     return tickers;
   }
 }

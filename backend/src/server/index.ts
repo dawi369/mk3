@@ -34,20 +34,20 @@ async function startHubServer() {
     // const currenciesReq = await scheduleBuilder.buildRequestAsync("currencies", "A");
     // const grainsReq = await scheduleBuilder.buildRequestAsync("grains", "A");
     // const softsReq = await scheduleBuilder.buildRequestAsync("softs", "A");
-    // const volatilesReq = await scheduleBuilder.buildRequestAsync("volatiles", "A");
+    const volatilesReq = await scheduleBuilder.buildRequestAsync("volatiles", "A");
 
     // await polygonClient.subscribe(usIndicesReq);
     // await polygonClient.subscribe(metalsReq);
     // await polygonClient.subscribe(currenciesReq);
     // await polygonClient.subscribe(grainsReq);
     // await polygonClient.subscribe(softsReq);
-    // await polygonClient.subscribe(volatilesReq);
+    await polygonClient.subscribe(volatilesReq);
 
     // All in parallel
-    for (const cls of POLYGON_ASSET_CLASS_LIST) {
-      const req = await scheduleBuilder.buildRequestAsync(cls, "A");
-      await polygonClient.subscribe(req);
-    }
+    // for (const cls of POLYGON_ASSET_CLASS_LIST) {
+    //   const req = await scheduleBuilder.buildRequestAsync(cls, "A");
+    //   await polygonClient.subscribe(req);
+    // }
 
     // Brief pause before continuing
     await Bun.sleep(1000);

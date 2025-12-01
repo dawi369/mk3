@@ -53,7 +53,7 @@ function TerminalPageContent() {
 
 export default function TerminalPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute redirectTo="/login">
       <Suspense
         fallback={
           <div className="flex items-center justify-center h-full">
