@@ -1,6 +1,6 @@
 // Test WebSocket client to verify connection and data reception
 
-const WS_URL = "ws://localhost:3001";
+const WS_URL = "ws://localhost:3000";
 
 console.log(`🔌 Connecting to ${WS_URL}...`);
 

@@ -29,16 +29,7 @@ export const NEXT_PUBLIC_REDIS_PORT = requireEnv(
   process.env.NEXT_PUBLIC_REDIS_PORT
 );
 
-
-
-
-
-export const NEXT_PUBLIC_HUB_REST_URL = requireEnv(
-  "NEXT_PUBLIC_HUB_REST_URL",
-  process.env.NEXT_PUBLIC_HUB_REST_URL
-);
-
-export const NEXT_PUBLIC_HUB_WS_URL = requireEnv(
-  "NEXT_PUBLIC_HUB_WS_URL",
-  process.env.NEXT_PUBLIC_HUB_WS_URL
+export const NEXT_PUBLIC_HUB_URL = requireEnv(
+  "NEXT_PUBLIC_HUB_URL",
+  process.env.NEXT_PUBLIC_HUB_URL
 );

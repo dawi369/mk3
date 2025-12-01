@@ -17,9 +17,9 @@ function getEnvVarAsInt(key: string): number {
 
 export const POLYGON_API_KEY = getEnvVar("POLYGON_API_KEY");
 export const POLYGON_API_URL = getEnvVar("POLYGON_API_URL");
-export const HUB_REST_PORT = getEnvVarAsInt("HUB_REST_PORT");
+export const HUB_PORT = getEnvVarAsInt("HUB_PORT");
 export const REDIS_HOST = getEnvVar("REDIS_HOST");
 export const REDIS_PORT = getEnvVarAsInt("REDIS_PORT");
 export const DATABASE_URL = getEnvVar("DATABASE_URL");
-export const SUPABASE_JWT_SECRET = getEnvVar("SUPABASE_JWT_SECRET");
+// export const SUPABASE_JWT_SECRET = getEnvVar("SUPABASE_JWT_SECRET");
 export const HUB_API_KEY = getEnvVar("HUB_API_KEY");
