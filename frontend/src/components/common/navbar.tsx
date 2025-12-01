@@ -2,16 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import {
-  CircleCheckIcon,
-  CircleHelpIcon,
-  CircleIcon,
-  Fingerprint,
-  Terminal,
-  ChartLine,
-  Activity,
-  Sparkles,
-} from "lucide-react";
+import { Terminal, Activity, Scale, Sparkles } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -25,122 +16,81 @@ import {
 } from "@/components/ui/navigation-menu";
 import { AuthIndicator } from "@/components/common/auth-indicator";
 
-const components: { title: string; href: string; description: string }[] = [
-  {
-    title: "Alert Dialog",
-    href: "/docs/primitives/alert-dialog",
-    description:
-      "A modal dialog that interrupts the user with important content and expects a response.",
-  },
-  {
-    title: "Hover Card",
-    href: "/docs/primitives/hover-card",
-    description:
-      "For sighted users to preview content available behind a link.",
-  },
-  {
-    title: "Progress",
-    href: "/docs/primitives/progress",
-    description:
-      "Displays an indicator showing the completion progress of a task, typically displayed as a progress bar.",
-  },
-  {
-    title: "Scroll-area",
-    href: "/docs/primitives/scroll-area",
-    description: "Visually or semantically separates content.",
-  },
-  {
-    title: "Tabs",
-    href: "/docs/primitives/tabs",
-    description:
-      "A set of layered sections of content—known as tab panels—that are displayed one at a time.",
-  },
-  {
-    title: "Tooltip",
-    href: "/docs/primitives/tooltip",
-    description:
-      "A popup that displays information related to an element when the element receives keyboard focus or the mouse hovers over it.",
-  },
-];
-
 export function Navbar() {
   const isMobile = useIsMobile();
 
   return (
-    <NavigationMenu viewport={!isMobile}>
-      <NavigationMenuList className="flex-wrap">
-        <NavigationMenuItem>
-          <NavigationMenuTrigger className="opacity-60 hover:opacity-100 transition-opacity">
-            Features
-          </NavigationMenuTrigger>
-          <NavigationMenuContent>
-            <ul className="grid gap-2 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
-              <li className="row-span-3">
-                <NavigationMenuLink asChild>
-                  <a
-                    className="group flex h-full w-full flex-col justify-end rounded-md border border-white/5 bg-white/0 p-4 no-underline outline-none transition-all duration-500 select-none hover:border-white/10 hover:bg-white/5 md:p-6"
-                    href="/terminal"
-                  >
-                    <div className="mb-2 text-lg font-bold font-space text-foreground transition-colors flex items-center gap-2 group-hover:text-primary">
-                      <Terminal className="h-5 w-5 transition-colors duration-500 text-muted-foreground group-hover:text-primary" />
-                      Terminal
-                    </div>
-                    <p className="text-muted-foreground text-sm leading-tight font-mono">
-                      Beautifully designed, lightning fast.
-                    </p>
-                  </a>
-                </NavigationMenuLink>
-              </li>
-              <ListItem href="/terminal" title="Indicators" icon={ChartLine}>
-                Actionable insights. Track technical signals and key metrics in
-                real-time.
-              </ListItem>
-              <ListItem
-                href="/terminal"
-                title="Market Sentiment"
-                icon={Activity}
-              >
-                Feel the market. Understand the pulse of futures trading across
-                all asset classes.
-              </ListItem>
-              <ListItem href="/ai-lab" title="AI Lab" icon={Sparkles}>
-                See what the data sees. Powered by the latest systems.
-              </ListItem>
-            </ul>
-          </NavigationMenuContent>
-        </NavigationMenuItem>
-
-        <NavigationMenuItem>
-          <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-            <Link
-              href="/mission"
+    <>
+      <NavigationMenu viewport={!isMobile} suppressHydrationWarning>
+        <NavigationMenuList className="flex-wrap">
+          <NavigationMenuItem>
+            <NavigationMenuTrigger
               className="opacity-60 hover:opacity-100 transition-opacity"
+              suppressHydrationWarning
             >
-              Mission
-            </Link>
-          </NavigationMenuLink>
-        </NavigationMenuItem>
+              Features
+            </NavigationMenuTrigger>
+            <NavigationMenuContent>
+              <ul className="grid gap-2 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
+                <li className="row-span-3">
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href="/terminal?view=terminal"
+                      className="group flex h-full w-full flex-col justify-end rounded-md border border-white/5 bg-white/0 p-4 no-underline outline-none transition-all duration-500 select-none hover:border-white/10 hover:bg-white/5 md:p-6"
+                    >
+                      <div className="mb-2 text-lg font-bold font-space text-foreground transition-colors flex items-center gap-2 group-hover:text-primary">
+                        <Terminal className="h-5 w-5 transition-colors duration-500 text-muted-foreground group-hover:text-primary" />
+                        Terminal
+                      </div>
+                      <p className="text-muted-foreground text-sm leading-tight font-mono">
+                        Beautifully designed, lightning fast.
+                      </p>
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+                {/* <ListItem href="/terminal?view=indicators" title="Indicators" icon={ChartLine}> */}
+                <ListItem href="/terminal?view=indicators" title="Indicators" icon={Activity}>
+                  Actionable insights. Track technical signals and key metrics in real-time.
+                </ListItem>
+                {/* <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Activity}> */}
+                <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Scale}>
+                  Feel the market. Understand the pulse of futures trading across all asset classes.
+                </ListItem>
+                <ListItem href="/terminal?view=ai-lab" title="AI Lab" icon={Sparkles}>
+                  {/* <ListItem href="/terminal?view=ai-lab" title="AI Lab" icon={BrainCircuit}> */}
+                  See what the data sees. Powered by the latest systems.
+                </ListItem>
+              </ul>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
 
-        <NavigationMenuItem>
-          <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-            <Link
-              href="/pricing"
-              className="opacity-60 hover:opacity-100 transition-opacity"
-            >
-              Pricing
-            </Link>
-          </NavigationMenuLink>
-        </NavigationMenuItem>
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+              <Link href="/backtesting" className="opacity-60 hover:opacity-100 transition-opacity">
+                Backtesting
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
 
-        <NavigationMenuItem>
-          <AuthIndicator />
-        </NavigationMenuItem>
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+              <Link href="/mission" className="opacity-60 hover:opacity-100 transition-opacity">
+                Mission
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
 
-        {/* <li className="flex items-center">
-          <LatencyIndicator />
-        </li> */}
-      </NavigationMenuList>
-    </NavigationMenu>
+          <NavigationMenuItem>
+            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
+              <Link href="/pricing" className="opacity-60 hover:opacity-100 transition-opacity">
+                Pricing
+              </Link>
+            </NavigationMenuLink>
+          </NavigationMenuItem>
+        </NavigationMenuList>
+      </NavigationMenu>
+      <AuthIndicator />
+    </>
   );
 }
 
@@ -167,9 +117,7 @@ function ListItem({
             )}
             {title}
           </div>
-          <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
-            {children}
-          </p>
+          <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">{children}</p>
         </Link>
       </NavigationMenuLink>
     </li>
