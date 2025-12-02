@@ -14,7 +14,7 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const allOptions = ["Front", ...ALL_MONTHS];
+  const allOptions = ["Front", "All", ...ALL_MONTHS];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -34,10 +34,10 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors"
+        className="flex items-center gap-0.5 px-1.5 py-0 text-[9px] font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors"
       >
         {selectedMonth}
-        <ChevronDown className="w-3 h-3" />
+        <ChevronDown className="w-2.5 h-2.5" />
       </button>
 
       {isOpen && (

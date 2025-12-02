@@ -108,6 +108,10 @@ function compareTickerDates(a: string, b: string): number {
  * Filter tickers by month code
  */
 export function filterByMonth(tickers: string[], monthFilter: string): string[] {
+  if (monthFilter === "All") {
+    return tickers;
+  }
+
   if (monthFilter === "Front") {
     // Group tickers by root symbol
     const tickersByRoot = new Map<string, string[]>();
