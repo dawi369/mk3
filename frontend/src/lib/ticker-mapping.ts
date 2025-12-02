@@ -5,14 +5,7 @@ import softs from "../../tickers/softs.json";
 import us_indices from "../../tickers/us_indices.json";
 import volatiles from "../../tickers/volatiles.json";
 
-export type AssetClassId =
-  | "currencies"
-  | "energies"
-  | "grains"
-  | "metals"
-  | "softs"
-  | "indices"
-  | "volatiles";
+export type AssetClassId = "currencies" | "grains" | "metals" | "softs" | "indices" | "volatiles";
 
 export interface TickerConfig {
   asset_class?: string;
@@ -22,7 +15,7 @@ export interface TickerConfig {
   [key: string]: any;
 }
 
-const ALL_TICKERS: Record<Exclude<AssetClassId, "energies">, TickerConfig[]> = {
+const ALL_TICKERS: Record<AssetClassId, TickerConfig[]> = {
   currencies: currencies as TickerConfig[],
   grains: grains as TickerConfig[],
   metals: metals as TickerConfig[],
@@ -77,7 +70,6 @@ export function getTickerDetails(ticker: string): TickerConfig | undefined {
 export const ASSET_CLASSES: { id: AssetClassId; title: string }[] = [
   { id: "indices", title: "US Indices" },
   { id: "metals", title: "Metals" },
-  { id: "energies", title: "Energies" },
   { id: "grains", title: "Grains" },
   { id: "currencies", title: "Currencies" },
   { id: "volatiles", title: "Volatiles" },

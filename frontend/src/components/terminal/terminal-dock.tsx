@@ -86,10 +86,10 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
   return (
     <>
       {/* Trigger Area - visible dock-shaped outline */}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[320px] h-[150px] translate-y-[50%] bg-transparent rounded-full pointer-events-none z-40" />
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[320px] h-[150px] translate-y-[50%] bg-transparent rounded-full pointer-events-none z-[90]" />
 
       <motion.div
-        className="absolute bottom-2 left-1/2 max-w-full -translate-x-1/2 z-50"
+        className="fixed bottom-2 left-1/2 max-w-full -translate-x-1/2 z-[999]"
         initial={{ y: 0 }}
         animate={{ y: isVisible ? 0 : "85%" }}
         transition={{ type: "spring", damping: 25, stiffness: 250 }}

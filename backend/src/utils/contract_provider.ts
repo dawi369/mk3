@@ -25,7 +25,7 @@ export class ContractProvider {
    * @returns List of contract tickers (e.g. ["ESZ5", "ESH6"]) sorted by expiration.
    */
   async fetchActiveContracts(root: string): Promise<string[]> {
-    console.log(`[ContractProvider] Starting fetch for ${root}`);
+    // console.log(`[ContractProvider] Starting fetch for ${root}`);
     const contractsMap = new Map<string, Contract>();
     let nextUrl:
       | string
@@ -43,7 +43,7 @@ export class ContractProvider {
         }
 
         pageCount++;
-        console.log(`[ContractProvider] Fetching page ${pageCount} for ${root}...`);
+        // console.log(`[ContractProvider] Fetching page ${pageCount} for ${root}...`);
         // console.log(`[ContractProvider] URL: ${nextUrl.replace(this.apiKey, "REDACTED")}`);
 
         const response = await fetch(nextUrl, {
@@ -64,9 +64,9 @@ export class ContractProvider {
 
         const data: any = await response.json();
         const results = Array.isArray(data) ? data : data.results || [];
-        console.log(
-          `[ContractProvider] Received ${results.length} results for ${root} (page ${pageCount})`
-        );
+        // console.log(
+        //   `[ContractProvider] Received ${results.length} results for ${root} (page ${pageCount})`
+        // );
 
         for (const item of results) {
           if (item.active !== false && item.type === "single") {
@@ -94,24 +94,31 @@ export class ContractProvider {
         }
 
         nextUrl = data.next_url;
-        console.log(
-          `[ContractProvider] Next URL for ${root}: ${nextUrl ? "exists" : "null (done)"}`
-        );
-        console.log(
-          `[ContractProvider] Total unique contracts so far for ${root}: ${contractsMap.size}`
-        );
+        // console.log(
+        // `[ContractProvider] Next URL for ${root}: ${nextUrl ? "exists" : "null (done)"}`
+        // );
+        // console.log(
+        // `[ContractProvider] Total unique contracts so far for ${root}: ${contractsMap.size}`
+        // );
 
         // If next_url doesn't have apiKey and we rely on query param, we might need to append it.
         // But we are using Header auth now, so it should be fine.
+      }
+
+      // Log if we stopped due to reaching max pages
+      if (pageCount >= MAX_PAGES_PER_TICKER && nextUrl) {
+        console.log(
+          `[ContractProvider] Reached max pages (${MAX_PAGES_PER_TICKER}) for ${root}. Stopped pagination.`
+        );
       }
     } catch (error) {
       console.error(`[ContractProvider] Error fetching contracts for ${root}:`, error);
       throw error; // Re-throw to help identify the issue
     }
 
-    console.log(`[ContractProvider] Finished fetching for ${root}, total pages: ${pageCount}`);
+    // console.log(`[ContractProvider] Finished fetching for ${root}, total pages: ${pageCount}`);
     const contracts = Array.from(contractsMap.values());
-    console.log(`[ContractProvider] Total unique contracts for ${root}: ${contracts.length}`);
+    // console.log(`[ContractProvider] Total unique contracts for ${root}: ${contracts.length}`);
 
     // Sort by last_trade_date
     contracts.sort((a, b) => {
@@ -119,7 +126,7 @@ export class ContractProvider {
     });
 
     const tickers = contracts.map((c) => c.ticker);
-    console.log(`[ContractProvider] Returning ${tickers.length} tickers for ${root}:`, tickers);
+    // console.log(`[ContractProvider] Returning ${tickers.length} tickers for ${root}:`, tickers);
     return tickers;
   }
 }

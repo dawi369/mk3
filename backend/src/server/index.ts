@@ -29,24 +29,24 @@ async function startHubServer() {
     // Build requests dynamically using API
     console.log("Building subscription requests...");
 
-    const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
+    // const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
     // const metalsReq = await scheduleBuilder.buildRequestAsync("metals", "A");
     // const currenciesReq = await scheduleBuilder.buildRequestAsync("currencies", "A");
     // const grainsReq = await scheduleBuilder.buildRequestAsync("grains", "A");
     // const softsReq = await scheduleBuilder.buildRequestAsync("softs", "A");
     // const volatilesReq = await scheduleBuilder.buildRequestAsync("volatiles", "A");
 
-    await polygonClient.subscribe(usIndicesReq);
+    // await polygonClient.subscribe(usIndicesReq);
     // await polygonClient.subscribe(metalsReq);
     // await polygonClient.subscribe(currenciesReq);
     // await polygonClient.subscribe(grainsReq);
     // await polygonClient.subscribe(softsReq);
 
     // All in parallel
-    // for (const cls of POLYGON_ASSET_CLASS_LIST) {
-    //   const req = await scheduleBuilder.buildRequestAsync(cls, "A");
-    //   await polygonClient.subscribe(req);
-    // }
+    for (const cls of POLYGON_ASSET_CLASS_LIST) {
+      const req = await scheduleBuilder.buildRequestAsync(cls, "A");
+      await polygonClient.subscribe(req);
+    }
 
     // Brief pause before continuing
     await Bun.sleep(1000);
@@ -56,8 +56,8 @@ async function startHubServer() {
     await monthlySubscriptionJob.loadStatus();
 
     // Schedule jobs
-    dailyClearJob.schedule();
-    monthlySubscriptionJob.schedule(polygonClient);
+    // dailyClearJob.schedule();
+    // monthlySubscriptionJob.schedule(polygonClient);
     // historySyncJob.schedule();
 
     // Start Hub REST API (pass polygon client for subscription management)

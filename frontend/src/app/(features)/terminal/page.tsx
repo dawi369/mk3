@@ -38,7 +38,7 @@ function TerminalPageContent() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-background">
       {/* Main Content Area */}
-      <div className="h-full w-full overflow-y-auto scrollbar-hide">
+      <div className="h-full w-full overflow-hidden">
         {activeView === "terminal" && <TerminalView />}
         {activeView === "indicators" && <IndicatorsView />}
         {activeView === "sentiment" && <SentimentView />}

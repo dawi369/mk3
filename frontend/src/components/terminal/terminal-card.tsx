@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { AssetClassData, MarketMover } from "./mock-data";
+import { AssetClassData, MarketMover } from "@/components/terminal/mock-data";
 import { cn } from "@/lib/utils";
-import { Sparkline } from "./sparkline";
+import { Sparkline } from "@/components/terminal/sparkline";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -69,7 +69,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
               )}
             >
               {isWinner ? "+" : ""}
-              {item.change}%
+              {item.change.toFixed(2)}%
             </span>
           </div>
         </div>
@@ -155,10 +155,12 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
             Gainers
           </p>
-          <div className="space-y-0.5 flex-1 overflow-hidden">
-            {data.winners.map((item) => (
-              <TickerRow key={item.ticker} item={item} isWinner={true} />
-            ))}
+          <div className="relative flex-1">
+            <div className="absolute inset-0 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
+              {data.winners.map((item) => (
+                <TickerRow key={item.ticker} item={item} isWinner={true} />
+              ))}
+            </div>
           </div>
           <RVolIndicator rvol={data.rvol} />
         </div>
@@ -168,10 +170,12 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
             Losers
           </p>
-          <div className="space-y-0.5 flex-1 overflow-hidden">
-            {data.losers.map((item) => (
-              <TickerRow key={item.ticker} item={item} isWinner={false} />
-            ))}
+          <div className="relative flex-1">
+            <div className="absolute inset-0 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
+              {data.losers.map((item) => (
+                <TickerRow key={item.ticker} item={item} isWinner={false} />
+              ))}
+            </div>
           </div>
           <SentimentIndicator sentiment={data.sentiment} />
         </div>
@@ -183,21 +187,21 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
               <h2 className="text-xl font-bold tracking-tight">{selectedTicker.ticker}</h2>
             </div>
             <div className="mb-0.5">
-              <span className="text-3xl font-mono font-medium tracking-tighter">
+              <span className="text-2xl font-mono font-medium tracking-tighter">
                 {formatNumber(selectedTicker.price)}
               </span>
             </div>
             <div
               className={cn(
-                "flex items-center gap-1 text-sm font-medium mb-4",
+                "flex items-center gap-1 text-sm font-medium mb-2",
                 selectedTicker.change >= 0 ? "text-emerald-500" : "text-rose-500"
               )}
             >
-              {selectedTicker.change >= 0 ? "↑" : "↓"} {Math.abs(selectedTicker.change)}%
+              {selectedTicker.change >= 0 ? "↑" : "↓"} {Math.abs(selectedTicker.change).toFixed(2)}%
             </div>
           </div>
 
-          <div className="flex-1 flex items-center justify-center py-2">
+          <div className="flex-1 flex items-center justify-center py-1">
             <Sparkline
               data={selectedTicker.sparklineData}
               width={140}
@@ -206,30 +210,30 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Vol
               </span>
-              <span className="text-sm font-mono">{formatVolume(selectedTicker.stats.volume)}</span>
+              <span className="text-xs font-mono">{formatVolume(selectedTicker.stats.volume)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Open
               </span>
-              <span className="text-sm font-mono">{formatNumber(selectedTicker.stats.open)}</span>
+              <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.open)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 High
               </span>
-              <span className="text-sm font-mono">{formatNumber(selectedTicker.stats.high)}</span>
+              <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.high)}</span>
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Low
               </span>
-              <span className="text-sm font-mono">{formatNumber(selectedTicker.stats.low)}</span>
+              <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.low)}</span>
             </div>
           </div>
         </div>
