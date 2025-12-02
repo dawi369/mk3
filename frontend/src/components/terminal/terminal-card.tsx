@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AssetClassData, MarketMover } from "@/components/terminal/mock-data";
 import { cn } from "@/lib/utils";
 import { Sparkline } from "@/components/terminal/sparkline";
+import { MonthSelector } from "@/components/terminal/month-selector";
+import { filterByMonth } from "@/lib/month-utils";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -12,21 +14,40 @@ interface TerminalCardProps {
 }
 
 export function TerminalCard({ data, onClick }: TerminalCardProps) {
-  const allTickers = [...data.winners, ...data.losers];
-  const [selectedTickerId, setSelectedTickerId] = useState<string | undefined>(
-    allTickers[0]?.ticker
-  );
+  const [selectedMonth, setSelectedMonth] = useState<string>("Front");
+  const [selectedTickerId, setSelectedTickerId] = useState<string | undefined>(undefined);
 
-  const selectedTicker = allTickers.find((t) => t.ticker === selectedTickerId) || allTickers[0];
+  // Filter tickers by selected month
+  const filteredWinners = useMemo(() => {
+    const tickers = data.winners.map((w) => w.ticker);
+    const filtered = filterByMonth(tickers, selectedMonth);
+    return data.winners.filter((w) => filtered.includes(w.ticker));
+  }, [data.winners, selectedMonth]);
+
+  const filteredLosers = useMemo(() => {
+    const tickers = data.losers.map((l) => l.ticker);
+    const filtered = filterByMonth(tickers, selectedMonth);
+    return data.losers.filter((l) => filtered.includes(l.ticker));
+  }, [data.losers, selectedMonth]);
+
+  const allTickers = [...filteredWinners, ...filteredLosers];
+
+  // Auto-select first ticker when selection is undefined or not in filtered list
+  const selectedTicker = useMemo(() => {
+    const current = allTickers.find((t) => t.ticker === selectedTickerId);
+    if (!current && allTickers.length > 0) {
+      setSelectedTickerId(allTickers[0].ticker);
+      return allTickers[0];
+    }
+    return current || allTickers[0];
+  }, [allTickers, selectedTickerId]);
 
   if (!selectedTicker) {
     return (
       <Card className="h-full bg-card border-2 border-white/20 shadow-sm flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-1 border-b border-white/20 shrink-0">
+        <div className="flex items-center justify-between px-3 py-0.5 border-b border-white/20 shrink-0">
           <h3 className="font-semibold text-xs tracking-tight text-foreground">{data.title}</h3>
-          <span className="text-[9px] font-medium text-muted-foreground border border-border/20 px-1.5 py-0.5 rounded bg-muted/5">
-            {data.activeMonth}
-          </span>
+          <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
         </div>
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
           No Data
@@ -78,9 +99,56 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
     );
   };
 
+  const ScrollableList = ({ items, isWinner }: { items: MarketMover[]; isWinner: boolean }) => {
+    const scrollRef = React.useRef<HTMLDivElement>(null);
+    const [showTopBlur, setShowTopBlur] = React.useState(false);
+    const [showBottomBlur, setShowBottomBlur] = React.useState(true);
+
+    const handleScroll = () => {
+      if (!scrollRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+
+      setShowTopBlur(scrollTop > 0);
+      setShowBottomBlur(scrollTop + clientHeight < scrollHeight - 1);
+    };
+
+    React.useEffect(() => {
+      const element = scrollRef.current;
+      if (element) {
+        handleScroll(); // Check initial state
+      }
+    }, [items]);
+
+    return (
+      <div className="relative flex-1">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className={cn(
+            "absolute inset-0 overflow-y-auto overflow-x-hidden space-y-0.5",
+            "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+            showTopBlur &&
+              showBottomBlur &&
+              "mask-[linear-gradient(to_bottom,transparent,black_12px,black_calc(100%-12px),transparent)]",
+            showTopBlur &&
+              !showBottomBlur &&
+              "mask-[linear-gradient(to_bottom,transparent,black_12px,black)]",
+            !showTopBlur &&
+              showBottomBlur &&
+              "mask-[linear-gradient(to_bottom,black,black_calc(100%-12px),transparent)]"
+          )}
+        >
+          {items.map((item) => (
+            <TickerRow key={item.ticker} item={item} isWinner={isWinner} />
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const RVolIndicator = ({ rvol }: { rvol: number }) => (
-    <div className="mt-auto pt-1.5 px-1.5">
-      <div className="flex justify-between items-end mb-0.5">
+    <div className="mt-auto pt-0.5 px-1.5">
+      <div className="flex justify-between items-end mb-0">
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
           RVol
         </span>
@@ -106,8 +174,8 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
   );
 
   const SentimentIndicator = ({ sentiment }: { sentiment: number }) => (
-    <div className="mt-auto pt-1.5 px-1.5">
-      <div className="flex justify-between items-end mb-0.5">
+    <div className="mt-auto pt-0.5 px-1.5">
+      <div className="flex justify-between items-end mb-0">
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
           Sent
         </span>
@@ -142,46 +210,32 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
       onClick={onClick}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-1 border-b border-white/20 shrink-0">
+      <div className="flex items-center justify-between px-3 py-0.5 border-b border-white/20 shrink-0">
         <h3 className="font-semibold text-xs tracking-tight text-foreground">{data.title}</h3>
-        <span className="text-[9px] font-medium text-muted-foreground border border-border/20 px-1.5 py-0.5 rounded bg-muted/5">
-          {data.activeMonth}
-        </span>
+        <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
       </div>
 
-      <CardContent className="flex-1 p-0 grid grid-cols-10 h-full min-h-0 overflow-hidden">
+      <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] h-full min-h-0 overflow-hidden">
         {/* Left Column: Gainers */}
-        <div className="col-span-3 border-r border-white/20 p-1.5 flex flex-col gap-0.5 overflow-hidden">
+        <div className="border-r border-white/20 p-1 flex flex-col gap-0 overflow-hidden">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
             Gainers
           </p>
-          <div className="relative flex-1">
-            <div className="absolute inset-0 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
-              {data.winners.map((item) => (
-                <TickerRow key={item.ticker} item={item} isWinner={true} />
-              ))}
-            </div>
-          </div>
+          <ScrollableList items={filteredWinners} isWinner={true} />
           <RVolIndicator rvol={data.rvol} />
         </div>
 
         {/* Middle Column: Losers */}
-        <div className="col-span-3 border-r border-white/20 p-1.5 flex flex-col gap-0.5 overflow-hidden">
+        <div className="border-r border-white/20 p-1 flex flex-col gap-0 overflow-hidden">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
             Losers
           </p>
-          <div className="relative flex-1">
-            <div className="absolute inset-0 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]">
-              {data.losers.map((item) => (
-                <TickerRow key={item.ticker} item={item} isWinner={false} />
-              ))}
-            </div>
-          </div>
+          <ScrollableList items={filteredLosers} isWinner={false} />
           <SentimentIndicator sentiment={data.sentiment} />
         </div>
 
         {/* Right Column: Details */}
-        <div className="col-span-4 p-3 flex flex-col justify-between overflow-hidden">
+        <div className="p-3 flex flex-col justify-between overflow-hidden">
           <div>
             <div className="flex items-start justify-between mb-1">
               <h2 className="text-xl font-bold tracking-tight">{selectedTicker.ticker}</h2>
