@@ -26,13 +26,15 @@ type TickerGroup = { [key: string]: TickerEntry };
 
 type AssetClass = "grains" | "volatiles" | "us_indices" | "softs" | "metals" | "currencies";
 
+const FRONTEND_ROOT = `${import.meta.dir}/../..`;
+
 const TICKER_FILES: { [key in AssetClass]: string } = {
-  grains: "/tickers/grains.json",
-  volatiles: "/tickers/volatiles.json",
-  us_indices: "/tickers/us_indices.json",
-  softs: "/tickers/softs.json",
-  metals: "/tickers/metals.json",
-  currencies: "/tickers/currencies.json",
+  grains: `${FRONTEND_ROOT}/tickers/grains.json`,
+  volatiles: `${FRONTEND_ROOT}/tickers/volatiles.json`,
+  us_indices: `${FRONTEND_ROOT}/tickers/us_indices.json`,
+  softs: `${FRONTEND_ROOT}/tickers/softs.json`,
+  metals: `${FRONTEND_ROOT}/tickers/metals.json`,
+  currencies: `${FRONTEND_ROOT}/tickers/currencies.json`,
 };
 
 async function loadJson(filepath: string): Promise<TickerEntry[]> {

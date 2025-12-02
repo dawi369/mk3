@@ -41,7 +41,6 @@ async function startHubServer() {
     // await polygonClient.subscribe(currenciesReq);
     // await polygonClient.subscribe(grainsReq);
     // await polygonClient.subscribe(softsReq);
-    // await polygonClient.subscribe(volatilesReq);
 
     // All in parallel
     // for (const cls of POLYGON_ASSET_CLASS_LIST) {

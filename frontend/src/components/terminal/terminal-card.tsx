@@ -12,14 +12,28 @@ interface TerminalCardProps {
 }
 
 export function TerminalCard({ data, onClick }: TerminalCardProps) {
-  const [selectedTickerId, setSelectedTickerId] = useState<string>(
-    (data.losers[0] || data.winners[0])?.ticker
+  const allTickers = [...data.winners, ...data.losers];
+  const [selectedTickerId, setSelectedTickerId] = useState<string | undefined>(
+    allTickers[0]?.ticker
   );
 
-  const selectedTicker =
-    [...data.winners, ...data.losers].find((t) => t.ticker === selectedTickerId) ||
-    data.losers[0] ||
-    data.winners[0];
+  const selectedTicker = allTickers.find((t) => t.ticker === selectedTickerId) || allTickers[0];
+
+  if (!selectedTicker) {
+    return (
+      <Card className="h-full bg-card border-2 border-white/20 shadow-sm flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-1 border-b border-white/20 shrink-0">
+          <h3 className="font-semibold text-xs tracking-tight text-foreground">{data.title}</h3>
+          <span className="text-[9px] font-medium text-muted-foreground border border-border/20 px-1.5 py-0.5 rounded bg-muted/5">
+            {data.activeMonth}
+          </span>
+        </div>
+        <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
+          No Data
+        </div>
+      </Card>
+    );
+  }
 
   const formatNumber = (num: number, decimals = 2) => {
     return new Intl.NumberFormat("en-US", {

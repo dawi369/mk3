@@ -26,13 +26,18 @@ type TickerGroup = { [key: string]: TickerEntry };
 
 type AssetClass = "grains" | "volatiles" | "us_indices" | "softs" | "metals" | "currencies";
 
+// Construct absolute paths to ticker files using import.meta.dir
+// import.meta.dir gives us /home/david/dev/mk3/backend/src/utils
+// We need to go up two levels to backend root, then into tickers/
+const BACKEND_ROOT = `${import.meta.dir}/../..`;
+
 const TICKER_FILES: { [key in AssetClass]: string } = {
-  grains: "/tickers/grains.json",
-  volatiles: "/tickers/volatiles.json",
-  us_indices: "/tickers/us_indices.json",
-  softs: "/tickers/softs.json",
-  metals: "/tickers/metals.json",
-  currencies: "/tickers/currencies.json",
+  grains: `${BACKEND_ROOT}/tickers/grains.json`,
+  volatiles: `${BACKEND_ROOT}/tickers/volatiles.json`,
+  us_indices: `${BACKEND_ROOT}/tickers/us_indices.json`,
+  softs: `${BACKEND_ROOT}/tickers/softs.json`,
+  metals: `${BACKEND_ROOT}/tickers/metals.json`,
+  currencies: `${BACKEND_ROOT}/tickers/currencies.json`,
 };
 
 async function loadJson(filepath: string): Promise<TickerEntry[]> {
