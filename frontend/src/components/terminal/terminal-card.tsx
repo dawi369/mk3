@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { AssetClassData, MarketMover } from "./mock-data";
 import { cn } from "@/lib/utils";
+import { Sparkline } from "./sparkline";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -11,9 +12,14 @@ interface TerminalCardProps {
 }
 
 export function TerminalCard({ data, onClick }: TerminalCardProps) {
-  const [selectedTicker, setSelectedTicker] = useState<MarketMover>(
-    data.losers[0] || data.winners[0]
+  const [selectedTickerId, setSelectedTickerId] = useState<string>(
+    (data.losers[0] || data.winners[0])?.ticker
   );
+
+  const selectedTicker =
+    [...data.winners, ...data.losers].find((t) => t.ticker === selectedTickerId) ||
+    data.losers[0] ||
+    data.winners[0];
 
   const formatNumber = (num: number, decimals = 2) => {
     return new Intl.NumberFormat("en-US", {
@@ -27,7 +33,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
   };
 
   const TickerRow = ({ item, isWinner }: { item: MarketMover; isWinner: boolean }) => {
-    const isSelected = selectedTicker.ticker === item.ticker;
+    const isSelected = selectedTickerId === item.ticker;
     return (
       <div
         className={cn(
@@ -36,7 +42,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
         )}
         onClick={(e) => {
           e.stopPropagation();
-          setSelectedTicker(item);
+          setSelectedTickerId(item.ticker);
         }}
       >
         <div className="flex items-center justify-between w-full gap-1">
@@ -175,6 +181,15 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
             >
               {selectedTicker.change >= 0 ? "↑" : "↓"} {Math.abs(selectedTicker.change)}%
             </div>
+          </div>
+
+          <div className="flex-1 flex items-center justify-center py-2">
+            <Sparkline
+              data={selectedTicker.sparklineData}
+              width={140}
+              height={40}
+              color={selectedTicker.change >= 0 ? "#10b981" : "#f43f5e"}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-x-3 gap-y-3">
