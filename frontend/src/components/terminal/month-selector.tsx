@@ -34,7 +34,7 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center gap-0.5 px-1.5 py-0 text-[9px] font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors"
+        className="flex items-center gap-0.5 px-1.5 py-0 text-xs font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors"
       >
         {selectedMonth}
         <ChevronDown className="w-2.5 h-2.5" />
@@ -51,7 +51,7 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
                 setIsOpen(false);
               }}
               className={cn(
-                "w-full text-left px-3 py-1.5 text-[11px] hover:bg-muted/50 transition-colors",
+                "w-full text-left px-3 py-1.5 text-xs hover:bg-muted/50 transition-colors",
                 selectedMonth === month && "bg-muted text-foreground font-medium"
               )}
             >
