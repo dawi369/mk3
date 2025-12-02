@@ -64,26 +64,44 @@ export function getMonthName(code: string): string {
 }
 
 /**
- * Get the front month (earliest available) from a list of tickers
+ * Extract year from ticker symbol
+ * e.g., "GCZ5" → 5, "ESH26" → 26
  */
-export function getFrontMonth(tickers: string[]): string | null {
-  const months = tickers.map(extractMonthCode).filter((code): code is string => code !== null);
+function extractYear(ticker: string): number | null {
+  const match = ticker.match(/([FGHJKMNQUVXZ])(\d{1,2})$/);
+  return match ? parseInt(match[2], 10) : null;
+}
 
-  if (months.length === 0) return null;
+/**
+ * Extract ticker root (symbol without month/year)
+ * e.g., "GCZ5" → "GC", "ESH26" → "ES"
+ */
+function extractRoot(ticker: string): string {
+  const match = ticker.match(/^([A-Z]+)[FGHJKMNQUVXZ]\d{1,2}$/);
+  return match ? match[1] : ticker;
+}
 
-  // Find the earliest month by comparing month numbers
-  let earliestCode = months[0];
-  let earliestNum = MONTH_CODE_TO_NUMBER[earliestCode] || 999;
+/**
+ * Compare two tickers to determine which is earlier
+ * Returns negative if a is earlier, positive if b is earlier
+ */
+function compareTickerDates(a: string, b: string): number {
+  const monthA = extractMonthCode(a);
+  const monthB = extractMonthCode(b);
+  const yearA = extractYear(a);
+  const yearB = extractYear(b);
 
-  for (const code of months) {
-    const num = MONTH_CODE_TO_NUMBER[code];
-    if (num && num < earliestNum) {
-      earliestNum = num;
-      earliestCode = code;
-    }
+  if (!monthA || !monthB || yearA === null || yearB === null) return 0;
+
+  // Compare years first
+  if (yearA !== yearB) {
+    return yearA - yearB;
   }
 
-  return earliestCode;
+  // If same year, compare months
+  const monthNumA = MONTH_CODE_TO_NUMBER[monthA] || 0;
+  const monthNumB = MONTH_CODE_TO_NUMBER[monthB] || 0;
+  return monthNumA - monthNumB;
 }
 
 /**
@@ -91,9 +109,28 @@ export function getFrontMonth(tickers: string[]): string | null {
  */
 export function filterByMonth(tickers: string[], monthFilter: string): string[] {
   if (monthFilter === "Front") {
-    const frontMonth = getFrontMonth(tickers);
-    if (!frontMonth) return tickers;
-    return tickers.filter((ticker) => extractMonthCode(ticker) === frontMonth);
+    // Group tickers by root symbol
+    const tickersByRoot = new Map<string, string[]>();
+
+    for (const ticker of tickers) {
+      const root = extractRoot(ticker);
+      if (!tickersByRoot.has(root)) {
+        tickersByRoot.set(root, []);
+      }
+      tickersByRoot.get(root)!.push(ticker);
+    }
+
+    // For each root, find the earliest contract
+    const frontContracts: string[] = [];
+    for (const [_, rootTickers] of tickersByRoot) {
+      if (rootTickers.length === 0) continue;
+
+      // Sort by date and take the earliest
+      const sorted = [...rootTickers].sort(compareTickerDates);
+      frontContracts.push(sorted[0]);
+    }
+
+    return frontContracts;
   }
 
   // Filter by specific month name (e.g., "Jan", "Feb")
