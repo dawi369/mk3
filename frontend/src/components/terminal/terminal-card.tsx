@@ -46,7 +46,9 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
     return (
       <Card className="h-full bg-card border-2 border-white/20 shadow-sm flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-2 py-0 border-b border-white/20 shrink-0 h-2">
-          <h3 className="font-semibold text-sm tracking-tight text-foreground">{data.title}</h3>
+          <h3 className="font-semibold text-sm tracking-tight text-foreground leading-none">
+            {data.title}
+          </h3>
           <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
         </div>
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
@@ -211,7 +213,9 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-2 py-0 border-b border-white/20 shrink-0 h-2">
-        <h3 className="font-semibold text-sm tracking-tight text-foreground">{data.title}</h3>
+        <h3 className="font-semibold text-sm tracking-tight text-foreground leading-none">
+          {data.title}
+        </h3>
         <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
       </div>
 
