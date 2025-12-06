@@ -21,7 +21,7 @@ export function TerminalPreviewCard({ variants }: TerminalPreviewCardProps) {
             <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500"></div>
             <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500"></div>
           </div>
-          <div className="text-muted-foreground">ESZ25 • CME • LIVE</div>
+          <div className="text-muted-foreground">temp graphic • ESZ25 • CME • LIVE</div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
