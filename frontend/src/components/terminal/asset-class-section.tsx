@@ -67,9 +67,7 @@ export function AssetClassSection({ title, tickers }: AssetClassSectionProps) {
               />
             ))}
             {winners.length === 0 && (
-              <div className="text-xs text-muted-foreground italic py-2">
-                No gainers yet
-              </div>
+              <div className="text-xs text-muted-foreground italic py-2">No gainers yet</div>
             )}
           </div>
 
@@ -78,9 +76,7 @@ export function AssetClassSection({ title, tickers }: AssetClassSectionProps) {
 
           {/* Losers */}
           <div className="flex-1 space-y-3">
-            <div className="text-xs font-mono text-muted-foreground uppercase mb-2">
-              Top Losers
-            </div>
+            <div className="text-xs font-mono text-muted-foreground uppercase mb-2">Top Losers</div>
             {losers.map((t) => (
               <TickerItem
                 key={t.symbol}
@@ -93,9 +89,7 @@ export function AssetClassSection({ title, tickers }: AssetClassSectionProps) {
               />
             ))}
             {losers.length === 0 && (
-              <div className="text-xs text-muted-foreground italic py-2">
-                No losers yet
-              </div>
+              <div className="text-xs text-muted-foreground italic py-2">No losers yet</div>
             )}
           </div>
         </div>
@@ -104,12 +98,8 @@ export function AssetClassSection({ title, tickers }: AssetClassSectionProps) {
         <div className="w-[180px] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="font-bold font-space text-lg">
-                {activeTickerSymbol}
-              </span>
-              <span className="text-xs font-mono text-muted-foreground">
-                DEC25
-              </span>
+              <span className="font-bold font-space text-lg">{activeTickerSymbol}</span>
+              <span className="text-xs font-mono text-muted-foreground">DEC25</span>
             </div>
             <div className="text-2xl font-mono font-medium tracking-tight">
               {activeTickerData?.price.toFixed(2) || "---"}
@@ -117,9 +107,7 @@ export function AssetClassSection({ title, tickers }: AssetClassSectionProps) {
             <div
               className={cn(
                 "text-sm font-mono flex items-center gap-1 mt-1",
-                (activeTickerData?.changePercent || 0) >= 0
-                  ? "text-green-500"
-                  : "text-red-500"
+                (activeTickerData?.changePercent || 0) >= 0 ? "text-green-500" : "text-red-500"
               )}
             >
               {(activeTickerData?.changePercent || 0) >= 0 ? (
@@ -134,15 +122,11 @@ export function AssetClassSection({ title, tickers }: AssetClassSectionProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Vol</span>
-              <span className="font-mono">
-                {activeTickerData?.volume.toLocaleString() || "-"}
-              </span>
+              <span className="font-mono">{activeTickerData?.volume.toLocaleString() || "-"}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Open</span>
-              <span className="font-mono">
-                {(activeTickerData?.price || 0).toFixed(2)}
-              </span>
+              <span className="font-mono">{(activeTickerData?.price || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">High</span>
@@ -190,18 +174,11 @@ function TickerItem({
     >
       <div className="flex justify-between items-center">
         <span className="font-medium text-sm">{symbol}</span>
-        <span
-          className={cn(
-            "text-xs font-mono",
-            isPositive ? "text-green-500" : "text-red-500"
-          )}
-        >
+        <span className={cn("text-xs font-mono", isPositive ? "text-green-500" : "text-red-500")}>
           {changePercent.toFixed(2)}%
         </span>
       </div>
-      <div className="text-xs text-muted-foreground font-mono mt-0.5">
-        {price.toFixed(2)}
-      </div>
+      <div className="text-xs text-muted-foreground font-mono mt-0.5">{price.toFixed(2)}</div>
     </motion.button>
   );
 }

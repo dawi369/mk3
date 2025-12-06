@@ -175,7 +175,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
         <span
           className={cn(
             "text-xs font-mono font-bold",
-            rvol > 1.2 ? "text-amber-500" : "text-muted-foreground"
+            rvol > 1.2 ? "text-amber" : "text-muted-foreground"
           )}
         >
           {rvol.toFixed(2)}x
@@ -183,10 +183,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
       </div>
       <div className="h-0.5 w-full bg-muted/30 rounded-full overflow-hidden">
         <div
-          className={cn(
-            "h-full rounded-full",
-            rvol > 1.2 ? "bg-amber-500" : "bg-muted-foreground/50"
-          )}
+          className={cn("h-full rounded-full", rvol > 1.2 ? "bg-amber" : "bg-muted-foreground/50")}
           style={{ width: `${Math.min(rvol * 50, 100)}%` }}
         />
       </div>

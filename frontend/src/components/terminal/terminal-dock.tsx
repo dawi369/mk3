@@ -19,22 +19,22 @@ const data: {
   {
     title: "Terminal",
     id: "terminal",
-    icon: <Terminal className="h-full w-full text-neutral-600 dark:text-neutral-300" />,
+    icon: <Terminal className="h-full w-full text-muted-foreground" />,
   },
   {
     title: "Indicators",
     id: "indicators",
-    icon: <Activity className="h-full w-full text-neutral-600 dark:text-neutral-300" />,
+    icon: <Activity className="h-full w-full text-muted-foreground" />,
   },
   {
     title: "Sentiment",
     id: "sentiment",
-    icon: <Scale className="h-full w-full text-neutral-600 dark:text-neutral-300" />,
+    icon: <Scale className="h-full w-full text-muted-foreground" />,
   },
   {
     title: "AI Lab",
     id: "ai-lab",
-    icon: <Sparkles className="h-full w-full text-neutral-600 dark:text-neutral-300" />,
+    icon: <Sparkles className="h-full w-full text-muted-foreground" />,
   },
 ];
 

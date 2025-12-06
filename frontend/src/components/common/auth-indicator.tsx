@@ -200,7 +200,7 @@ export function AuthIndicator() {
                 {/* Feature Request */}
                 <div className="space-y-2 pt-2 border-t border-white/10">
                   <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                    <Lightbulb className="w-3 h-3 text-indigo-400" /> Feature Request
+                    <Lightbulb className="w-3 h-3 text-primary" /> Feature Request
                   </h4>
                   <form onSubmit={handleFeatureRequestSubmit} className="flex gap-2">
                     <Input
@@ -233,7 +233,7 @@ export function AuthIndicator() {
                 <div className="pt-2 border-t border-white/10">
                   <button
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                    className="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign out
