@@ -53,7 +53,15 @@ export async function createFreeSubscription(userId: string): Promise<Subscripti
       console.log("Subscription already exists for user:", userId);
       return getUserSubscription(userId);
     }
-    console.error("Error creating free subscription:", error);
+    // Log full debug info
+    // console.error("--- Create Subscription Error Debug ---");
+    // console.error("User ID:", userId);
+    // console.error("Error Code:", error?.code);
+    // console.error("Error Message:", error?.message);
+    // console.error("Error Details:", error?.details);
+    // console.error("Error Hint:", error?.hint);
+    // console.error("Full Error Object:", error);
+    // console.error("-------------------------------------");
     return null;
   }
 

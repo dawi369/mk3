@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Transaction } from "@/lib/billing/types";
+import type { Transaction } from "@/types/billing.types";
 
 interface TransactionTableProps {
   transactions: Transaction[];
