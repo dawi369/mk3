@@ -241,9 +241,9 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
           <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
         </div>
 
-        <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] h-full min-h-0 overflow-hidden">
+        <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] h-full min-h-0">
           {/* Left Column: Gainers */}
-          <div className="border-r border-white/20 p-1 -mt-4 flex flex-col gap-0 overflow-hidden">
+          <div className="border-r border-white/20 p-1 -mt-6 flex flex-col gap-0 overflow-hidden">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
               Gainers
             </p>
@@ -252,7 +252,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
           </div>
 
           {/* Middle Column: Losers */}
-          <div className="border-r border-white/20 p-1 -mt-4 flex flex-col gap-0 overflow-hidden">
+          <div className="border-r border-white/20 p-1 -mt-6 flex flex-col gap-0 overflow-hidden">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
               Losers
             </p>
@@ -261,7 +261,7 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
           </div>
 
           {/* Right Column: Details */}
-          <div className="p-3 -mt-4 flex flex-col justify-between overflow-hidden">
+          <div className="p-3 -mt-6 flex flex-col justify-between overflow-hidden">
             <div>
               <div className="flex items-start justify-between mb-1">
                 <h2 className="text-xl font-bold tracking-tight">{selectedTicker.ticker}</h2>

@@ -233,7 +233,7 @@ export function AuthIndicator() {
                 <div className="pt-2 border-t border-white/10">
                   <button
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                    className="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign out
