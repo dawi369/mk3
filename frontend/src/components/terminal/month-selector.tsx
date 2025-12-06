@@ -34,10 +34,10 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center justify-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors leading-none"
+        className="flex items-center justify-center gap-0.5 px-1.5 py-0 text-xs font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors leading-none"
       >
         <span className="leading-none">{selectedMonth}</span>
-        <ChevronDown className="w-2.5 h-2.5 shrink-0" />
+        <ChevronDown className="w-3 h-3 shrink-0" />
       </button>
 
       {isOpen && (

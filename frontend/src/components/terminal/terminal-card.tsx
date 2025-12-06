@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { Sparkline } from "@/components/terminal/sparkline";
 import { MonthSelector } from "@/components/terminal/month-selector";
 import { filterByMonth } from "@/lib/month-utils";
+import { Tilt } from "@/components/ui/tilt";
+import { BorderTrail } from "@/components/ui/border-trail";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -44,17 +46,33 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
 
   if (!selectedTicker) {
     return (
-      <Card className="h-full bg-card border-2 border-white/20 shadow-sm flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-2 border-b border-white/20 shrink-0 min-h-[18px]">
-          <h3 className="font-semibold text-xs tracking-tight text-foreground leading-tight">
-            {data.title}
-          </h3>
-          <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
-        </div>
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs">
-          No Data
-        </div>
-      </Card>
+      <Tilt
+        rotationFactor={1}
+        isRevese={true}
+        springOptions={{ stiffness: 400, damping: 25 }}
+        className="h-full"
+      >
+        <Card className="relative h-full bg-card border-2 border-white/20 shadow-sm flex flex-col overflow-hidden">
+          <BorderTrail
+            className="bg-linear-to-l from-blue-500 via-purple-500 to-pink-500"
+            size={80}
+            transition={{
+              repeat: Infinity,
+              duration: 4,
+              ease: "linear",
+            }}
+          />
+          <div className="flex items-center justify-between px-2 h-5 border-b border-white/20 shrink-0">
+            <h3 className="font-semibold text-sm tracking-tight text-foreground leading-none">
+              {data.title}
+            </h3>
+            <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+          </div>
+          <div className="flex-1 flex items-center justify-center text-muted-foreground text-xs animate-pulse">
+            Loading...
+          </div>
+        </Card>
+      </Tilt>
     );
   }
 
@@ -207,95 +225,106 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
   );
 
   return (
-    <Card
-      className="h-full bg-card border-2 border-white/20 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden"
-      onClick={onClick}
+    <Tilt
+      //edit this to 3 or 4 for more rotation
+      rotationFactor={1}
+      isRevese={true}
+      springOptions={{ stiffness: 400, damping: 25 }}
+      className="h-full"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-2 border-b border-white/20 shrink-0 min-h-[18px]">
-        <h3 className="font-semibold text-xs tracking-tight text-foreground leading-tight">
-          {data.title}
-        </h3>
-        <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
-      </div>
-
-      <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] h-full min-h-0 overflow-hidden">
-        {/* Left Column: Gainers */}
-        <div className="border-r border-white/20 p-1 flex flex-col gap-0 overflow-hidden">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
-            Gainers
-          </p>
-          <ScrollableList items={filteredWinners} isWinner={true} />
-          <RVolIndicator rvol={data.rvol} />
+      <Card
+        className="h-full bg-card border-2 border-white/20 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden"
+        onClick={onClick}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-2 h-5 border-b border-white/20 shrink-0">
+          <h3 className="font-semibold text-sm tracking-tight text-foreground leading-none">
+            {data.title}
+          </h3>
+          <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
         </div>
 
-        {/* Middle Column: Losers */}
-        <div className="border-r border-white/20 p-1 flex flex-col gap-0 overflow-hidden">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
-            Losers
-          </p>
-          <ScrollableList items={filteredLosers} isWinner={false} />
-          <SentimentIndicator sentiment={data.sentiment} />
-        </div>
-
-        {/* Right Column: Details */}
-        <div className="p-3 flex flex-col justify-between overflow-hidden">
-          <div>
-            <div className="flex items-start justify-between mb-1">
-              <h2 className="text-xl font-bold tracking-tight">{selectedTicker.ticker}</h2>
-            </div>
-            <div className="mb-0.5">
-              <span className="text-2xl font-mono font-medium tracking-tighter">
-                {formatNumber(selectedTicker.price)}
-              </span>
-            </div>
-            <div
-              className={cn(
-                "flex items-center gap-1 text-sm font-medium mb-2",
-                selectedTicker.change >= 0 ? "text-emerald-500" : "text-rose-500"
-              )}
-            >
-              {selectedTicker.change >= 0 ? "↑" : "↓"} {Math.abs(selectedTicker.change).toFixed(2)}%
-            </div>
+        <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] h-full min-h-0 overflow-hidden">
+          {/* Left Column: Gainers */}
+          <div className="border-r border-white/20 p-1 flex flex-col gap-0 overflow-hidden">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
+              Gainers
+            </p>
+            <ScrollableList items={filteredWinners} isWinner={true} />
+            <RVolIndicator rvol={data.rvol} />
           </div>
 
-          <div className="flex-1 flex items-center justify-center py-1">
-            <Sparkline
-              data={selectedTicker.sparklineData}
-              width={140}
-              height={40}
-              color={selectedTicker.change >= 0 ? "#10b981" : "#f43f5e"}
-            />
+          {/* Middle Column: Losers */}
+          <div className="border-r border-white/20 p-1 flex flex-col gap-0 overflow-hidden">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
+              Losers
+            </p>
+            <ScrollableList items={filteredLosers} isWinner={false} />
+            <SentimentIndicator sentiment={data.sentiment} />
           </div>
 
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Vol
-              </span>
-              <span className="text-xs font-mono">{formatVolume(selectedTicker.stats.volume)}</span>
+          {/* Right Column: Details */}
+          <div className="p-3 flex flex-col justify-between overflow-hidden">
+            <div>
+              <div className="flex items-start justify-between mb-1">
+                <h2 className="text-xl font-bold tracking-tight">{selectedTicker.ticker}</h2>
+              </div>
+              <div className="mb-0.5">
+                <span className="text-2xl font-mono font-medium tracking-tighter">
+                  {formatNumber(selectedTicker.price)}
+                </span>
+              </div>
+              <div
+                className={cn(
+                  "flex items-center gap-1 text-sm font-medium mb-2",
+                  selectedTicker.change >= 0 ? "text-emerald-500" : "text-rose-500"
+                )}
+              >
+                {selectedTicker.change >= 0 ? "↑" : "↓"}{" "}
+                {Math.abs(selectedTicker.change).toFixed(2)}%
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Open
-              </span>
-              <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.open)}</span>
+
+            <div className="flex-1 flex items-center justify-center py-1">
+              <Sparkline
+                data={selectedTicker.sparklineData}
+                width={140}
+                height={40}
+                color={selectedTicker.change >= 0 ? "#10b981" : "#f43f5e"}
+              />
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                High
-              </span>
-              <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.high)}</span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Low
-              </span>
-              <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.low)}</span>
+
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Vol
+                </span>
+                <span className="text-xs font-mono">
+                  {formatVolume(selectedTicker.stats.volume)}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Open
+                </span>
+                <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.open)}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  High
+                </span>
+                <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.high)}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Low
+                </span>
+                <span className="text-xs font-mono">{formatNumber(selectedTicker.stats.low)}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Tilt>
   );
 }
