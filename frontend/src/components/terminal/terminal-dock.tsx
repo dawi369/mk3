@@ -46,7 +46,7 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
     // Start extended, then retract after a delay
     const timer = setTimeout(() => {
       setForceVisible(false);
-    }, 500);
+    }, 600);
     return () => clearTimeout(timer);
   }, []);
 
@@ -58,7 +58,7 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
 
       // Dock-shaped trigger area dimensions (matching the visual indicator)
       const dockWidth = 320;
-      const dockHeight = 150;
+      const dockHeight = 140;
 
       // Calculate the bounds of the trigger area
       // The visual dock is at bottom: 0, translate-y-[50%], so it's centered on the bottom edge
@@ -91,8 +91,19 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
       <motion.div
         className="fixed bottom-2 left-1/2 max-w-full -translate-x-1/2 z-999"
         initial={{ y: 0 }}
-        animate={{ y: isVisible ? 0 : "85%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 250 }}
+        animate={{ y: isVisible ? 0 : "120%" }}
+        // transition={{ type: "spring", damping: 25, stiffness: 250 }}
+        // transition={{
+        //   type: "spring",
+        //   stiffness: 350,
+        //   damping: 30,
+        //   mass: 0.8,
+        // }}
+        transition={{
+          type: "spring",
+          stiffness: 500,
+          damping: 40,
+        }}
       >
         <Dock className="items-end pb-3">
           {data.map((item) => (
