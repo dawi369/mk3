@@ -9,6 +9,7 @@ import { MonthSelector } from "@/components/terminal/month-selector";
 import { filterByMonth } from "@/lib/month-utils";
 import { Tilt } from "@/components/ui/tilt";
 import { BorderTrail } from "@/components/ui/border-trail";
+import { useTickerModal } from "@/components/terminal/ticker-modal-provider";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -18,6 +19,7 @@ interface TerminalCardProps {
 export function TerminalCard({ data, onClick }: TerminalCardProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>("Front");
   const [selectedTickerId, setSelectedTickerId] = useState<string | undefined>(undefined);
+  const { open: openTickerModal } = useTickerModal();
 
   // Filter tickers by selected month
   const filteredWinners = useMemo(() => {
@@ -97,7 +99,13 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
         )}
         onClick={(e) => {
           e.stopPropagation();
-          setSelectedTickerId(item.ticker);
+          if (isSelected) {
+            // Already selected - open modal
+            openTickerModal(item);
+          } else {
+            // First click - just select
+            setSelectedTickerId(item.ticker);
+          }
         }}
       >
         <div className="flex items-center justify-between w-full gap-1">
