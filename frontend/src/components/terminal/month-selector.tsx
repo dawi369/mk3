@@ -28,13 +28,13 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
   }, []);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative -mt-5" ref={dropdownRef}>
       <button
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center justify-center gap-0.5 px-1.5 py-0 text-xs font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors leading-none"
+        className="flex items-center justify-center gap-0.5 px-1.5 py-0 text-sm font-medium text-muted-foreground border border-border/20 rounded bg-muted/5 hover:bg-muted/10 transition-colors leading-none"
       >
         <span className="leading-none">{selectedMonth}</span>
         <ChevronDown className="w-3 h-3 shrink-0" />
