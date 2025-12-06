@@ -3,7 +3,6 @@ import { createClient } from "@/utils/supabase/client";
 export interface UserProfile {
   id: string;
   display_name: string | null;
-  tier: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -16,7 +15,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, tier, created_at, updated_at")
+    .select("id, display_name, created_at, updated_at")
     .eq("id", userId)
     .single();
 
