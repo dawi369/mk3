@@ -106,7 +106,7 @@ export default function LoginPage() {
         className="w-full max-w-md space-y-8"
       >
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome</h1>
           <p className="text-muted-foreground">Sign in to access the terminal</p>
         </div>
 
@@ -155,14 +155,14 @@ export default function LoginPage() {
                   variant="outline"
                   className="w-full"
                   onClick={() => handleOAuthLogin("apple")}
-                  disabled={isAnyLoading}
+                  disabled={true}
                 >
                   {oauthLoading === "apple" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <AppleIcon />
                   )}
-                  Continue with Apple
+                  Continue with Apple (fuc u apple, not paying 100 ayear)
                 </Button>
 
                 <Button
@@ -228,12 +228,13 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
+          Thanks for checking out Swordfish.{" "}
           <Link
-            href="/signup"
+            href="https://daviderwin.me"
+            target="_blank"
             className="underline underline-offset-4 hover:text-primary transition-colors"
           >
-            Contact admin
+            Contact the lead developer
           </Link>
         </p>
       </motion.div>
