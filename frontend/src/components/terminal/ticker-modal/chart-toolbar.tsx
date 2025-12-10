@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { useTickerModal, TIMEFRAMES, type Timeframe } from "./ticker-modal-provider";
+import { useTickerModal, TIMEFRAMES, type Timeframe } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { cn } from "@/lib/utils";
 
 export function ChartToolbar() {

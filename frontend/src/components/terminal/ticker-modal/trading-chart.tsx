@@ -11,7 +11,7 @@ import {
   LineData,
   Time,
 } from "lightweight-charts";
-import { SYMBOL_COLORS } from "./ticker-modal-provider";
+import { SYMBOL_COLORS } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 
 interface TradingChartProps {
   ticker: string;

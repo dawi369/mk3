@@ -40,7 +40,13 @@ const getDisplayName = (user: User, profile: UserProfile | null): string => {
   return "Trader";
 };
 
-export function AuthIndicator() {
+type AlignmentType = "left" | "center" | "right";
+
+interface AuthIndicatorProps {
+  align?: AlignmentType;
+}
+
+export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
   const { user, profile, loading, signOut, refreshProfile, updateProfile } = useAuth();
   const [editedName, setEditedName] = useState("");
   const [featureRequest, setFeatureRequest] = useState("");
@@ -126,7 +132,8 @@ export function AuthIndicator() {
   }
 
   return (
-    <NavigationMenu>
+    // bg-zinc-900??
+    <NavigationMenu viewport={false}>
       <NavigationMenuList>
         <NavigationMenuItem>
           <NavigationMenuTrigger className="opacity-60 hover:opacity-100 transition-opacity group">
@@ -142,7 +149,13 @@ export function AuthIndicator() {
               </span>
             </div>
           </NavigationMenuTrigger>
-          <NavigationMenuContent className="right-0 left-auto">
+          <NavigationMenuContent
+            className={cn(
+              align === "right" && "right-0 left-auto",
+              align === "center" && "left-1/2 -translate-x-1/2",
+              align === "left" && "left-0 right-auto"
+            )}
+          >
             <div className="grid gap-3 p-4 w-[300px] md:w-[350px]">
               {/* User Info Header */}
               <div className="flex flex-col space-y-1 pb-2 border-b border-white/10">

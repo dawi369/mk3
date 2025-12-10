@@ -2,7 +2,7 @@
 
 import React from "react";
 import { X } from "lucide-react";
-import { useTickerModal, SYMBOL_COLORS } from "./ticker-modal-provider";
+import { useTickerModal, SYMBOL_COLORS } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { cn } from "@/lib/utils";
 
 export function ChartLegend() {

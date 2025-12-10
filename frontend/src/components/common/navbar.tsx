@@ -89,7 +89,7 @@ export function Navbar() {
           </NavigationMenuItem>
         </NavigationMenuList>
       </NavigationMenu>
-      <AuthIndicator />
+      <AuthIndicator align="right" />
     </>
   );
 }

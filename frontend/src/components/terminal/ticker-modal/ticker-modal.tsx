@@ -4,12 +4,12 @@ import React, { useEffect, useState } from "react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTickerModal } from "./ticker-modal-provider";
+import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
-import { TradingChart } from "./trading-chart";
-import { ChartToolbar } from "./chart-toolbar";
-import { ChartLegend } from "./chart-legend";
-import { AISidebar } from "./ai-sidebar";
+import { TradingChart } from "@/components/terminal/ticker-modal/trading-chart";
+import { ChartToolbar } from "@/components/terminal/ticker-modal/chart-toolbar";
+import { ChartLegend } from "@/components/terminal/ticker-modal/chart-legend";
+import { AISidebar } from "@/components/terminal/ticker-modal/ai-sidebar";
 
 export function TickerModal() {
   const { isOpen, ticker, close, isSidebarOpen, comparisons } = useTickerModal();

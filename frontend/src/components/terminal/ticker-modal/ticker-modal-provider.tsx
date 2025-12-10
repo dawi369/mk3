@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
-import { MarketMover } from "./mock-data";
+import { MarketMover } from "@/components/terminal/_shared/mock-data";
 
 // Timeframe options
 export const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;

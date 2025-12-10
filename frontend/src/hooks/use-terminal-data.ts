@@ -6,7 +6,7 @@ import {
   getAssetClassForTicker,
   getTickerDetails,
 } from "@/lib/ticker-mapping";
-import { AssetClassData, MarketMover } from "@/components/terminal/mock-data";
+import { AssetClassData, MarketMover } from "@/components/terminal/_shared/mock-data";
 
 export function useTerminalData() {
   const { marketData } = useData();

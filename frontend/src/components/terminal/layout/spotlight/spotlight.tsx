@@ -12,7 +12,10 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { Terminal, Activity, Scale, Sparkles, Settings, Search } from "lucide-react";
-import { useSpotlight, SpotlightCommand } from "./spotlight-provider";
+import {
+  useSpotlight,
+  SpotlightCommand,
+} from "@/components/terminal/layout/spotlight/spotlight-provider";
 
 // Default navigation commands available in all views
 function useDefaultCommands(): SpotlightCommand[] {

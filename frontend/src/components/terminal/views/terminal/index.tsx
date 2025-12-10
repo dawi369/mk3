@@ -1,8 +1,18 @@
-import { TerminalCard } from "./terminal-card";
+"use client";
+
+import { useEffect } from "react";
+import { TerminalCard } from "@/components/terminal/views/terminal/terminal-card";
 import { useTerminalData } from "@/hooks/use-terminal-data";
+import { useHeader } from "@/components/terminal/layout/header-provider";
 
 export function TerminalView() {
   const terminalData = useTerminalData();
+  const { setNavContent } = useHeader();
+
+  // Clear header nav content for terminal view (blank header)
+  useEffect(() => {
+    setNavContent(null);
+  }, [setNavContent]);
 
   return (
     <div className="relative h-full w-full overflow-hidden">

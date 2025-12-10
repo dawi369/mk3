@@ -2,14 +2,14 @@
 
 import React, { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { AssetClassData, MarketMover } from "@/components/terminal/mock-data";
+import { AssetClassData, MarketMover } from "@/components/terminal/_shared/mock-data";
 import { cn } from "@/lib/utils";
-import { Sparkline } from "@/components/terminal/sparkline";
-import { MonthSelector } from "@/components/terminal/month-selector";
+import { Sparkline } from "@/components/terminal/views/terminal/sparkline";
+import { MonthSelector } from "@/components/terminal/views/terminal/month-selector";
 import { filterByMonth } from "@/lib/month-utils";
 import { Tilt } from "@/components/ui/tilt";
 import { BorderTrail } from "@/components/ui/border-trail";
-import { useTickerModal } from "@/components/terminal/ticker-modal-provider";
+import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 
 interface TerminalCardProps {
   data: AssetClassData;

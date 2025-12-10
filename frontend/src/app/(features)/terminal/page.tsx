@@ -3,11 +3,11 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
-import { TerminalDock, TerminalViewType } from "@/components/terminal/terminal-dock";
-import { TerminalView } from "@/components/terminal/view-terminal";
-import { IndicatorsView } from "@/components/terminal/view-indicators";
-import { SentimentView } from "@/components/terminal/view-sentiment";
-import { AiLabView } from "@/components/terminal/view-ai-lab";
+import { TerminalDock, TerminalViewType } from "@/components/terminal/layout/terminal-dock";
+import { TerminalView } from "@/components/terminal/views/terminal";
+import { IndicatorsView } from "@/components/terminal/views/indicators";
+import { SentimentView } from "@/components/terminal/views/sentiment";
+import { AiLabView } from "@/components/terminal/views/ai-lab";
 
 const VALID_VIEWS: TerminalViewType[] = ["terminal", "indicators", "sentiment", "ai-lab"];
 
