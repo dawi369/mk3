@@ -4,6 +4,13 @@ import {
   MAX_PAGES_PER_TICKER,
   MAX_UNIQUE_CONTRACTS,
 } from "@/utils/consts.js";
+import { appendFileSync, existsSync, writeFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const INVALID_TICKERS_FILE = join(__dirname, "invalid_tickers.txt");
 
 interface Contract {
   ticker: string;
@@ -17,6 +24,27 @@ export class ContractProvider {
 
   constructor(apiKey: string = POLYGON_API_KEY) {
     this.apiKey = apiKey;
+  }
+
+  /**
+   * Log an invalid ticker (one that returns empty JSON) to the invalid_tickers.txt file.
+   */
+  private logInvalidTicker(root: string): void {
+    const timestamp = new Date().toISOString();
+    const entry = `${timestamp} - ${root}\n`;
+
+    try {
+      if (!existsSync(INVALID_TICKERS_FILE)) {
+        writeFileSync(
+          INVALID_TICKERS_FILE,
+          "# Invalid Tickers Log\n# Tickers that returned empty JSON from Polygon API\n\n"
+        );
+      }
+      appendFileSync(INVALID_TICKERS_FILE, entry);
+      console.log(`[ContractProvider] Logged invalid ticker: ${root}`);
+    } catch (error) {
+      console.error(`[ContractProvider] Failed to log invalid ticker ${root}:`, error);
+    }
   }
 
   /**
@@ -64,6 +92,14 @@ export class ContractProvider {
 
         const data: any = await response.json();
         const results = Array.isArray(data) ? data : data.results || [];
+
+        // Check for invalid ticker on first page - empty results means invalid ticker
+        if (pageCount === 1 && results.length === 0) {
+          console.log(`[ContractProvider] Empty response for ${root} - ticker is invalid`);
+          this.logInvalidTicker(root);
+          break;
+        }
+
         // console.log(
         //   `[ContractProvider] Received ${results.length} results for ${root} (page ${pageCount})`
         // );

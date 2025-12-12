@@ -1,0 +1,8 @@
+{
+  "currencies": ["6J", "6E", "6A", "6B", "6M", "6L", "6S"],
+  "grains": ["ZC", "KE", "ZW", "ZS", "ZM", "ZL", "ZO", "ZR"],
+  "metals": ["HG", "GC", "SI", "PL", "PA"],
+  "softs": ["KT", "CJ", "TT", "YO"],
+  "us_indices": ["ES", "NQ", "YM", "RTY"],
+  "volatiles": ["CL", "BZ", "DC", "LE", "HE", "GF", "LBR"]
+}
