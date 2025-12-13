@@ -3,6 +3,7 @@ import { redisStore } from "@/server/data/redis_store.js";
 import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
+import { frontMonthJob } from "@/jobs/front_month_job.js";
 import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
 import type { Server, ServerWebSocket } from "bun";
 
@@ -42,7 +43,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
 
   const server = Bun.serve({
     port: HUB_PORT,
-    fetch(req: Request, server: Server) {
+    fetch(req: Request, server: Server<undefined>) {
       const url = new URL(req.url);
       const path = url.pathname;
       const method = req.method;
@@ -115,6 +116,20 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
         return jsonResponse({ symbols, count: symbols.length });
       }
 
+      // Front months endpoint (public - no auth required)
+      if (method === "GET" && path === "/front-months") {
+        const cache = frontMonthJob.getCache();
+        if (!cache) {
+          return jsonResponse({
+            lastUpdated: null,
+            products: {},
+            message:
+              "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
+          });
+        }
+        return jsonResponse(cache);
+      }
+
       // --- Protected Routes ---
 
       // Check auth for all /admin routes
@@ -164,6 +179,29 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
             totalSymbols: subscriptions.reduce((sum, sub) => sum + sub.symbols.length, 0),
           });
         }
+
+        if (method === "POST" && path === "/admin/refresh-front-months") {
+          return (async () => {
+            try {
+              await frontMonthJob.runRefresh();
+              const status = frontMonthJob.getStatus();
+              const cache = frontMonthJob.getCache();
+              return jsonResponse({
+                message: "Front month refresh triggered",
+                status,
+                cache,
+              });
+            } catch (err) {
+              return jsonResponse(
+                {
+                  error: "Refresh failed",
+                  details: err instanceof Error ? err.message : String(err),
+                },
+                500
+              );
+            }
+          })();
+        }
       }
 
       return errorResponse("Not Found", 404);
@@ -188,7 +226,11 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
           for (const [id, fields] of recentMessages.reverse()) {
             const data: Record<string, any> = {};
             for (let i = 0; i < fields.length; i += 2) {
-              data[fields[i]] = fields[i + 1];
+              const key = fields[i];
+              const value = fields[i + 1];
+              if (key !== undefined) {
+                data[key] = value;
+              }
             }
 
             const payload = JSON.stringify({
@@ -222,7 +264,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
   return Promise.resolve();
 }
 
-async function startStreamBroadcaster(server: Server) {
+async function startStreamBroadcaster(server: Server<undefined>) {
   console.log("Starting Redis Stream Broadcaster...");
   // Create a dedicated Redis client for blocking operations
   const subRedis = redisStore.redis.duplicate();
@@ -233,7 +275,7 @@ async function startStreamBroadcaster(server: Server) {
       // Block for 5 seconds waiting for new messages
       const streams = await subRedis.xread("BLOCK", 5000, "STREAMS", "market_data", lastId);
 
-      if (streams) {
+      if (streams && streams[0]) {
         const [streamName, messages] = streams[0];
 
         for (const [id, fields] of messages) {
@@ -242,7 +284,11 @@ async function startStreamBroadcaster(server: Server) {
           // Parse fields
           const data: Record<string, any> = {};
           for (let i = 0; i < fields.length; i += 2) {
-            data[fields[i]] = fields[i + 1];
+            const key = fields[i];
+            const value = fields[i + 1];
+            if (key !== undefined) {
+              data[key] = value;
+            }
           }
 
           // Broadcast to all connected clients

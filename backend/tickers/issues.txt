@@ -1,0 +1,2 @@
+CL (Crude Oil): No active contracts found - might need different product code
+BZ (Brent): Only spread contracts showing, no outright volume

@@ -6,6 +6,7 @@ import type { PolygonMarketType } from "@/types/polygon.types.js";
 import { startHubRESTApi } from "@/server/api/rest_client.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
+import { frontMonthJob } from "@/jobs/front_month_job.js";
 // import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 import { POLYGON_ASSET_CLASS_LIST } from "@/utils/consts.js";
@@ -54,6 +55,7 @@ async function startHubServer() {
     // Load persisted job statuses
     await dailyClearJob.loadStatus();
     await monthlySubscriptionJob.loadStatus();
+    await frontMonthJob.loadStatus();
 
     // Schedule jobs
     // dailyClearJob.schedule();
