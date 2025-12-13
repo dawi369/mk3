@@ -14,7 +14,7 @@ export function MonthSelector({ selectedMonth, onMonthChange }: MonthSelectorPro
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const allOptions = ["Front", "All", ...ALL_MONTHS];
+  const allOptions = ["Active", "Nearest", "All", ...ALL_MONTHS];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

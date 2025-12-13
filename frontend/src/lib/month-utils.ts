@@ -76,7 +76,7 @@ function extractYear(ticker: string): number | null {
  * Extract ticker root (symbol without month/year)
  * e.g., "GCZ5" → "GC", "ESH26" → "ES"
  */
-function extractRoot(ticker: string): string {
+export function extractRoot(ticker: string): string {
   const match = ticker.match(/^([A-Z]+)[FGHJKMNQUVXZ]\d{1,2}$/);
   return match ? match[1] : ticker;
 }
@@ -105,15 +105,57 @@ function compareTickerDates(a: string, b: string): number {
 }
 
 /**
- * Filter tickers by month code
+ * Filter tickers by month mode
+ * @param tickers - List of ticker symbols
+ * @param monthFilter - Filter mode: "Active", "Nearest", "All", or month name
+ * @param getFrontMonth - Optional function to get volume-based front month for a product code
  */
-export function filterByMonth(tickers: string[], monthFilter: string): string[] {
+export function filterByMonth(
+  tickers: string[],
+  monthFilter: string,
+  getFrontMonth?: (productCode: string) => string | null
+): string[] {
   if (monthFilter === "All") {
     return tickers;
   }
 
-  if (monthFilter === "Front") {
+  if (monthFilter === "Active") {
+    // Use volume-based front months from the provider
+    if (!getFrontMonth) {
+      // Fallback to "Nearest" if no lookup function provided
+      return filterByMonth(tickers, "Nearest");
+    }
+
     // Group tickers by root symbol
+    const tickersByRoot = new Map<string, string[]>();
+    for (const ticker of tickers) {
+      const root = extractRoot(ticker);
+      if (!tickersByRoot.has(root)) {
+        tickersByRoot.set(root, []);
+      }
+      tickersByRoot.get(root)!.push(ticker);
+    }
+
+    // For each root, use the front month from the provider
+    const activeContracts: string[] = [];
+    for (const [root, rootTickers] of tickersByRoot) {
+      if (rootTickers.length === 0) continue;
+
+      const frontMonth = getFrontMonth(root);
+      if (frontMonth && rootTickers.includes(frontMonth)) {
+        activeContracts.push(frontMonth);
+      } else {
+        // Fallback: if front month not in available tickers, use nearest
+        const sorted = [...rootTickers].sort(compareTickerDates);
+        activeContracts.push(sorted[0]);
+      }
+    }
+
+    return activeContracts;
+  }
+
+  if (monthFilter === "Nearest") {
+    // Original "Front" logic - find earliest expiry
     const tickersByRoot = new Map<string, string[]>();
 
     for (const ticker of tickers) {
@@ -124,17 +166,15 @@ export function filterByMonth(tickers: string[], monthFilter: string): string[] 
       tickersByRoot.get(root)!.push(ticker);
     }
 
-    // For each root, find the earliest contract
-    const frontContracts: string[] = [];
+    const nearestContracts: string[] = [];
     for (const [_, rootTickers] of tickersByRoot) {
       if (rootTickers.length === 0) continue;
 
-      // Sort by date and take the earliest
       const sorted = [...rootTickers].sort(compareTickerDates);
-      frontContracts.push(sorted[0]);
+      nearestContracts.push(sorted[0]);
     }
 
-    return frontContracts;
+    return nearestContracts;
   }
 
   // Filter by specific month name (e.g., "Jan", "Feb")

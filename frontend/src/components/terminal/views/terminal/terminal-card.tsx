@@ -6,10 +6,11 @@ import { AssetClassData, MarketMover } from "@/components/terminal/_shared/mock-
 import { cn } from "@/lib/utils";
 import { Sparkline } from "@/components/terminal/views/terminal/sparkline";
 import { MonthSelector } from "@/components/terminal/views/terminal/month-selector";
-import { filterByMonth } from "@/lib/month-utils";
+import { filterByMonth, extractRoot } from "@/lib/month-utils";
 import { Tilt } from "@/components/ui/tilt";
 import { BorderTrail } from "@/components/ui/border-trail";
 import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import { useFrontMonth } from "@/providers/front-month-provider";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -17,22 +18,23 @@ interface TerminalCardProps {
 }
 
 export function TerminalCard({ data, onClick }: TerminalCardProps) {
-  const [selectedMonth, setSelectedMonth] = useState<string>("Front");
+  const [selectedMonth, setSelectedMonth] = useState<string>("Active");
   const [selectedTickerId, setSelectedTickerId] = useState<string | undefined>(undefined);
   const { open: openTickerModal } = useTickerModal();
+  const { getFrontMonth, isRolling } = useFrontMonth();
 
   // Filter tickers by selected month
   const filteredWinners = useMemo(() => {
     const tickers = data.winners.map((w) => w.ticker);
-    const filtered = filterByMonth(tickers, selectedMonth);
+    const filtered = filterByMonth(tickers, selectedMonth, getFrontMonth);
     return data.winners.filter((w) => filtered.includes(w.ticker));
-  }, [data.winners, selectedMonth]);
+  }, [data.winners, selectedMonth, getFrontMonth]);
 
   const filteredLosers = useMemo(() => {
     const tickers = data.losers.map((l) => l.ticker);
-    const filtered = filterByMonth(tickers, selectedMonth);
+    const filtered = filterByMonth(tickers, selectedMonth, getFrontMonth);
     return data.losers.filter((l) => filtered.includes(l.ticker));
-  }, [data.losers, selectedMonth]);
+  }, [data.losers, selectedMonth, getFrontMonth]);
 
   const allTickers = [...filteredWinners, ...filteredLosers];
 
@@ -91,6 +93,9 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
 
   const TickerRow = ({ item, isWinner }: { item: MarketMover; isWinner: boolean }) => {
     const isSelected = selectedTickerId === item.ticker;
+    const productCode = extractRoot(item.ticker);
+    const tickerIsRolling = isRolling(productCode);
+
     return (
       <div
         className={cn(
@@ -111,6 +116,11 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
         <div className="flex items-center justify-between w-full gap-1">
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-sm tracking-tight">{item.ticker}</span>
+            {tickerIsRolling && (
+              <span className="text-[10px] text-amber-500" title="Roll in progress">
+                🔄
+              </span>
+            )}
             <span
               className={cn(
                 "text-xs font-mono font-medium",
