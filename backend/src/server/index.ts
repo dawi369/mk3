@@ -30,14 +30,14 @@ async function startHubServer() {
     // Build requests dynamically using API
     console.log("Building subscription requests...");
 
-    // const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
+    const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
     // const metalsReq = await scheduleBuilder.buildRequestAsync("metals", "A");
     // const currenciesReq = await scheduleBuilder.buildRequestAsync("currencies", "A");
     // const grainsReq = await scheduleBuilder.buildRequestAsync("grains", "A");
     // const softsReq = await scheduleBuilder.buildRequestAsync("softs", "A");
     // const volatilesReq = await scheduleBuilder.buildRequestAsync("volatiles", "A");
 
-    // await polygonClient.subscribe(usIndicesReq);
+    await polygonClient.subscribe(usIndicesReq);
     // await polygonClient.subscribe(metalsReq);
     // await polygonClient.subscribe(currenciesReq);
     // await polygonClient.subscribe(grainsReq);

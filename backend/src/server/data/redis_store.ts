@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { REDIS_HOST, REDIS_PORT } from "@/config/env.js";
+import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
 import type { Bar } from "@/types/common.types.js";
 
@@ -10,6 +10,7 @@ class RedisStore {
     this.redis = new Redis({
       host: REDIS_HOST,
       port: REDIS_PORT,
+      password: REDIS_PASSWORD,
       retryStrategy: (times) => {
         // Exponential backoff with max delay of 2 seconds
         const delay = Math.min(times * 50, 2000);
