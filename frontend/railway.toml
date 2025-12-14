@@ -1,0 +1,9 @@
+# Frontend Railway Configuration
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["src/**", "public/**", "package.json", "bun.lock", "Dockerfile", "next.config.ts"]
+
+[deploy]
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"

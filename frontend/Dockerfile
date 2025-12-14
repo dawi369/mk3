@@ -34,4 +34,5 @@ COPY --from=prerelease /app/package.json .
 # Run the app
 USER bun
 EXPOSE 3000/tcp
-ENTRYPOINT [ "bun", "run", "start" ]
+# Run the app directly to allow PORT injection
+ENTRYPOINT [ "bun", "run", "next", "start" ]

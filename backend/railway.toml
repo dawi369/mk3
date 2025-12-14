@@ -1,0 +1,9 @@
+# Backend Railway Configuration
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["src/**", "package.json", "bun.lock", "Dockerfile", "tsconfig.json"]
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

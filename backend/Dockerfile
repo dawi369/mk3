@@ -21,7 +21,7 @@ COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 
 # [Optional] tests & build
-ENV NODE_ENV=production
+# ENV NODE_ENV=production
 # RUN bun test
 # RUN bun run build
 
