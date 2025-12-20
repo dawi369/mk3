@@ -34,15 +34,17 @@ export function Header() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-center gap-4">
           <Link href="/" className="flex items-center">
-            <Image
-              src="/mk3LogoTransparent.png"
-              alt="Swordfish Logo"
-              width={40}
-              height={40}
-              priority
-              fetchPriority="high"
-              className="h-10 w-auto"
-            />
+            <motion.div layoutId="header-logo" className="flex items-center">
+              <Image
+                src="/mk3LogoTransparent.png"
+                alt="Swordfish Logo"
+                width={40}
+                height={40}
+                priority
+                fetchPriority="high"
+                className="h-10 w-auto"
+              />
+            </motion.div>
           </Link>
           <Navbar />
         </div>

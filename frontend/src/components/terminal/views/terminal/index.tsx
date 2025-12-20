@@ -7,16 +7,10 @@ import { useHeader } from "@/components/terminal/layout/header-provider";
 
 export function TerminalView() {
   const terminalData = useTerminalData();
-  const { setNavContent } = useHeader();
-
-  // Clear header nav content for terminal view (blank header)
-  useEffect(() => {
-    setNavContent(null);
-  }, [setNavContent]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <div className="absolute inset-x-4 top-4 bottom-18 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-4">
+    <div className="h-full w-full overflow-hidden flex flex-col gap-4">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2 gap-4 min-h-0">
         {terminalData.map((data) => (
           <div key={data.id} className="min-h-0 min-w-0 h-full">
             <TerminalCard data={data} onClick={() => console.log(`Clicked ${data.title}`)} />

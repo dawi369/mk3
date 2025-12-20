@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { TerminalDock, TerminalViewType } from "@/components/terminal/layout/terminal-dock";
@@ -8,6 +9,7 @@ import { TerminalView } from "@/components/terminal/views/terminal";
 import { IndicatorsView } from "@/components/terminal/views/indicators";
 import { SentimentView } from "@/components/terminal/views/sentiment";
 import { AiLabView } from "@/components/terminal/views/ai-lab";
+import { useTerminalView } from "@/providers/terminal-view-provider";
 
 const VALID_VIEWS: TerminalViewType[] = ["terminal", "indicators", "sentiment", "ai-lab"];
 
@@ -16,37 +18,29 @@ function isValidView(view: string | null): view is TerminalViewType {
 }
 
 function TerminalPageContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const viewParam = searchParams.get("view");
-  const initialView = isValidView(viewParam) ? viewParam : "terminal";
-  const [activeView, setActiveView] = useState<TerminalViewType>(initialView);
-
-  // Sync URL when view changes from dock
-  const handleViewChange = (view: TerminalViewType) => {
-    setActiveView(view);
-    router.replace(`/terminal?view=${view}`, { scroll: false });
-  };
-
-  // Sync state when URL changes (e.g., from browser back/forward or direct navigation)
-  useEffect(() => {
-    if (isValidView(viewParam) && viewParam !== activeView) {
-      setActiveView(viewParam);
-    }
-  }, [viewParam, activeView]);
+  const { activeView } = useTerminalView();
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-background">
+    <div className="h-full w-full overflow-hidden bg-background">
       {/* Main Content Area */}
-      <div className="h-full w-full overflow-hidden">
-        {activeView === "terminal" && <TerminalView />}
-        {activeView === "indicators" && <IndicatorsView />}
-        {activeView === "sentiment" && <SentimentView />}
-        {activeView === "ai-lab" && <AiLabView />}
-      </div>
-
-      {/* Dock */}
-      <TerminalDock activeView={activeView} onSelect={handleViewChange} />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeView}
+          initial={{ opacity: 0, y: 10, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -10, scale: 0.99 }}
+          transition={{
+            duration: 0.2,
+            ease: [0.23, 1, 0.32, 1], // Custom ease-out expo
+          }}
+          className="h-full w-full"
+        >
+          {activeView === "terminal" && <TerminalView />}
+          {activeView === "indicators" && <IndicatorsView />}
+          {activeView === "sentiment" && <SentimentView />}
+          {activeView === "ai-lab" && <AiLabView />}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

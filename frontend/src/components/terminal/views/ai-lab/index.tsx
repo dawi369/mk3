@@ -18,7 +18,7 @@ export function AiLabView() {
   const sortedBars = [...allBars].sort((a, b) => b.startTime - a.startTime).slice(0, 100);
 
   return (
-    <div className="p-6 h-full flex flex-col gap-4">
+    <div className="h-full w-full flex flex-col gap-4">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">AI Lab / Data Stream</h1>

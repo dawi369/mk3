@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Terminal, Activity, Scale, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -89,7 +90,9 @@ export function Navbar() {
           </NavigationMenuItem>
         </NavigationMenuList>
       </NavigationMenu>
-      <AuthIndicator align="right" />
+      <motion.div layoutId="header-auth">
+        <AuthIndicator align="right" />
+      </motion.div>
     </>
   );
 }

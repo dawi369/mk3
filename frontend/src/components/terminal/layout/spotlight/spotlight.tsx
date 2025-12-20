@@ -110,7 +110,7 @@ export function Spotlight() {
   // Keyboard shortcut handler - Ctrl+K or Cmd+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "q") {
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
         e.preventDefault();
         toggle();
       }
