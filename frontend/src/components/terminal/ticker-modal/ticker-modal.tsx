@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
-import { X } from "lucide-react";
+import { X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
@@ -10,9 +10,15 @@ import { TradingChart } from "@/components/terminal/ticker-modal/trading-chart";
 import { ChartToolbar } from "@/components/terminal/ticker-modal/chart-toolbar";
 import { ChartLegend } from "@/components/terminal/ticker-modal/chart-legend";
 import { AISidebar } from "@/components/terminal/ticker-modal/ai-sidebar";
+import { useFrontMonth } from "@/providers/front-month-provider";
+import { extractRoot } from "@/lib/month-utils";
 
 export function TickerModal() {
   const { isOpen, ticker, close, isSidebarOpen, comparisons } = useTickerModal();
+  const { isRolling } = useFrontMonth();
+
+  const productCode = ticker ? extractRoot(ticker.ticker) : "";
+  const tickerIsRolling = isRolling(productCode);
 
   // Handle escape key
   useEffect(() => {
@@ -48,7 +54,10 @@ export function TickerModal() {
         {/* Header - minimal */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold tracking-tight">{ticker.ticker}</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-lg font-bold tracking-tight">{ticker.ticker}</h2>
+              {tickerIsRolling && <RefreshCw className="h-3 w-3 text-white" />}
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-base font-mono">{formatNumber(ticker.price)}</span>
               <span

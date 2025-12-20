@@ -11,6 +11,7 @@ import { Tilt } from "@/components/ui/tilt";
 import { BorderTrail } from "@/components/ui/border-trail";
 import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { useFrontMonth } from "@/providers/front-month-provider";
+import { RefreshCw } from "lucide-react";
 
 interface TerminalCardProps {
   data: AssetClassData;
@@ -114,16 +115,14 @@ export function TerminalCard({ data, onClick }: TerminalCardProps) {
         }}
       >
         <div className="flex items-center justify-between w-full gap-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-sm tracking-tight">{item.ticker}</span>
-            {tickerIsRolling && (
-              <span className="text-[10px] text-amber-500" title="Roll in progress">
-                🔄
-              </span>
-            )}
+          <div className="flex items-center gap-1.5 w-full">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-sm tracking-tight">{item.ticker}</span>
+              {tickerIsRolling && <RefreshCw className="h-2.5 w-2.5 text-white" />}
+            </div>
             <span
               className={cn(
-                "text-xs font-mono font-medium",
+                "text-xs font-mono font-medium ml-auto",
                 isWinner ? "text-emerald-500" : "text-rose-500"
               )}
             >
