@@ -15,29 +15,36 @@ interface MetricCardProps {
 
 function MetricCard({ title, value, change, changeType, icon, gradient }: MetricCardProps) {
   return (
-    <Card className="relative overflow-hidden border-white/10 bg-card/50">
-      <div className={cn("absolute inset-0 opacity-10", gradient)} />
+    <Card className="relative overflow-hidden border-white/10 bg-card shadow-lg">
+      <div
+        className={cn(
+          "absolute top-0 left-0 w-1 h-full",
+          changeType === "positive" && "bg-emerald-500/50",
+          changeType === "negative" && "bg-rose-500/50",
+          changeType === "neutral" && "bg-muted-foreground/30"
+        )}
+      />
       <CardContent className="p-4 relative">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <p className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest">
               {title}
             </p>
-            <p className="text-2xl font-bold tracking-tight">{value}</p>
+            <p className="text-xl font-bold tracking-tight font-mono">{value}</p>
             {change && (
               <p
                 className={cn(
-                  "text-xs font-medium",
-                  changeType === "positive" && "text-emerald-500",
-                  changeType === "negative" && "text-rose-500",
-                  changeType === "neutral" && "text-muted-foreground"
+                  "text-[10px] font-bold tracking-tight uppercase px-1.5 py-0.5 rounded w-fit",
+                  changeType === "positive" && "bg-emerald-500/10 text-emerald-500",
+                  changeType === "negative" && "bg-rose-500/10 text-rose-500",
+                  changeType === "neutral" && "bg-muted/30 text-muted-foreground"
                 )}
               >
                 {change}
               </p>
             )}
           </div>
-          <div className="p-2 rounded-lg bg-white/5">{icon}</div>
+          <div className="p-2 rounded-lg bg-white/2 border border-white/5 opacity-80">{icon}</div>
         </div>
       </CardContent>
     </Card>
@@ -50,34 +57,34 @@ export function OverviewCards() {
       <MetricCard
         title="Global Momentum"
         value="+74.5"
-        change="↑ 2.3 from prev session"
+        change="↑ STRONG BULLISH"
         changeType="positive"
-        icon={<TrendingUp className="w-5 h-5 text-emerald-500" />}
-        gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
+        icon={<TrendingUp className="w-4 h-4 text-emerald-500" />}
+        gradient=""
       />
       <MetricCard
         title="Volatility Index"
         value="18.4%"
-        change="Elevated"
+        change="! ELEVATED"
         changeType="negative"
-        icon={<Flame className="w-5 h-5 text-orange-500" />}
-        gradient="bg-gradient-to-br from-orange-500 to-red-600"
+        icon={<Flame className="w-4 h-4 text-rose-500" />}
+        gradient=""
       />
       <MetricCard
-        title="Trend Strength"
+        title="Avg Trend Str"
         value="8.5/10"
-        change="Strong bullish alignment"
+        change="HIGH ALIGNMENT"
         changeType="positive"
-        icon={<Target className="w-5 h-5 text-blue-500" />}
-        gradient="bg-gradient-to-br from-blue-500 to-blue-700"
+        icon={<Target className="w-4 h-4 text-emerald-500" />}
+        gradient=""
       />
       <MetricCard
         title="Volume Flow"
-        value="+1.2k"
-        change="Net buying pressure"
+        value="+1.2M"
+        change="NET BUYING"
         changeType="positive"
-        icon={<Zap className="w-5 h-5 text-yellow-500" />}
-        gradient="bg-gradient-to-br from-yellow-500 to-amber-600"
+        icon={<Zap className="w-4 h-4 text-amber-500" />}
+        gradient=""
       />
     </div>
   );

@@ -38,27 +38,36 @@ export function IndicatorsNav({
   const selectedAsset = ASSETS.find((a) => a.value === asset) || ASSETS[0];
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       {/* Search */}
-      <Button variant="ghost" size="sm" className="h-8 px-3 gap-2" onClick={onSearchClick}>
-        <Search className="w-4 h-4" />
-        <span className="hidden sm:inline text-muted-foreground">Search...</span>
-        <kbd className="hidden md:inline-flex ml-2 px-1.5 py-0.5 rounded bg-muted text-[10px] font-mono">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 px-3 gap-2 border-white/5 bg-white/2 hover:bg-white/5 transition-all"
+        onClick={onSearchClick}
+      >
+        <Search className="w-3.5 h-3.5 text-muted-foreground/60" />
+        <span className="hidden sm:inline text-xs font-bold text-muted-foreground/80 tracking-tight">
+          Search Symbols
+        </span>
+        <kbd className="hidden md:inline-flex ml-2 px-1 py-0 rounded bg-white/5 border border-white/10 text-[9px] font-mono text-muted-foreground/40">
           ⌘K
         </kbd>
       </Button>
 
+      <div className="w-px h-4 bg-white/10 mx-1" />
+
       {/* Timeframe Selector */}
-      <div className="flex items-center rounded-md border border-white/10 overflow-hidden">
+      <div className="flex items-center rounded-lg border border-white/5 bg-white/2 p-0.5">
         {TIMEFRAMES.map((tf) => (
           <button
             key={tf}
             onClick={() => onTimeframeChange(tf)}
             className={cn(
-              "px-2.5 py-1 text-xs font-medium transition-colors",
+              "px-3 py-1 text-[10px] font-bold tracking-widest uppercase rounded-md transition-all duration-200",
               timeframe === tf
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted text-muted-foreground"
+                ? "bg-white/10 text-white shadow-sm ring-1 ring-white/10"
+                : "hover:bg-white/5 text-muted-foreground/60 hover:text-muted-foreground"
             )}
           >
             {tf}
@@ -69,17 +78,31 @@ export function IndicatorsNav({
       {/* Asset Selector */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="h-8 px-3 gap-2">
-            <span className="text-xs font-medium">{selectedAsset.value}</span>
-            <ChevronDown className="w-3 h-3" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 gap-2 border-white/5 bg-white/2 hover:bg-white/5"
+          >
+            <span className="text-[10px] font-bold tracking-widest uppercase">
+              {selectedAsset.value}
+            </span>
+            <ChevronDown className="w-3 h-3 text-muted-foreground/50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[160px]">
+        <DropdownMenuContent
+          align="end"
+          className="min-w-[180px] bg-card border-white/10 shadow-2xl"
+        >
           {ASSETS.map((a) => (
             <DropdownMenuItem
               key={a.value}
               onClick={() => onAssetChange(a.value)}
-              className={cn("text-xs", asset === a.value && "bg-accent")}
+              className={cn(
+                "text-[10px] font-bold tracking-widest uppercase py-2 cursor-pointer",
+                asset === a.value
+                  ? "bg-white/10 text-white"
+                  : "text-muted-foreground hover:text-white"
+              )}
             >
               {a.label}
             </DropdownMenuItem>

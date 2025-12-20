@@ -42,7 +42,7 @@ export function TickerModal() {
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && close()} handleOnly>
-      <DrawerContent className="h-[92vh] max-h-none! rounded-t-2xl [&>div.bg-muted]:hidden">
+      <DrawerContent className="h-[94vh] max-h-none! rounded-t-2xl [&>div.bg-muted]:hidden">
         {/* Accessibility: Hidden title and description for screen readers */}
         <DrawerTitle asChild>
           <VisuallyHidden.Root>{ticker.ticker} Details</VisuallyHidden.Root>

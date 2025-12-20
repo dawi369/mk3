@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { ArrowUp, ArrowDown, Minus, Activity } from "lucide-react";
+import { TechnicalIndicatorData } from "@/types/indicator.types";
 
-// Mock data for futures contracts
-const MOCK_CONTRACTS = [
+// Mock data for futures contracts using the new types
+const MOCK_CONTRACTS: TechnicalIndicatorData[] = [
   {
     ticker: "ESZ5",
     name: "S&P 500",
@@ -135,9 +136,19 @@ export function IndicatorTable({
     asset === "ALL" ? MOCK_CONTRACTS : MOCK_CONTRACTS.filter((c) => c.ticker.startsWith(asset));
 
   return (
-    <Card className="h-full flex flex-col border-white/10 bg-card/50">
-      <CardHeader className="py-3 px-4 border-b border-white/10">
-        <CardTitle className="text-sm font-medium">Indicator Signals · {timeframe}</CardTitle>
+    <Card className="h-full flex flex-col border-white/10 bg-card rounded-xl overflow-hidden shadow-2xl">
+      <CardHeader className="py-2 px-4 border-b border-white/5 bg-white/2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xs font-bold tracking-widest text-muted-foreground uppercase flex items-center gap-2">
+            <Activity className="w-3 h-3" />
+            Technical Signals · {timeframe}
+          </CardTitle>
+          <div className="flex gap-2">
+            <span className="text-[10px] font-mono text-muted-foreground/50 italic">
+              Live Update Enabled
+            </span>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-0">
         <Table>
@@ -157,34 +168,37 @@ export function IndicatorTable({
               <TableRow
                 key={contract.ticker}
                 className={cn(
-                  "cursor-pointer border-white/5 transition-colors",
-                  selectedContract === contract.ticker ? "bg-primary/10" : "hover:bg-muted/30"
+                  "cursor-pointer border-white/5 transition-all duration-200 group h-9",
+                  selectedContract === contract.ticker ? "bg-white/5" : "hover:bg-white/2"
                 )}
                 onClick={() => onSelectContract(contract.ticker)}
               >
-                <TableCell className="font-medium">
-                  <div>
-                    <span className="text-sm">{contract.ticker}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{contract.name}</span>
+                <TableCell className="py-1 px-4">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-bold tracking-tight group-hover:text-white transition-colors">
+                      {contract.ticker}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/60 uppercase font-medium">
+                      {contract.name}
+                    </span>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <Badge
-                    variant="outline"
+                <TableCell className="py-1">
+                  <div
                     className={cn(
-                      "text-[10px] font-medium",
-                      contract.trend === "BULLISH" && "border-emerald-500/50 text-emerald-500",
-                      contract.trend === "BEARISH" && "border-rose-500/50 text-rose-500",
-                      contract.trend === "NEUTRAL" && "border-gray-500/50 text-gray-400"
+                      "text-[10px] font-bold tracking-wider",
+                      contract.trend === "BULLISH" && "text-emerald-500",
+                      contract.trend === "BEARISH" && "text-rose-500",
+                      contract.trend === "NEUTRAL" && "text-muted-foreground"
                     )}
                   >
                     {contract.trend}
-                  </Badge>
+                  </div>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right py-1">
                   <span
                     className={cn(
-                      "font-mono text-sm",
+                      "font-mono text-xs font-bold",
                       contract.rsi > 70 && "text-rose-500",
                       contract.rsi < 30 && "text-emerald-500",
                       contract.rsi >= 30 && contract.rsi <= 70 && "text-foreground"
@@ -193,15 +207,8 @@ export function IndicatorTable({
                     {contract.rsi}
                   </span>
                 </TableCell>
-                <TableCell className="text-right">
-                  <span className="flex items-center justify-end gap-1 font-mono text-sm">
-                    {contract.macd > 0 ? (
-                      <ArrowUp className="w-3 h-3 text-emerald-500" />
-                    ) : contract.macd < 0 ? (
-                      <ArrowDown className="w-3 h-3 text-rose-500" />
-                    ) : (
-                      <Minus className="w-3 h-3 text-gray-500" />
-                    )}
+                <TableCell className="text-right py-1">
+                  <div className="flex items-center justify-end gap-1 font-mono text-xs font-bold">
                     <span
                       className={cn(
                         contract.macd > 0 && "text-emerald-500",
@@ -211,25 +218,24 @@ export function IndicatorTable({
                       {contract.macd > 0 ? "+" : ""}
                       {contract.macd.toFixed(1)}
                     </span>
-                  </span>
+                  </div>
                 </TableCell>
-                <TableCell>
-                  <Badge
-                    variant="secondary"
+                <TableCell className="py-1">
+                  <span
                     className={cn(
-                      "text-[10px]",
-                      contract.vwap === "Above" && "bg-emerald-500/20 text-emerald-400",
-                      contract.vwap === "Below" && "bg-rose-500/20 text-rose-400",
-                      contract.vwap === "At" && "bg-gray-500/20 text-gray-400"
+                      "text-[10px] font-bold uppercase",
+                      contract.vwap === "Above" && "text-emerald-500/80",
+                      contract.vwap === "Below" && "text-rose-500/80",
+                      contract.vwap === "At" && "text-muted-foreground/80"
                     )}
                   >
                     {contract.vwap}
-                  </Badge>
+                  </span>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right py-1">
                   <span
                     className={cn(
-                      "font-mono text-sm",
+                      "font-mono text-xs font-bold",
                       contract.oi.startsWith("+") && "text-emerald-500",
                       contract.oi.startsWith("-") && "text-rose-500"
                     )}
@@ -237,20 +243,25 @@ export function IndicatorTable({
                     {contract.oi}
                   </span>
                 </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                <TableCell className="text-right py-1 px-4">
+                  <div className="flex items-center justify-end gap-3">
+                    <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
                       <div
                         className={cn(
-                          "h-full rounded-full",
-                          contract.mtf >= 7 && "bg-emerald-500",
-                          contract.mtf >= 4 && contract.mtf < 7 && "bg-yellow-500",
-                          contract.mtf < 4 && "bg-rose-500"
+                          "h-full rounded-full transition-all duration-500",
+                          contract.mtf >= 7 &&
+                            "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]",
+                          contract.mtf >= 4 &&
+                            contract.mtf < 7 &&
+                            "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]",
+                          contract.mtf < 4 && "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]"
                         )}
                         style={{ width: `${contract.mtf * 10}%` }}
                       />
                     </div>
-                    <span className="font-mono text-xs">{contract.mtf}</span>
+                    <span className="font-mono text-[10px] font-bold text-muted-foreground">
+                      {contract.mtf.toFixed(1)}
+                    </span>
                   </div>
                 </TableCell>
               </TableRow>
