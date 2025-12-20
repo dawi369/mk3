@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { Terminal, Activity, Scale, Sparkles } from "lucide-react";
+import { Terminal, Activity, Scale, Sparkles, LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+import { cn } from "@/lib/utils";
 
 import { Dock, DockIcon, DockItem, DockLabel } from "@/components/ui/dock";
 
@@ -13,28 +15,28 @@ interface TerminalDockProps {
 
 const data: {
   title: string;
-  icon: React.ReactNode;
+  icon: LucideIcon;
   id: TerminalViewType;
 }[] = [
   {
     title: "Terminal",
     id: "terminal",
-    icon: <Terminal className="h-full w-full text-muted-foreground" />,
+    icon: Terminal,
   },
   {
     title: "Indicators",
     id: "indicators",
-    icon: <Activity className="h-full w-full text-muted-foreground" />,
+    icon: Activity,
   },
   {
     title: "Sentiment",
     id: "sentiment",
-    icon: <Scale className="h-full w-full text-muted-foreground" />,
+    icon: Scale,
   },
   {
     title: "AI Lab",
     id: "ai-lab",
-    icon: <Sparkles className="h-full w-full text-muted-foreground" />,
+    icon: Sparkles,
   },
 ];
 
@@ -105,15 +107,31 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
           damping: 40,
         }}
       >
-        <Dock className="items-end pb-3">
+        <Dock className="items-end pb-3 bg-neutral-950 border-white/5 shadow-2xl backdrop-blur-none">
           {data.map((item) => (
             <DockItem
               key={item.id}
-              className="aspect-square rounded-full bg-gray-200 dark:bg-neutral-800 cursor-pointer"
+              className="aspect-square rounded-full cursor-pointer relative"
               onClick={() => onSelect(item.id)}
             >
-              <DockLabel>{item.title}</DockLabel>
-              <DockIcon>{item.icon}</DockIcon>
+              <DockLabel className="bg-neutral-900 border-white/10 text-neutral-200">
+                {item.title}
+              </DockLabel>
+              <DockIcon>
+                {activeView === item.id && (
+                  <motion.div
+                    layoutId="active-pill"
+                    className="absolute inset-0 rounded-full bg-neutral-800 border border-white/10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <item.icon
+                  className={cn(
+                    "h-full w-full transition-colors duration-200 relative z-10",
+                    activeView === item.id ? "text-white scale-110" : "text-neutral-500"
+                  )}
+                />
+              </DockIcon>
             </DockItem>
           ))}
         </Dock>

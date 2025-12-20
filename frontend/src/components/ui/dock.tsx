@@ -175,11 +175,12 @@ function DockItem({ children, className, onClick }: DockItemProps) {
 }
 
 function DockLabel({ children, className, ...rest }: DockLabelProps) {
-  const restProps = rest as Record<string, unknown>;
-  const isHovered = restProps["isHovered"] as MotionValue<number>;
+  const { isHovered: _isHovered, width: _width, ...domProps } = rest as any;
+  const isHovered = _isHovered as MotionValue<number>;
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    if (!isHovered) return;
     const unsubscribe = isHovered.on("change", (latest) => {
       setIsVisible(latest === 1);
     });
@@ -201,6 +202,7 @@ function DockLabel({ children, className, ...rest }: DockLabelProps) {
           )}
           role="tooltip"
           style={{ x: "-50%" }}
+          {...domProps}
         >
           {children}
         </motion.div>
@@ -210,8 +212,8 @@ function DockLabel({ children, className, ...rest }: DockLabelProps) {
 }
 
 function DockIcon({ children, className, ...rest }: DockIconProps) {
-  const restProps = rest as Record<string, unknown>;
-  const width = restProps["width"] as MotionValue<number>;
+  const { width: _width, isHovered: _isHovered, ...domProps } = rest as any;
+  const width = _width as MotionValue<number>;
 
   const widthTransform = useTransform(width, (val) => val / 2);
 
@@ -219,6 +221,7 @@ function DockIcon({ children, className, ...rest }: DockIconProps) {
     <motion.div
       style={{ width: widthTransform }}
       className={cn("flex items-center justify-center", className)}
+      {...domProps}
     >
       {children}
     </motion.div>
