@@ -17,7 +17,9 @@ function TerminalLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden flex-col relative">
       <TerminalHeader />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main className="flex-1 overflow-hidden px-4 pb-4">{children}</main>
+      {/* Spacer footer - half header height (h-14 / 2 = h-7) for dock separation */}
+      <div className="h-7 shrink-0" />
       <Spotlight />
       <TickerModal />
       <TerminalDock activeView={activeView} onSelect={setActiveView} />
