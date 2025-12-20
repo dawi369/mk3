@@ -8,6 +8,7 @@ import React, {
   useMemo,
   ReactNode,
   useEffect,
+  startTransition,
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TerminalViewType } from "@/components/terminal/layout/terminal-dock";
@@ -74,8 +75,10 @@ export function TerminalViewProvider({ children }: { children: ReactNode }) {
   const setActiveView = useCallback(
     (view: TerminalViewType) => {
       setActiveViewInternal(view);
-      // Use router.replace to handle URL sync reliably in Next.js
-      router.replace(`/terminal?view=${view}`, { scroll: false });
+      // Use startTransition to avoid Suspense re-trigger during URL sync
+      startTransition(() => {
+        router.replace(`/terminal?view=${view}`, { scroll: false });
+      });
     },
     [router]
   );
