@@ -52,6 +52,24 @@ export function TerminalViewProvider({ children }: { children: ReactNode }) {
   const [timeframe, setTimeframe] = useState("1H");
   const [asset, setAsset] = useState("ES");
 
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedTimeframe = localStorage.getItem("terminal-settings-timeframe");
+    const savedAsset = localStorage.getItem("terminal-settings-asset");
+
+    if (savedTimeframe) setTimeframe(savedTimeframe);
+    if (savedAsset) setAsset(savedAsset);
+  }, []);
+
+  // Save to localStorage on changes
+  useEffect(() => {
+    localStorage.setItem("terminal-settings-timeframe", timeframe);
+  }, [timeframe]);
+
+  useEffect(() => {
+    localStorage.setItem("terminal-settings-asset", asset);
+  }, [asset]);
+
   // Synchronized view changer
   const setActiveView = useCallback(
     (view: TerminalViewType) => {

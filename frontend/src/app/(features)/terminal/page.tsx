@@ -10,6 +10,7 @@ import { IndicatorsView } from "@/components/terminal/views/indicators";
 import { SentimentView } from "@/components/terminal/views/sentiment";
 import { AiLabView } from "@/components/terminal/views/ai-lab";
 import { useTerminalView } from "@/providers/terminal-view-provider";
+import { ErrorBoundary } from "@/components/common/error-boundary";
 
 const VALID_VIEWS: TerminalViewType[] = ["terminal", "indicators", "sentiment", "ai-lab"];
 
@@ -35,10 +36,26 @@ function TerminalPageContent() {
           }}
           className="h-full w-full"
         >
-          {activeView === "terminal" && <TerminalView />}
-          {activeView === "indicators" && <IndicatorsView />}
-          {activeView === "sentiment" && <SentimentView />}
-          {activeView === "ai-lab" && <AiLabView />}
+          {activeView === "terminal" && (
+            <ErrorBoundary name="Main Terminal">
+              <TerminalView />
+            </ErrorBoundary>
+          )}
+          {activeView === "indicators" && (
+            <ErrorBoundary name="Indicators">
+              <IndicatorsView />
+            </ErrorBoundary>
+          )}
+          {activeView === "sentiment" && (
+            <ErrorBoundary name="Sentiment">
+              <SentimentView />
+            </ErrorBoundary>
+          )}
+          {activeView === "ai-lab" && (
+            <ErrorBoundary name="AI Lab">
+              <AiLabView />
+            </ErrorBoundary>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>

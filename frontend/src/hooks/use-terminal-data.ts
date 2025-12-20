@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { useData } from "@/providers/data-provider";
+import { useMarketStore } from "@/store/use-market-store";
+import { useThrottledValue } from "@/hooks/use-throttled-value";
 import {
   ASSET_CLASSES,
   AssetClassId,
@@ -9,7 +10,8 @@ import {
 import { AssetClassData, MarketMover } from "@/components/terminal/_shared/mock-data";
 
 export function useTerminalData() {
-  const { marketData } = useData();
+  const rawMarketData = useMarketStore((state) => state.marketData);
+  const marketData = useThrottledValue(rawMarketData, 100);
 
   const terminalData = useMemo(() => {
     // Initialize data structure for all asset classes

@@ -1,11 +1,11 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { useData } from "@/providers/data-provider";
+import { useMarketStore } from "@/store/use-market-store";
 import { useConnection } from "@/providers/connection-provider";
 
 export function AiLabView() {
-  const { marketData } = useData();
+  const marketData = useMarketStore((state) => state.marketData);
   const { status } = useConnection();
 
   // Flatten all bars for display (just for testing purposes)
