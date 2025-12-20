@@ -38,70 +38,45 @@ export function IndicatorsNav({
   const selectedAsset = ASSETS.find((a) => a.value === asset) || ASSETS[0];
 
   return (
-    <div className="flex items-center gap-3">
-      {/* Search */}
+    <div className="flex items-center gap-4">
+      {/* Search - Ultra minimal */}
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="h-8 px-3 gap-2 border-white/5 bg-white/2 hover:bg-white/5 transition-all"
+        className="h-9 px-3 gap-2 text-muted-foreground/40 hover:text-white hover:bg-white/5 transition-all group"
         onClick={onSearchClick}
       >
-        <Search className="w-3.5 h-3.5 text-muted-foreground/60" />
-        <span className="hidden sm:inline text-xs font-bold text-muted-foreground/80 tracking-tight">
-          Search Symbols
-        </span>
-        <kbd className="hidden md:inline-flex ml-2 px-1 py-0 rounded bg-white/5 border border-white/10 text-[9px] font-mono text-muted-foreground/40">
-          ⌘K
-        </kbd>
+        <Search className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
+        <span className="hidden sm:inline text-xs font-bold tracking-tight uppercase">Search</span>
       </Button>
 
-      <div className="w-px h-4 bg-white/10 mx-1" />
+      <div className="w-px h-5 bg-white/5" />
 
-      {/* Timeframe Selector */}
-      <div className="flex items-center rounded-lg border border-white/5 bg-white/2 p-0.5">
-        {TIMEFRAMES.map((tf) => (
-          <button
-            key={tf}
-            onClick={() => onTimeframeChange(tf)}
-            className={cn(
-              "px-3 py-1 text-[10px] font-bold tracking-widest uppercase rounded-md transition-all duration-200",
-              timeframe === tf
-                ? "bg-white/10 text-white shadow-sm ring-1 ring-white/10"
-                : "hover:bg-white/5 text-muted-foreground/60 hover:text-muted-foreground"
-            )}
-          >
-            {tf}
-          </button>
-        ))}
-      </div>
-
-      {/* Asset Selector */}
+      {/* Asset Selector - More prominent */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-8 px-3 gap-2 border-white/5 bg-white/2 hover:bg-white/5"
+            className="h-9 px-4 gap-3 bg-white/5 hover:bg-white/10 border border-white/5"
           >
-            <span className="text-[10px] font-bold tracking-widest uppercase">
-              {selectedAsset.value}
+            <span className="text-xs font-black tracking-widest uppercase">
+              {selectedAsset.label}
             </span>
-            <ChevronDown className="w-3 h-3 text-muted-foreground/50" />
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          align="end"
-          className="min-w-[180px] bg-card border-white/10 shadow-2xl"
+          align="start"
+          className="min-w-[200px] bg-neutral-950 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)] z-50"
         >
           {ASSETS.map((a) => (
             <DropdownMenuItem
               key={a.value}
               onClick={() => onAssetChange(a.value)}
               className={cn(
-                "text-[10px] font-bold tracking-widest uppercase py-2 cursor-pointer",
-                asset === a.value
-                  ? "bg-white/10 text-white"
-                  : "text-muted-foreground hover:text-white"
+                "text-[10px] font-bold tracking-[0.2em] uppercase py-3 px-4 cursor-pointer focus:bg-white/10 focus:text-white",
+                asset === a.value ? "bg-white/5 text-white" : "text-muted-foreground"
               )}
             >
               {a.label}
@@ -109,6 +84,24 @@ export function IndicatorsNav({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Timeframe Selector - Pill style */}
+      <div className="flex items-center gap-1 p-1 bg-neutral-900/50 border border-white/5 rounded-full">
+        {TIMEFRAMES.map((tf) => (
+          <button
+            key={tf}
+            onClick={() => onTimeframeChange(tf)}
+            className={cn(
+              "px-3 py-1 text-[10px] font-black tracking-tighter uppercase rounded-full transition-all duration-300",
+              timeframe === tf
+                ? "bg-white text-black shadow-lg"
+                : "text-muted-foreground hover:text-white hover:bg-white/5"
+            )}
+          >
+            {tf}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
