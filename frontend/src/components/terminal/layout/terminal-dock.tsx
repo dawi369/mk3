@@ -83,7 +83,9 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
-  const isVisible = forceVisible || isHovered;
+  //todo: decide if we want to use this
+  // const isVisible = forceVisible || isHovered;
+  const isVisible = true;
 
   return (
     <>
@@ -107,7 +109,7 @@ export function TerminalDock({ activeView, onSelect }: TerminalDockProps) {
           damping: 40,
         }}
       >
-        <Dock className="items-end pb-3 bg-neutral-950 border-white/5 shadow-2xl backdrop-blur-none">
+        <Dock className="items-end pb-3 bg-neutral-950/90 border-white/10 shadow-2xl backdrop-blur-none">
           {data.map((item) => (
             <DockItem
               key={item.id}
