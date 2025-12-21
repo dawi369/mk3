@@ -74,8 +74,11 @@ export function TerminalViewProvider({ children }: { children: ReactNode }) {
   // Synchronized view changer
   const setActiveView = useCallback(
     (view: TerminalViewType) => {
+      // Update local state immediately for fast response
       setActiveViewInternal(view);
-      // Use startTransition to avoid Suspense re-trigger during URL sync
+
+      // Update the URL. This will trigger the searchParams to change,
+      // but we handle the sync carefully in the effect below.
       startTransition(() => {
         router.replace(`/terminal?view=${view}`, { scroll: false });
       });
@@ -83,12 +86,14 @@ export function TerminalViewProvider({ children }: { children: ReactNode }) {
     [router]
   );
 
-  // Sync state if URL changes from external source (back/forward)
+  // Sync state if URL changes from external source (back/forward buttons)
   useEffect(() => {
-    if (isValidView(viewParam) && viewParam !== activeView) {
-      setActiveViewInternal(viewParam);
+    // We use a functional update to check the current state without adding it to dependencies.
+    // This is the cleanest way to sync the URL to state without triggering flip-flops.
+    if (isValidView(viewParam)) {
+      setActiveViewInternal((current) => (current !== viewParam ? viewParam : current));
     }
-  }, [viewParam, activeView]);
+  }, [viewParam]); // Only depend on viewParam to avoid state -> URL -> state bounce.
 
   const value = useMemo(
     () => ({
