@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Terminal, Activity, Scale, Sparkles } from "lucide-react";
+import { Terminal, Activity, Scale, Sparkles, FlaskConical } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -50,8 +50,8 @@ export function Navbar() {
                   </NavigationMenuLink>
                 </li>
                 {/* <ListItem href="/terminal?view=indicators" title="Indicators" icon={ChartLine}> */}
-                <ListItem href="/terminal?view=indicators" title="Indicators" icon={Activity}>
-                  Actionable insights. Track technical signals and key metrics in real-time.
+                <ListItem href="/backtesting" title="Backtesting" icon={FlaskConical}>
+                  Test your edge. Run historical simulations and validate strategies.
                 </ListItem>
                 {/* <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Activity}> */}
                 <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Scale}>
@@ -63,14 +63,6 @@ export function Navbar() {
                 </ListItem>
               </ul>
             </NavigationMenuContent>
-          </NavigationMenuItem>
-
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild className={navigationMenuTriggerStyle()}>
-              <Link href="/backtesting" className="opacity-60 hover:opacity-100 transition-opacity">
-                Backtesting
-              </Link>
-            </NavigationMenuLink>
           </NavigationMenuItem>
 
           <NavigationMenuItem>
@@ -105,7 +97,7 @@ function ListItem({
   ...props
 }: React.ComponentPropsWithoutRef<"li"> & {
   href: string;
-  icon?: React.ElementType;
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <li {...props}>

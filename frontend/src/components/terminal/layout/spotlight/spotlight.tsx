@@ -11,7 +11,7 @@ import {
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command";
-import { Terminal, Activity, Scale, Sparkles, Settings, Search } from "lucide-react";
+import { Terminal, Activity, Scale, Sparkles, Settings, Search, FlaskConical } from "lucide-react";
 import {
   useSpotlight,
   SpotlightCommand,
@@ -36,13 +36,13 @@ function useDefaultCommands(): SpotlightCommand[] {
         },
       },
       {
-        id: "nav-indicators",
-        label: "Go to Indicators",
-        icon: <Activity className="size-4" />,
-        shortcut: "I",
+        id: "nav-backtesting",
+        label: "Go to Backtesting",
+        icon: <FlaskConical className="size-4" />,
+        shortcut: "B",
         group: "Navigation",
         action: () => {
-          router.push("/terminal?view=indicators");
+          router.push("/backtesting");
           close();
         },
       },

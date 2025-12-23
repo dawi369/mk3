@@ -43,4 +43,14 @@ export const mockSentimentData = {
     { id: "4", title: "Bond Yield Correlation", category: "macro", impact: 30, status: "growing" },
     { id: "5", title: "Retail FOMO Flow", category: "flow", impact: 85, status: "growing" },
   ] as SentimentTheme[],
+  indicators: {
+    trendStrength: 78,
+    volatilityRegime: "EXPANDING",
+    volatilityValue: 18.5,
+    momentum: 62,
+    globalMomentum: "+74.5",
+    volatilityIndex: "18.4%",
+    avgTrendStr: "8.5/10",
+    volumeFlow: "+1.2M",
+  },
 };

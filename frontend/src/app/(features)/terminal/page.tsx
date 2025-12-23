@@ -6,13 +6,12 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { TerminalDock, TerminalViewType } from "@/components/terminal/layout/terminal-dock";
 import { TerminalView } from "@/components/terminal/views/terminal";
-import { IndicatorsView } from "@/components/terminal/views/indicators";
 import { SentimentView } from "@/components/terminal/views/sentiment";
 import { AiLabView } from "@/components/terminal/views/ai-lab";
 import { useTerminalView } from "@/providers/terminal-view-provider";
 import { ErrorBoundary } from "@/components/common/error-boundary";
 
-const VALID_VIEWS: TerminalViewType[] = ["terminal", "indicators", "sentiment", "ai-lab"];
+const VALID_VIEWS: TerminalViewType[] = ["terminal", "sentiment", "ai-lab"];
 
 function isValidView(view: string | null): view is TerminalViewType {
   return view !== null && VALID_VIEWS.includes(view as TerminalViewType);
@@ -39,11 +38,6 @@ function TerminalPageContent() {
           {activeView === "terminal" && (
             <ErrorBoundary name="Main Terminal">
               <TerminalView />
-            </ErrorBoundary>
-          )}
-          {activeView === "indicators" && (
-            <ErrorBoundary name="Indicators">
-              <IndicatorsView />
             </ErrorBoundary>
           )}
           {activeView === "sentiment" && (

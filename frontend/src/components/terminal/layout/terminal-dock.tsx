@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Dock, DockIcon, DockItem, DockLabel } from "@/components/ui/dock";
 
-export type TerminalViewType = "terminal" | "indicators" | "sentiment" | "ai-lab";
+export type TerminalViewType = "terminal" | "sentiment" | "ai-lab";
 
 interface TerminalDockProps {
   activeView: TerminalViewType;
@@ -23,11 +23,11 @@ const data: {
     id: "terminal",
     icon: Terminal,
   },
-  {
-    title: "Indicators",
-    id: "indicators",
-    icon: Activity,
-  },
+  // {
+  //   title: "Indicators",
+  //   id: "indicators",
+  //   icon: Activity,
+  // },
   {
     title: "Sentiment",
     id: "sentiment",

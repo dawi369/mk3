@@ -42,6 +42,7 @@ export function Header() {
             <motion.div layoutId="header-logo" className="flex items-center">
               <Image
                 src="/mk3LogoTransparent.png"
+                // src="/cleaned_up_logo.svg"
                 alt="Swordfish Logo"
                 width={40}
                 height={40}

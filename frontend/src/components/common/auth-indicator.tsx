@@ -253,12 +253,12 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
                         </div>
 
                         {/* Theme Toggle */}
-                        <div className="pt-2 border-t border-white/10">
+                        {/* <div className="pt-2 border-t border-white/10">
                           <div className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors">
                             <span className="text-sm font-medium">Theme</span>
                             <ThemeToggle />
                           </div>
-                        </div>
+                        </div> */}
 
                         {/* Sign Out */}
                         <div className="pt-2 border-t border-white/10">

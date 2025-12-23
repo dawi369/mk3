@@ -6,6 +6,7 @@ import { ArrowRight, Zap, Shield, BarChart3, Globe, Sparkles, Cpu } from "lucide
 import Link from "next/link";
 import Image from "next/image";
 import { ScrambleTitle } from "@/components/home/scramble-title";
+import { PlatformDemoSection } from "@/components/home/platform-demo-section";
 import { ANIMATION_CONFIG, SCRAMBLE_DELAYS } from "@/app/(homeAmarketing)/constants";
 import { useUIStore } from "@/store/use-ui-store";
 
@@ -60,21 +61,19 @@ export default function Home() {
               variants={fadeInUp}
               className="flex flex-wrap items-center justify-center gap-6"
             >
-              <Link href="/terminal">
+              {/* <Link href="/onboarding">
                 <button
                   onMouseEnter={() => setIsHoveringBackground(true)}
                   onMouseLeave={() => setIsHoveringBackground(false)}
-                  className="h-14 px-10 bg-primary text-primary-foreground font-semibold rounded-full hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]"
+                  className="group relative h-16 px-12 overflow-hidden rounded-full bg-linear-to-br from-primary via-primary to-primary/80 text-primary-foreground font-bold text-lg transition-all hover:scale-105 hover:shadow-[0_0_50px_-10px_rgba(var(--primary-rgb),0.6)] active:scale-95 flex items-center gap-3"
                 >
-                  Start Trading
-                  <ArrowRight size={18} />
+                  <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out pointer-events-none" />
+                  <span className="relative z-10 flex items-center gap-3">
+                    Onboarding
+                    <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  </span>
                 </button>
-              </Link>
-              <Link href="/mission">
-                <button className="h-14 px-10 border border-white/10 bg-white/5 backdrop-blur-md text-white font-medium rounded-full hover:bg-white/10 transition-colors">
-                  The Mission
-                </button>
-              </Link>
+              </Link> */}
             </motion.div>
           </motion.div>
 
@@ -101,25 +100,28 @@ export default function Home() {
         </section>
 
         {/* Bento Feature Section */}
-        <section className="py-40 px-6 max-w-7xl mx-auto space-y-24">
-          <motion.div
+        {/* <section className="py-40 px-6 max-w-7xl mx-auto space-y-24"> */}
+        {/* <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-center space-y-4"
           >
             <h2 className="text-4xl md:text-5xl font-bold font-space uppercase">
-              engineered for speed
+              engineered for <br />
+              <span className="italic font-black text-6xl md:text-7xl lowercase bg-linear-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent inline-block">
+                you
+              </span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
               Elite features designed for professional futures traders who demand perfection.
             </p>
-          </motion.div>
+          </motion.div> */}
 
-          {/* Bento Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
-            {/* Large Card 1: Speed */}
-            <motion.div
+        {/* Bento Grid */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]"> */}
+        {/* Large Card 1: Speed */}
+        {/* <motion.div
               whileHover={{ y: -5 }}
               className="md:col-span-2 relative p-8 rounded-3xl border border-white/8 bg-white/3 backdrop-blur-xl overflow-hidden group border-linear-to-b from-white/10 to-transparent"
             >
@@ -136,10 +138,10 @@ export default function Home() {
                   precision. Never miss a tick.
                 </p>
               </div>
-            </motion.div>
+            </motion.div> */}
 
-            {/* Small Card 1: Security */}
-            <motion.div
+        {/* Small Card 1: Security */}
+        {/* <motion.div
               whileHover={{ y: -5 }}
               className="relative p-8 rounded-3xl border border-white/8 bg-white/3 backdrop-blur-xl overflow-hidden group"
             >
@@ -154,10 +156,10 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </motion.div> */}
 
-            {/* Small Card 2: Analytics */}
-            <motion.div
+        {/* Small Card 2: Analytics */}
+        {/* <motion.div
               whileHover={{ y: -5 }}
               className="relative p-8 rounded-3xl border border-white/8 bg-white/3 backdrop-blur-xl overflow-hidden group"
             >
@@ -172,10 +174,10 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </motion.div> */}
 
-            {/* Large Card 2: Global Reach */}
-            <motion.div
+        {/* Large Card 2: Global Reach */}
+        {/* <motion.div
               whileHover={{ y: -5 }}
               className="md:col-span-2 relative p-8 rounded-3xl border border-white/8 bg-white/3 backdrop-blur-xl overflow-hidden group"
             >
@@ -193,39 +195,11 @@ export default function Home() {
               </div>
             </motion.div>
           </div>
-        </section>
+        </section> */}
 
-        {/* Final CTA */}
-        <section className="py-60 px-6 relative overflow-visible">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="max-w-4xl mx-auto text-center space-y-10"
-          >
-            <h2 className="text-6xl md:text-8xl font-bold font-space tracking-tighter uppercase leading-none">
-              The Trade <br />
-              <span className="text-primary italic">Starts Here</span>
-            </h2>
-            <p className="text-xl text-muted-foreground font-light max-w-xl mx-auto">
-              Elevate your execution with the most advanced futures terminal ever created.
-            </p>
-            <div className="flex justify-center pt-8">
-              <Link href="/terminal">
-                <button
-                  onMouseEnter={() => setIsHoveringBackground(true)}
-                  onMouseLeave={() => setIsHoveringBackground(false)}
-                  className="group h-16 px-16 bg-white text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all text-xl flex items-center gap-3"
-                >
-                  Open Terminal
-                  <ArrowRight
-                    size={24}
-                    className="group-hover:translate-x-2 transition-transform"
-                  />
-                </button>
-              </Link>
-            </div>
-          </motion.div>
+        {/* Platform Demo Section */}
+        <section className="py-40 px-6 max-w-6xl mx-auto">
+          <PlatformDemoSection variants={fadeInUp} />
         </section>
       </main>
     </div>

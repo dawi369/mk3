@@ -3,7 +3,18 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Info,
+  Activity,
+  Zap,
+  Gauge,
+  Flame,
+  Target,
+} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { SentimentAssetData, SentimentTheme } from "./mock-sentiment-data";
 
 export const MacroGauge = ({ value }: { value: number }) => {
@@ -136,3 +147,99 @@ export const ThemeCard = ({ theme }: { theme: SentimentTheme }) => {
     </div>
   );
 };
+
+// --- Ported Indicator Components ---
+
+interface GaugeProps {
+  label: string;
+  value: number | string;
+  percent?: number;
+  icon: React.ReactNode;
+  subLabel?: string;
+  statusColor?: string;
+}
+
+export function StatusGauge({ label, value, percent, icon, subLabel, statusColor }: GaugeProps) {
+  return (
+    <div className="p-4 rounded-2xl bg-white/3 border border-white/5 flex flex-col gap-3 relative overflow-hidden group">
+      <div className="flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-neutral-900 border border-white/5 text-muted-foreground group-hover:text-white transition-colors">
+            {icon}
+          </div>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            {label}
+          </span>
+        </div>
+        <span className={cn("text-lg font-mono font-black", statusColor || "text-white")}>
+          {value}
+        </span>
+      </div>
+
+      {percent !== undefined && (
+        <div className="space-y-1.5 relative z-10">
+          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${percent}%` }}
+              className={cn(
+                "h-full rounded-full shadow-[0_0_8px]",
+                statusColor?.replace("text-", "bg-") || "bg-white"
+              )}
+              transition={{ duration: 1, ease: "easeOut" }}
+            />
+          </div>
+          {subLabel && (
+            <p className="text-[10px] font-medium text-muted-foreground/60">{subLabel}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string;
+  change?: string;
+  changeType?: "positive" | "negative" | "neutral";
+  icon: React.ReactNode;
+}
+
+export function MetricCard({ title, value, change, changeType, icon }: MetricCardProps) {
+  return (
+    <Card className="relative overflow-hidden border-2 border-white/20 bg-card shadow-lg h-full">
+      <div
+        className={cn(
+          "absolute top-0 left-0 w-1 h-full",
+          changeType === "positive" && "bg-emerald-500/50",
+          changeType === "negative" && "bg-rose-500/50",
+          changeType === "neutral" && "bg-muted-foreground/30"
+        )}
+      />
+      <CardContent className="p-4 relative">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-widest">
+              {title}
+            </p>
+            <p className="text-xl font-bold tracking-tight font-mono">{value}</p>
+            {change && (
+              <p
+                className={cn(
+                  "text-[10px] font-bold tracking-tight uppercase px-1.5 py-0.5 rounded w-fit",
+                  changeType === "positive" && "bg-emerald-500/10 text-emerald-500",
+                  changeType === "negative" && "bg-rose-500/10 text-rose-500",
+                  changeType === "neutral" && "bg-muted/30 text-muted-foreground"
+                )}
+              >
+                {change}
+              </p>
+            )}
+          </div>
+          <div className="p-2 rounded-lg bg-white/2 border border-white/5 opacity-80">{icon}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

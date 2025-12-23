@@ -26,13 +26,7 @@ export const metadata: Metadata = {
     template: "%s | Swordfish",
   },
   description: "Futures. Focused. Fast",
-  keywords: [
-    "Trading",
-    "Futures",
-    "Swordfish",
-    "Real-time market data",
-    "Technical indicators",
-  ],
+  keywords: ["Trading", "Futures", "Swordfish", "Real-time market data", "Technical indicators"],
   authors: [{ name: "David Erwin", url: "/" }],
   creator: "David Erwin",
   publisher: "Swordfish",
@@ -103,11 +97,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body

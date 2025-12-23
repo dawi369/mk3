@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useHeader } from "@/components/terminal/layout/header-provider";
 import { AuthIndicator } from "@/components/common/auth-indicator";
 import { useTerminalView } from "@/providers/terminal-view-provider";
-import { IndicatorsNav } from "@/components/terminal/views/indicators/indicators-nav";
 
 export function TerminalHeader() {
   const { navContent: manualNavContent } = useHeader();
@@ -18,16 +17,6 @@ export function TerminalHeader() {
     if (manualNavContent) return manualNavContent;
 
     switch (activeView) {
-      case "indicators":
-        return (
-          <IndicatorsNav
-            timeframe={timeframe}
-            onTimeframeChange={setTimeframe}
-            asset={asset}
-            onAssetChange={setAsset}
-            onSearchClick={() => console.log("Search indicator")}
-          />
-        );
       case "terminal":
       case "sentiment":
       case "ai-lab":
