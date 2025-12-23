@@ -7,16 +7,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { ScrambleTitle } from "@/components/home/scramble-title";
 import { ANIMATION_CONFIG, SCRAMBLE_DELAYS } from "@/app/(homeAmarketing)/constants";
+import { useUIStore } from "@/store/use-ui-store";
 
 const { fadeInUp, stagger } = ANIMATION_CONFIG;
 export default function Home() {
+  const { setIsHoveringBackground } = useUIStore();
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 100]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
   return (
     <div className="min-h-screen text-white selection:bg-primary/30 selection:text-primary-foreground overflow-x-hidden">
-      <main>
+      <main className="relative z-10">
         {/* Centered Hero Section */}
         <section className="min-h-screen flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
           <motion.div
@@ -28,6 +30,8 @@ export default function Home() {
             {/* Headline */}
             <motion.h1
               variants={fadeInUp}
+              onMouseEnter={() => setIsHoveringBackground(true)}
+              onMouseLeave={() => setIsHoveringBackground(false)}
               className="text-6xl md:text-[7rem] font-bold tracking-tight font-space leading-[0.85] uppercase"
             >
               <span className="block italic font-light text-muted-foreground/60 transition-colors hover:text-white duration-500">
@@ -57,7 +61,11 @@ export default function Home() {
               className="flex flex-wrap items-center justify-center gap-6"
             >
               <Link href="/terminal">
-                <button className="h-14 px-10 bg-primary text-primary-foreground font-semibold rounded-full hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]">
+                <button
+                  onMouseEnter={() => setIsHoveringBackground(true)}
+                  onMouseLeave={() => setIsHoveringBackground(false)}
+                  className="h-14 px-10 bg-primary text-primary-foreground font-semibold rounded-full hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]"
+                >
                   Start Trading
                   <ArrowRight size={18} />
                 </button>
@@ -204,7 +212,11 @@ export default function Home() {
             </p>
             <div className="flex justify-center pt-8">
               <Link href="/terminal">
-                <button className="group h-16 px-16 bg-white text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all text-xl flex items-center gap-3">
+                <button
+                  onMouseEnter={() => setIsHoveringBackground(true)}
+                  onMouseLeave={() => setIsHoveringBackground(false)}
+                  className="group h-16 px-16 bg-white text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all text-xl flex items-center gap-3"
+                >
                   Open Terminal
                   <ArrowRight
                     size={24}

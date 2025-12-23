@@ -3,12 +3,10 @@
 import { GL } from "@/components/gl";
 import { useState } from "react";
 
-export function WavyDotBackground() {
-  const [hovering, setHovering] = useState(false);
-
+export function WavyDotBackground({ isHovering = false }: { isHovering?: boolean }) {
   return (
     <div className="relative">
-      <GL hovering={hovering} />
+      <GL hovering={isHovering} />
     </div>
   );
 }
