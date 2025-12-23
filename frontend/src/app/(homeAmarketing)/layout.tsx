@@ -1,11 +1,13 @@
 import { Header } from "@/components/common/header";
 import { Footer } from "@/components/common/footer";
-import { GeometricBackground } from "@/components/home/geometric-background";
+// import { GeometricBackground } from "@/components/home/geometric-background";
+import { WavyDotBackground } from "@/components/home/wavy-dot-background";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen flex flex-col bg-transparent">
-      <GeometricBackground />
+      {/* <GeometricBackground /> */}
+      <WavyDotBackground />
       <Header />
       <main className="flex-1 relative z-10">{children}</main>
       <Footer />

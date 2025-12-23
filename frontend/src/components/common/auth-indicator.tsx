@@ -10,7 +10,7 @@ import {
   Settings,
   Lightbulb,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -108,155 +108,177 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
     toast.success("Feature request sent!");
   };
 
-  if (loading) {
-    return (
-      <div className={navigationMenuTriggerStyle()}>
-        <Loader2 className="h-4 w-4 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <Link href="/login" className={navigationMenuTriggerStyle()}>
-        <motion.span
-          className="inline-flex items-center gap-2"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <Fingerprint className="w-4 h-4" />
-          <span>Login</span>
-        </motion.span>
-      </Link>
-    );
-  }
-
   return (
-    // bg-zinc-900??
-    <NavigationMenu viewport={false}>
-      <NavigationMenuList>
-        <NavigationMenuItem>
-          <NavigationMenuTrigger className="opacity-60 hover:opacity-100 transition-opacity group">
-            <div className="flex items-center gap-2">
-              <div className="relative flex items-center justify-center">
-                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <UserIcon className="w-3 h-3 text-primary" />
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border-2 border-background"></span>
-              </div>
-              <span className="text-sm font-medium max-w-[100px] truncate hidden sm:inline-block">
-                {getDisplayName(user, profile)}
-              </span>
-            </div>
-          </NavigationMenuTrigger>
-          <NavigationMenuContent
-            className={cn(
-              align === "right" && "right-0 left-auto",
-              align === "center" && "left-1/2 -translate-x-1/2",
-              align === "left" && "left-0 right-auto"
-            )}
+    <motion.div layout className="relative flex items-center justify-end">
+      <AnimatePresence mode="wait" initial={false}>
+        {loading ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className={navigationMenuTriggerStyle()}
           >
-            <div className="grid gap-3 p-4 w-[300px] md:w-[350px]">
-              {/* User Info Header */}
-              <div className="flex flex-col space-y-1 pb-2 border-b border-white/10">
-                <p className="text-sm font-medium leading-none">{getDisplayName(user, profile)}</p>
-                <p className="text-xs leading-snug text-muted-foreground truncate">{user.email}</p>
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </motion.div>
+        ) : !user ? (
+          <motion.div
+            key="login"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Link href="/login" className={navigationMenuTriggerStyle()}>
+              <div className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                <Fingerprint className="w-4 h-4" />
+                <span className="font-medium">Login</span>
               </div>
-
-              <div className="grid gap-2">
-                {/* Profile / Name Edit */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                    <UserIcon className="w-3 h-3" /> Profile
-                  </h4>
-                  <form onSubmit={handleSaveName} className="flex gap-2">
-                    <Input
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      placeholder="Display Name"
-                      className="h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20"
-                      onKeyDown={(e) => e.stopPropagation()}
-                      disabled={isSavingName}
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSavingName}
-                      className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-8 px-3"
-                    >
-                      {isSavingName ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-                    </button>
-                  </form>
-                </div>
-
-                {/* Links */}
-                <div className="grid grid-cols-2 gap-2">
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/billing"
-                      className="group flex items-center gap-2 rounded-md p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground transition-colors"
-                    >
-                      <CreditCard className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                      Billing
-                    </Link>
-                  </NavigationMenuLink>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href="/settings"
-                      className="group flex items-center gap-2 rounded-md p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground transition-colors"
-                    >
-                      <Settings className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                      Settings
-                    </Link>
-                  </NavigationMenuLink>
-                </div>
-
-                {/* Feature Request */}
-                <div className="space-y-2 pt-2 border-t border-white/10">
-                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                    <Lightbulb className="w-3 h-3 text-primary" /> Feature Request
-                  </h4>
-                  <form onSubmit={handleFeatureRequestSubmit} className="flex gap-2">
-                    <Input
-                      value={featureRequest}
-                      onChange={(e) => setFeatureRequest(e.target.value)}
-                      placeholder="I want..."
-                      className="h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20"
-                      onKeyDown={(e) => e.stopPropagation()}
-                      disabled={isSendingRequest}
-                    />
-                    <button
-                      type="submit"
-                      disabled={isSendingRequest}
-                      className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-8 px-3"
-                    >
-                      {isSendingRequest ? <Loader2 className="h-3 w-3 animate-spin" /> : "Send"}
-                    </button>
-                  </form>
-                </div>
-
-                {/* Theme Toggle */}
-                <div className="pt-2 border-t border-white/10">
-                  <div className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors">
-                    <span className="text-sm font-medium">Theme</span>
-                    <ThemeToggle />
-                  </div>
-                </div>
-
-                {/* Sign Out */}
-                <div className="pt-2 border-t border-white/10">
-                  <button
-                    onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+            </Link>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="flex items-center"
+          >
+            <NavigationMenu viewport={false}>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="opacity-60 hover:opacity-100 transition-opacity group">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                          <UserIcon className="w-3 h-3 text-primary" />
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border-2 border-background"></span>
+                      </div>
+                      <span className="text-sm font-medium max-w-[100px] truncate hidden sm:inline-block">
+                        {getDisplayName(user, profile)}
+                      </span>
+                    </div>
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent
+                    className={cn(
+                      align === "right" && "right-0 left-auto",
+                      align === "center" && "left-1/2 -translate-x-1/2",
+                      align === "left" && "left-0 right-auto"
+                    )}
                   >
-                    <LogOut className="w-4 h-4" />
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            </div>
-          </NavigationMenuContent>
-        </NavigationMenuItem>
-      </NavigationMenuList>
-    </NavigationMenu>
+                    <div className="grid gap-3 p-4 w-[300px] md:w-[350px]">
+                      {/* User Info Header */}
+                      <div className="flex flex-col space-y-1 pb-2 border-b border-white/10">
+                        <p className="text-sm font-medium leading-none">
+                          {getDisplayName(user, profile)}
+                        </p>
+                        <p className="text-xs leading-snug text-muted-foreground truncate">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        {/* Profile / Name Edit */}
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                            <UserIcon className="w-3 h-3" /> Profile
+                          </h4>
+                          <form onSubmit={handleSaveName} className="flex gap-2">
+                            <Input
+                              value={editedName}
+                              onChange={(e) => setEditedName(e.target.value)}
+                              placeholder="Display Name"
+                              className="h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20"
+                              onKeyDown={(e) => e.stopPropagation()}
+                              disabled={isSavingName}
+                            />
+                            <button
+                              type="submit"
+                              disabled={isSavingName}
+                              className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-8 px-3"
+                            >
+                              {isSavingName ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                            </button>
+                          </form>
+                        </div>
+
+                        {/* Links */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href="/billing"
+                              className="group flex items-center gap-2 rounded-md p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground transition-colors"
+                            >
+                              <CreditCard className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                              Billing
+                            </Link>
+                          </NavigationMenuLink>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href="/settings"
+                              className="group flex items-center gap-2 rounded-md p-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground transition-colors"
+                            >
+                              <Settings className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                              Settings
+                            </Link>
+                          </NavigationMenuLink>
+                        </div>
+
+                        {/* Feature Request */}
+                        <div className="space-y-2 pt-2 border-t border-white/10">
+                          <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                            <Lightbulb className="w-3 h-3 text-primary" /> Feature Request
+                          </h4>
+                          <form onSubmit={handleFeatureRequestSubmit} className="flex gap-2">
+                            <Input
+                              value={featureRequest}
+                              onChange={(e) => setFeatureRequest(e.target.value)}
+                              placeholder="I want..."
+                              className="h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20"
+                              onKeyDown={(e) => e.stopPropagation()}
+                              disabled={isSendingRequest}
+                            />
+                            <button
+                              type="submit"
+                              disabled={isSendingRequest}
+                              className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-8 px-3"
+                            >
+                              {isSendingRequest ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                "Send"
+                              )}
+                            </button>
+                          </form>
+                        </div>
+
+                        {/* Theme Toggle */}
+                        <div className="pt-2 border-t border-white/10">
+                          <div className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors">
+                            <span className="text-sm font-medium">Theme</span>
+                            <ThemeToggle />
+                          </div>
+                        </div>
+
+                        {/* Sign Out */}
+                        <div className="pt-2 border-t border-white/10">
+                          <button
+                            onClick={handleSignOut}
+                            className="flex w-full items-center gap-2 rounded-md p-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition-colors"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            Sign out
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

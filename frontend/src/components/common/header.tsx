@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
+import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/common/navbar";
 
 export function Header() {
   const [hidden, setHidden] = useState(false);
   const { scrollY } = useScroll();
+  const pathname = usePathname();
 
   useMotionValueEvent(scrollY, "change", (latest) => {
     const previous = scrollY.getPrevious() ?? 0;
@@ -20,6 +22,9 @@ export function Header() {
       setHidden(false);
     }
   });
+
+  // Don't show header on login page - Move after hooks to satisfy Rules of Hooks
+  if (pathname === "/login") return null;
 
   return (
     <motion.header
