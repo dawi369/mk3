@@ -6,7 +6,7 @@ import { ArrowRight, Zap, Shield, BarChart3, Globe, Sparkles, Cpu } from "lucide
 import Link from "next/link";
 import Image from "next/image";
 import { ScrambleTitle } from "@/components/home/scramble-title";
-import { WaveBackground } from "@/components/home/wave-background";
+import { GeometricBackground } from "@/components/home/geometric-background";
 import { ANIMATION_CONFIG, SCRAMBLE_DELAYS } from "@/app/(homeAmarketing)/constants";
 
 const { fadeInUp, stagger } = ANIMATION_CONFIG;
@@ -17,8 +17,8 @@ export default function Home() {
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
 
   return (
-    <div className="min-h-screen text-white selection:bg-primary/30 selection:text-primary-foreground overflow-x-hidden">
-      <WaveBackground />
+    <div className="relative min-h-screen text-white selection:bg-primary/30 selection:text-primary-foreground overflow-x-hidden">
+      <GeometricBackground />
       <main className="relative z-10">
         {/* Centered Hero Section */}
         <section className="min-h-screen flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
