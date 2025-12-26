@@ -23,7 +23,7 @@ export function GlobalBackground() {
   const isHomePage = pathname === "/";
 
   const speed = isHomePage ? 1.0 : 0.5;
-  const darknessMultiplier = isHomePage ? 1.0 : 5.0;
+  const darknessMultiplier = isHomePage ? 1.0 : 4.0;
 
   return (
     <WavyDotBackground
