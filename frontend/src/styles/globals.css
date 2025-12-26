@@ -173,3 +173,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Vidstack Video Player Styles */
+.media-player[data-view-type="video"] {
+  aspect-ratio: 16 / 9;
+}
+
+.vds-video-layout {
+  --video-brand: hsl(var(--primary));
+}
+
+/* Smooth poster fade */
+.vds-poster {
+  transition: opacity 0.3s ease-out;
+}
+
+/* Custom play button glow on hover */
+.vds-play-button:hover {
+  filter: drop-shadow(0 0 20px hsl(var(--primary) / 0.5));
+}

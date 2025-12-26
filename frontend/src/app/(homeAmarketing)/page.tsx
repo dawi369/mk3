@@ -198,7 +198,7 @@ export default function Home() {
         </section> */}
 
         {/* Platform Demo Section */}
-        <section className="py-40 px-6 max-w-6xl mx-auto">
+        <section className="pt-60 pb-30 px-6 max-w-6xl mx-auto">
           <PlatformDemoSection variants={fadeInUp} />
         </section>
       </main>
