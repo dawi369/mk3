@@ -41,8 +41,8 @@ export const GL = ({ hovering, speed: externalSpeed = 1.0, darknessMultiplier = 
     {
       // Hide controls by default in production or based on a condition
       // hidden: process.env.NODE_ENV === "production",
-      render: () => process.env.NODE_ENV !== "production",
-      // render: () => false,
+      // render: () => process.env.NODE_ENV !== "production",
+      render: () => false,
     }
   );
 

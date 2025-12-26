@@ -19,7 +19,7 @@ export function GlobalBackground() {
   }
 
   // Home page gets full speed and brightness
-  // Other pages get slower (0.3x) and 80% darker (5x multiplier = opacity/5)
+  // Other pages get slower (0.5x) and 80% darker (5x multiplier = opacity/5)
   const isHomePage = pathname === "/";
 
   const speed = isHomePage ? 1.0 : 0.5;

@@ -99,13 +99,30 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
     if (!featureRequest.trim()) return;
 
     setIsSendingRequest(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    console.log("Feature Request Submitted:", featureRequest);
-    setFeatureRequest("");
-    setIsSendingRequest(false);
-    toast.success("Feature request sent!");
+    try {
+      const response = await fetch("/api/feature-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          featureRequest: featureRequest.trim(),
+          userName: getDisplayName(user!, profile),
+          userEmail: user?.email,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send feature request");
+      }
+
+      setFeatureRequest("");
+      toast.success("Feature request sent! Thanks for your feedback 🎉");
+    } catch (error) {
+      console.error("Feature request error:", error);
+      toast.error("Failed to send feature request. Please try again.");
+    } finally {
+      setIsSendingRequest(false);
+    }
   };
 
   return (
