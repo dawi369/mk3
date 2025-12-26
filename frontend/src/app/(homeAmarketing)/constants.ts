@@ -18,10 +18,9 @@ export const ANIMATION_CONFIG = {
 } as const;
 
 export const SCRAMBLE_DELAYS = {
-  futures: 200,
-  tools: 400,
-  need: 600,
-  change: 800,
+  line1: 200,
+  line2: 400,
+  line3: 600,
 } as const;
 
 export const DEMO_CHART_HEIGHTS = [

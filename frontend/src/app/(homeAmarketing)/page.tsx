@@ -36,13 +36,13 @@ export default function Home() {
               className="text-6xl md:text-[7rem] font-bold tracking-tight font-space leading-[0.85] uppercase"
             >
               <span className="block italic font-light text-muted-foreground/60 transition-colors hover:text-white duration-500">
-                <ScrambleTitle delay={SCRAMBLE_DELAYS.futures}>Precision</ScrambleTitle>
+                <ScrambleTitle delay={SCRAMBLE_DELAYS.line1}>Futures</ScrambleTitle>
               </span>
               <span className="block bg-linear-to-b from-white to-white/40 bg-clip-text text-transparent">
-                <ScrambleTitle delay={SCRAMBLE_DELAYS.tools}>Intelligence</ScrambleTitle>
+                <ScrambleTitle delay={SCRAMBLE_DELAYS.line2}>Amplified</ScrambleTitle>
               </span>
               <span className="block text-primary">
-                <ScrambleTitle delay={SCRAMBLE_DELAYS.need}>Absolute Edge</ScrambleTitle>
+                <ScrambleTitle delay={SCRAMBLE_DELAYS.line3}>Intelligence</ScrambleTitle>
               </span>
             </motion.h1>
 
@@ -51,9 +51,9 @@ export default function Home() {
               variants={fadeInUp}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-light leading-relaxed"
             >
-              Swordfish is the new standard in institutional-grade futures trading. Sub-millisecond
-              delivery, professional-grade signals, and an interface engineered for the highest
-              stakes.
+              Turn market noise into institutional clarity. The professional high-fidelity terminal
+              for futures, powered by real-time data, market-wide contextual sentiment, AI-driven
+              labs, and precision backtesting.
             </motion.p>
 
             {/* CTA Group */}
