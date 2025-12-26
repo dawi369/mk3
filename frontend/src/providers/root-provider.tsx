@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ConnectionProvider } from "@/providers/connection-provider";
 import { DataProvider } from "@/providers/data-provider";
+import { GlobalBackground } from "@/components/common/global-background";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useUIStore } from "@/store/use-ui-store";
@@ -28,6 +29,8 @@ export function RootProvider({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <ConnectionProvider>
           <DataProvider>
+            {/* Global wavy dot background for all pages */}
+            <GlobalBackground />
             {/* <TooltipProvider> */}
             {children}
             {/* </TooltipProvider> */}

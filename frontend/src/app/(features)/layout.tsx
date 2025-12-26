@@ -1,10 +1,6 @@
 import React from "react";
 
-export default function FeaturesLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function FeaturesLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background relative">
       {/* Background Grid */}

@@ -1,12 +1,21 @@
 "use client";
 
 import { GL } from "@/components/gl";
-import { useState } from "react";
 
-export function WavyDotBackground({ isHovering = false }: { isHovering?: boolean }) {
+interface WavyDotBackgroundProps {
+  isHovering?: boolean;
+  speed?: number;
+  darknessMultiplier?: number;
+}
+
+export function WavyDotBackground({
+  isHovering = false,
+  speed = 1.0,
+  darknessMultiplier = 1.0,
+}: WavyDotBackgroundProps) {
   return (
     <div className="relative">
-      <GL hovering={isHovering} />
+      <GL hovering={isHovering} speed={speed} darknessMultiplier={darknessMultiplier} />
     </div>
   );
 }

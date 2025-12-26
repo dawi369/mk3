@@ -5,7 +5,13 @@ import { useControls } from "leva";
 import { Particles } from "./particles";
 import { VignetteShader } from "./shaders/vignetteShader";
 
-export const GL = ({ hovering }: { hovering: boolean }) => {
+interface GLProps {
+  hovering: boolean;
+  speed?: number;
+  darknessMultiplier?: number;
+}
+
+export const GL = ({ hovering, speed: externalSpeed = 1.0, darknessMultiplier = 1.0 }: GLProps) => {
   // PERMANENT CHANGES:
   // To make changes permanent, update the 'value' fields below with your desired settings.
   // Example: speed: { value: 1.5, ... }
@@ -56,6 +62,13 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
     useManualTime,
     manualTime,
   } = controls;
+
+  // Apply external multipliers directly (leva caches initial values, so we multiply here)
+  // darknessMultiplier > 1 means darker: reduce opacity and increase vignette
+  const effectiveSpeed = speed * externalSpeed;
+  const effectiveOpacity = opacity / darknessMultiplier; // e.g. 0.8 / 5 = 0.16 (80% darker)
+  const effectiveVignetteDarkness = Math.min(vignetteDarkness * darknessMultiplier, 2.0);
+
   return (
     <div id="webgl">
       <Canvas
@@ -69,7 +82,7 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
         {/* <Perf position="top-left" /> */}
         <color attach="background" args={["#000"]} />
         <Particles
-          speed={speed}
+          speed={effectiveSpeed}
           aperture={aperture}
           focus={focus}
           size={size}
@@ -77,7 +90,7 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
           noiseIntensity={noiseIntensity}
           timeScale={timeScale}
           pointSize={pointSize}
-          opacity={opacity}
+          opacity={effectiveOpacity}
           planeScale={planeScale}
           useManualTime={useManualTime}
           manualTime={manualTime}
@@ -86,7 +99,7 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
         <Effects multisamping={0} disableGamma>
           <shaderPass
             args={[VignetteShader]}
-            uniforms-darkness-value={vignetteDarkness}
+            uniforms-darkness-value={effectiveVignetteDarkness}
             uniforms-offset-value={vignetteOffset}
           />
         </Effects>
