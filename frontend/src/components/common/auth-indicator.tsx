@@ -9,6 +9,8 @@ import {
   CreditCard,
   Settings,
   Lightbulb,
+  Check,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -52,6 +54,7 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
   const [featureRequest, setFeatureRequest] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [isSendingRequest, setIsSendingRequest] = useState(false);
+  const [requestStatus, setRequestStatus] = useState<"idle" | "success" | "error">("idle");
 
   useEffect(() => {
     if (user) {
@@ -99,6 +102,7 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
     if (!featureRequest.trim()) return;
 
     setIsSendingRequest(true);
+    setRequestStatus("idle");
 
     try {
       const response = await fetch("/api/feature-request", {
@@ -108,6 +112,7 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
           featureRequest: featureRequest.trim(),
           userName: getDisplayName(user!, profile),
           userEmail: user?.email,
+          userId: user?.id,
         }),
       });
 
@@ -116,10 +121,16 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
       }
 
       setFeatureRequest("");
-      toast.success("Feature request sent! Thanks for your feedback 🎉");
+      setRequestStatus("success");
+
+      // Reset status after 3 seconds
+      setTimeout(() => setRequestStatus("idle"), 3000);
     } catch (error) {
       console.error("Feature request error:", error);
-      toast.error("Failed to send feature request. Please try again.");
+      setRequestStatus("error");
+
+      // Reset status after 3 seconds
+      setTimeout(() => setRequestStatus("idle"), 3000);
     } finally {
       setIsSendingRequest(false);
     }
@@ -251,22 +262,87 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
                               value={featureRequest}
                               onChange={(e) => setFeatureRequest(e.target.value)}
                               placeholder="I want..."
-                              className="h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20"
+                              className={cn(
+                                "h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20 transition-all duration-300",
+                                requestStatus === "success" && "border-green-500/50 bg-green-500/5",
+                                requestStatus === "error" && "border-red-500/50 bg-red-500/5"
+                              )}
                               onKeyDown={(e) => e.stopPropagation()}
-                              disabled={isSendingRequest}
+                              disabled={isSendingRequest || requestStatus !== "idle"}
                             />
                             <button
                               type="submit"
-                              disabled={isSendingRequest}
-                              className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-8 px-3"
-                            >
-                              {isSendingRequest ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                "Send"
+                              disabled={isSendingRequest || requestStatus !== "idle"}
+                              className={cn(
+                                "inline-flex items-center justify-center rounded-md text-xs font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none h-8 px-3 min-w-[52px]",
+                                requestStatus === "idle" &&
+                                  "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 disabled:opacity-50",
+                                requestStatus === "success" &&
+                                  "bg-green-500/20 text-green-500 border border-green-500/30",
+                                requestStatus === "error" &&
+                                  "bg-red-500/20 text-red-500 border border-red-500/30"
                               )}
+                            >
+                              <AnimatePresence mode="wait">
+                                {isSendingRequest ? (
+                                  <motion.div
+                                    key="loading"
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.5 }}
+                                  >
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  </motion.div>
+                                ) : requestStatus === "success" ? (
+                                  <motion.div
+                                    key="success"
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.5 }}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </motion.div>
+                                ) : requestStatus === "error" ? (
+                                  <motion.div
+                                    key="error"
+                                    initial={{ opacity: 0, scale: 0.5 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.5 }}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </motion.div>
+                                ) : (
+                                  <motion.span
+                                    key="send"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                  >
+                                    Send
+                                  </motion.span>
+                                )}
+                              </AnimatePresence>
                             </button>
                           </form>
+                          {/* Status message */}
+                          <AnimatePresence>
+                            {requestStatus !== "idle" && (
+                              <motion.p
+                                initial={{ opacity: 0, y: -5, height: 0 }}
+                                animate={{ opacity: 1, y: 0, height: "auto" }}
+                                exit={{ opacity: 0, y: -5, height: 0 }}
+                                className={cn(
+                                  "text-[10px] font-medium",
+                                  requestStatus === "success" && "text-green-500",
+                                  requestStatus === "error" && "text-red-500"
+                                )}
+                              >
+                                {requestStatus === "success"
+                                  ? "Thanks for your feedback! 🎉"
+                                  : "Failed to send. Please try again."}
+                              </motion.p>
+                            )}
+                          </AnimatePresence>
                         </div>
 
                         {/* Theme Toggle */}
