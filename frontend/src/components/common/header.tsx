@@ -39,7 +39,11 @@ export function Header() {
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-center gap-4">
           <Link href="/" className="flex items-center">
-            <motion.div layoutId="header-logo" className="flex items-center">
+            <motion.div
+              layoutId="header-logo"
+              layout="position"
+              className="flex items-center will-change-transform"
+            >
               <Image
                 src="/mk3LogoTransparent.png"
                 // src="/cleaned_up_logo.svg"

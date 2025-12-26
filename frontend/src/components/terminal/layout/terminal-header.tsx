@@ -31,7 +31,11 @@ export function TerminalHeader() {
         {/* Logo - left aligned */}
         <div className="w-48 shrink-0">
           <Link href="/" className="flex items-center">
-            <motion.div layoutId="header-logo" className="flex items-center">
+            <motion.div
+              layoutId="header-logo"
+              layout="position"
+              className="flex items-center will-change-transform"
+            >
               <Image
                 src="/mk3LogoTransparent.png"
                 alt="Swordfish Logo"
@@ -61,7 +65,7 @@ export function TerminalHeader() {
 
         {/* Auth indicator - right aligned */}
         <div className="w-48 shrink-0 flex justify-end">
-          <motion.div layoutId="header-auth">
+          <motion.div layoutId="header-auth" layout="position" className="will-change-transform">
             <AuthIndicator align="right" />
           </motion.div>
         </div>

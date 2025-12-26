@@ -82,7 +82,7 @@ export function Navbar() {
           </NavigationMenuItem>
         </NavigationMenuList>
       </NavigationMenu>
-      <motion.div layoutId="header-auth">
+      <motion.div layoutId="header-auth" layout="position" className="will-change-transform">
         <AuthIndicator align="right" />
       </motion.div>
     </>
