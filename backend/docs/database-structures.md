@@ -29,10 +29,29 @@ Redis is used for **real-time data**, **job status persistence**, and **caching*
 
 ### Real-Time Data Keys
 
-| Key Pattern           | Type   | Purpose                          | TTL                      |
-| --------------------- | ------ | -------------------------------- | ------------------------ |
-| `bar:latest:{symbol}` | STRING | Latest bar (JSON) for a symbol   | Cleared daily at 2 AM ET |
-| `bar:today:{symbol}`  | LIST   | Today's bars (JSON) for a symbol | Cleared daily at 2 AM ET |
+| Key Pattern          | Type | Purpose                            | TTL                      |
+| -------------------- | ---- | ---------------------------------- | ------------------------ |
+| `bar:latest`         | HASH | Latest bar (JSON) per symbol field | Cleared daily at 2 AM ET |
+| `bar:today:{symbol}` | LIST | Today's bars (JSON) for a symbol   | Cleared daily at 2 AM ET |
+
+**Hash Operations:**
+
+```bash
+# Set latest bar for a symbol
+HSET bar:latest ESZ25 '{"symbol":"ESZ25",...}'
+
+# Get latest bar for one symbol (O(1))
+HGET bar:latest ESZ25
+
+# Get all latest bars in one call (O(N), single round-trip)
+HGETALL bar:latest
+
+# Get list of symbols
+HKEYS bar:latest
+
+# Get symbol count
+HLEN bar:latest
+```
 
 **Bar JSON Structure:**
 
@@ -267,7 +286,8 @@ ORDER BY timestamp ASC;
 VWAP is calculated during insert:
 
 ```typescript
-const vwap = bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close;
+const vwap =
+  bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close;
 ```
 
 ---

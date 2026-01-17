@@ -30,7 +30,10 @@ async function startHubServer() {
     // Build requests dynamically using API
     console.log("Building subscription requests...");
 
-    const usIndicesReq = await scheduleBuilder.buildRequestAsync("us_indices", "A");
+    const usIndicesReq = await scheduleBuilder.buildRequestAsync(
+      "us_indices",
+      "A",
+    );
     // const metalsReq = await scheduleBuilder.buildRequestAsync("metals", "A");
     // const currenciesReq = await scheduleBuilder.buildRequestAsync("currencies", "A");
     // const grainsReq = await scheduleBuilder.buildRequestAsync("grains", "A");
@@ -69,15 +72,10 @@ async function startHubServer() {
 
     // Log stats every 5 seconds
     setInterval(async () => {
-      console.log("--- flowStore ---");
-      console.log("Symbols:", flowStore.getSymbols());
-      console.log("Latest bars:", flowStore.getAllLatest().length);
-
-      console.log("\n--- Redis ---");
       const stats = await redisStore.getStats();
-      console.log("Stats:", stats);
-
-      console.log("-----------------------------------\n");
+      console.log(
+        `[Stats] Date: ${stats.date} | Symbols: ${stats.symbolCount} | Bars: ${stats.barCount}`,
+      );
     }, 5000);
   } catch (err) {
     console.error("Hub server startup failed:", err);

@@ -1,4 +1,3 @@
-import { flowStore } from "@/server/data/flow_store.js";
 import { redisStore } from "@/server/data/redis_store.js";
 import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
@@ -65,7 +64,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
       if (method === "GET" && path === "/health") {
         return (async () => {
           const redisStats = await redisStore.getStats();
-          const symbols = flowStore.getSymbols();
+          const symbols = await redisStore.getSymbols();
           const clearJobStatus = dailyClearJob.getStatus();
           const refreshJobStatus = monthlySubscriptionJob.getStatus();
 
@@ -73,7 +72,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
             status: "ok",
             timestamp: Date.now(),
             symbols: symbols,
-            symbolCount: symbols.length,
+            symbolCount: redisStats.symbolCount,
             redis: redisStats,
             dailyClearJob: clearJobStatus,
             subscriptionRefreshJob: refreshJobStatus,
@@ -82,21 +81,25 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
       }
 
       if (method === "GET" && path === "/bars/latest") {
-        const bars = flowStore.getAllLatest();
-        return jsonResponse({ bars, count: bars.length });
+        return (async () => {
+          const bars = await redisStore.getAllLatestArray();
+          return jsonResponse({ bars, count: bars.length });
+        })();
       }
 
       // Match /bars/latest/:symbol
       const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
       if (method === "GET" && latestMatch) {
-        const symbol = latestMatch[1];
-        if (!symbol) return errorResponse("Invalid symbol", 400);
+        return (async () => {
+          const symbol = latestMatch[1];
+          if (!symbol) return errorResponse("Invalid symbol", 400);
 
-        const bar = flowStore.getLatest(symbol);
-        if (!bar) {
-          return errorResponse("Symbol not found", 404);
-        }
-        return jsonResponse(bar);
+          const bar = await redisStore.getLatest(symbol);
+          if (!bar) {
+            return errorResponse("Symbol not found", 404);
+          }
+          return jsonResponse(bar);
+        })();
       }
 
       // Match /bars/today/:symbol
@@ -112,8 +115,10 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
       }
 
       if (method === "GET" && path === "/symbols") {
-        const symbols = flowStore.getSymbols();
-        return jsonResponse({ symbols, count: symbols.length });
+        return (async () => {
+          const symbols = await redisStore.getSymbols();
+          return jsonResponse({ symbols, count: symbols.length });
+        })();
       }
 
       // Front months endpoint (public - no auth required)
@@ -161,7 +166,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
                   error: "Refresh failed",
                   details: err instanceof Error ? err.message : String(err),
                 },
-                500
+                500,
               );
             }
           })();
@@ -176,7 +181,10 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
           return jsonResponse({
             subscriptions,
             count: subscriptions.length,
-            totalSymbols: subscriptions.reduce((sum, sub) => sum + sub.symbols.length, 0),
+            totalSymbols: subscriptions.reduce(
+              (sum, sub) => sum + sub.symbols.length,
+              0,
+            ),
           });
         }
 
@@ -197,7 +205,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
                   error: "Refresh failed",
                   details: err instanceof Error ? err.message : String(err),
                 },
-                500
+                500,
               );
             }
           })();
@@ -210,7 +218,12 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
       async open(ws: ServerWebSocket<unknown>) {
         console.log("Client connected to Hub WebSocket");
         ws.subscribe("market_data");
-        ws.send(JSON.stringify({ type: "info", message: "Connected to Market Data Stream" }));
+        ws.send(
+          JSON.stringify({
+            type: "info",
+            message: "Connected to Market Data Stream",
+          }),
+        );
 
         // Send recent history as snapshot (last 100 messages)
         try {
@@ -220,7 +233,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
             "+",
             "-",
             "COUNT",
-            100
+            100,
           );
 
           for (const [id, fields] of recentMessages.reverse()) {
@@ -273,7 +286,13 @@ async function startStreamBroadcaster(server: Server<undefined>) {
   while (true) {
     try {
       // Block for 5 seconds waiting for new messages
-      const streams = await subRedis.xread("BLOCK", 5000, "STREAMS", "market_data", lastId);
+      const streams = await subRedis.xread(
+        "BLOCK",
+        5000,
+        "STREAMS",
+        "market_data",
+        lastId,
+      );
 
       if (streams && streams[0]) {
         const [streamName, messages] = streams[0];
