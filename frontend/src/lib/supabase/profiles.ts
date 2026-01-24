@@ -10,7 +10,9 @@ export interface UserProfile {
 /**
  * Fetch user profile from profiles table
  */
-export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+export async function getUserProfile(
+  userId: string,
+): Promise<UserProfile | null> {
   const supabase = createClient();
 
   const { data, error } = await supabase
@@ -36,7 +38,10 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 /**
  * Update user's display name in profiles table
  */
-export async function updateDisplayName(userId: string, displayName: string): Promise<boolean> {
+export async function updateDisplayName(
+  userId: string,
+  displayName: string,
+): Promise<boolean> {
   const supabase = createClient();
 
   const { error } = await supabase
@@ -57,7 +62,10 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
  * Silently fails if table doesn't exist
  * @returns true if profile was newly created, false if it already existed or on error
  */
-export async function ensureUserProfile(userId: string, email?: string): Promise<boolean> {
+export async function ensureUserProfile(
+  userId: string,
+  email?: string,
+): Promise<boolean> {
   const supabase = createClient();
 
   try {
@@ -70,7 +78,13 @@ export async function ensureUserProfile(userId: string, email?: string): Promise
 
     if (selectError && selectError.code !== "PGRST116") {
       // PGRST116 means no rows found, which is fine
-      console.error("Error checking profile:", selectError);
+      console.error("Error checking profile:", {
+        code: selectError.code,
+        message: selectError.message,
+        details: selectError.details,
+        hint: selectError.hint,
+        raw: JSON.stringify(selectError),
+      });
       return false;
     }
 
@@ -86,7 +100,9 @@ export async function ensureUserProfile(userId: string, email?: string): Promise
         profileData.email = email;
       }
 
-      const { error: insertError } = await supabase.from("profiles").insert(profileData);
+      const { error: insertError } = await supabase
+        .from("profiles")
+        .insert(profileData);
 
       if (insertError) {
         // 23505 = duplicate key, which means profile already exists (race condition)
@@ -98,7 +114,9 @@ export async function ensureUserProfile(userId: string, email?: string): Promise
         console.error("Error creating profile - Full error:", insertError);
         console.error("Error code:", insertError.code);
         console.error("Error message:", insertError.message);
-        console.error("This might be due to RLS policies. Check Supabase RLS settings.");
+        console.error(
+          "This might be due to RLS policies. Check Supabase RLS settings.",
+        );
         return false;
       } else {
         console.log("Profile created successfully for user:", userId);

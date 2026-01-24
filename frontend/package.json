@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3010",
-    "dev:ws": "bun run scripts/ws-proxy.ts",
     "build": "next build",
     "start": "next start -p 3010",
     "lint": "eslint"
@@ -45,7 +44,6 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.24",
     "input-otp": "^1.4.2",
-    "ioredis": "^5.8.2",
     "leva": "^0.10.1",
     "lightweight-charts": "^5.0.9",
     "lightweight-charts-react-wrapper": "^2.1.1",

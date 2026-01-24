@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
@@ -13,7 +19,32 @@ interface ConnectionContextType {
 
 const ConnectionContext = createContext<ConnectionContextType | null>(null);
 
-export function ConnectionProvider({ children }: { children: React.ReactNode }) {
+/**
+ * Convert HTTP(S) URL to WebSocket URL (WS/WSS)
+ * This allows using the same env var for both REST and WebSocket connections
+ */
+function toWebSocketUrl(url: string): string {
+  if (url.startsWith("ws://") || url.startsWith("wss://")) {
+    return url; // Already a WebSocket URL
+  }
+  if (url.startsWith("https://")) {
+    return url.replace("https://", "wss://");
+  }
+  if (url.startsWith("http://")) {
+    return url.replace("http://", "ws://");
+  }
+  // Assume ws:// if no protocol specified
+  console.warn(
+    `[ConnectionProvider] No protocol in HUB_URL "${url}", assuming ws://`,
+  );
+  return `ws://${url}`;
+}
+
+export function ConnectionProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<Timer | null>(null);
@@ -23,39 +54,60 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
   const connect = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
+    const wsUrl = toWebSocketUrl(NEXT_PUBLIC_HUB_URL);
     setStatus("connecting");
-    console.log(`🔌 Connecting to Hub WebSocket at ${NEXT_PUBLIC_HUB_URL}...`);
+    console.log(`🔌 Connecting to Hub WebSocket at ${wsUrl}...`);
 
-    const ws = new WebSocket(NEXT_PUBLIC_HUB_URL);
-    wsRef.current = ws;
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onopen = () => {
-      setStatus("connected");
-      retryCountRef.current = 0;
-      console.log("✅ Connected to Hub WebSocket");
-    };
+      ws.onopen = () => {
+        setStatus("connected");
+        retryCountRef.current = 0;
+        console.log("✅ Connected to Hub WebSocket");
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        // Dispatch to all subscribers
-        subscribersRef.current.forEach((callback) => callback(data));
-      } catch (err) {
-        console.error("Failed to parse WS message:", err);
-      }
-    };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          // Dispatch to all subscribers
+          subscribersRef.current.forEach((callback) => callback(data));
+        } catch (err) {
+          console.error(
+            "❌ [ConnectionProvider] Failed to parse WS message:",
+            err,
+          );
+        }
+      };
 
-    ws.onclose = () => {
-      setStatus("disconnected");
-      wsRef.current = null;
-      scheduleReconnect();
-    };
+      ws.onclose = (event) => {
+        setStatus("disconnected");
+        wsRef.current = null;
+        console.warn(
+          `⚠️ [ConnectionProvider] WebSocket closed (code: ${event.code}, reason: ${event.reason || "none"})`,
+        );
+        scheduleReconnect();
+      };
 
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
+      ws.onerror = (err) => {
+        console.error("❌ [ConnectionProvider] WebSocket error:", {
+          url: wsUrl,
+          error: err,
+          hint: "Check if the backend is running and the HUB_URL is correct",
+        });
+        setStatus("error");
+        // onclose will trigger reconnect
+      };
+    } catch (err) {
+      console.error("❌ [ConnectionProvider] Failed to create WebSocket:", {
+        url: wsUrl,
+        originalUrl: NEXT_PUBLIC_HUB_URL,
+        error: err,
+      });
       setStatus("error");
-      // onclose will trigger reconnect
-    };
+      scheduleReconnect();
+    }
   };
 
   const scheduleReconnect = () => {
@@ -72,7 +124,8 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
   };
 
   useEffect(() => {
-    connect();
+    // Defer to avoid synchronous setState in effect body
+    queueMicrotask(() => connect());
     return () => {
       if (wsRef.current) {
         wsRef.current.close();

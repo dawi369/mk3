@@ -19,7 +19,9 @@ const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, status } = useConnection();
-  const handleMarketUpdate = useMarketStore((state) => state.handleMarketUpdate);
+  const handleMarketUpdate = useMarketStore(
+    (state) => state.handleMarketUpdate,
+  );
   const setIsLoading = useMarketStore((state) => state.setIsLoading);
   const marketData = useMarketStore((state) => state.marketData);
   const isLoading = useMarketStore((state) => state.isLoading);
@@ -27,9 +29,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Subscribe to WebSocket messages
     const unsubscribe = subscribe((message: any) => {
+      // Handle info messages from backend
+      if (message.type === "info") {
+        console.log("ℹ️ [Hub]", message.message);
+        return;
+      }
+
       if (message.type === "market_data") {
         const { symbol, ...barData } = message.data;
-        if (!symbol) return;
+        if (!symbol) {
+          console.warn(
+            "⚠️ [DataProvider] Received market_data without symbol:",
+            message,
+          );
+          return;
+        }
 
         // Update the global store instead of local state
         handleMarketUpdate(symbol, { symbol, ...barData });
@@ -47,7 +61,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <DataContext.Provider
-      value={{ marketData, isLoading: isLoading && status !== "connected", getLatestBar }}
+      value={{
+        marketData,
+        isLoading: isLoading && status !== "connected",
+        getLatestBar,
+      }}
     >
       {children}
     </DataContext.Provider>
