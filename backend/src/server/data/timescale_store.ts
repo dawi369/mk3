@@ -10,9 +10,26 @@ const unzipAsync = promisify(unzip);
 
 class TimescaleStore {
   private sql: postgres.Sql | null = null;
-  private isConnected = false;
+  private connected = false;
 
   constructor() {}
+
+  get isConnected(): boolean {
+    return this.connected;
+  }
+
+  /**
+   * Ping the database to verify connection is alive
+   */
+  async ping(): Promise<boolean> {
+    if (!this.sql || !this.connected) return false;
+    try {
+      await this.sql`SELECT 1`;
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async init() {
     if (!DATABASE_URL) {
@@ -65,13 +82,13 @@ class TimescaleStore {
         CREATE INDEX IF NOT EXISTS idx_bars_symbol_time ON bars (symbol, timestamp DESC);
       `;
 
-      this.isConnected = true;
+      this.connected = true;
       console.log("TimescaleDB schema initialized");
     } catch (err: any) {
       console.error("Failed to initialize TimescaleDB:", err);
       if (err.code === "ECONNREFUSED") {
         console.error(
-          "❌ TimescaleDB connection refused. Is the 'timescaledb' container running? (docker compose up -d timescaledb)"
+          "❌ TimescaleDB connection refused. Is the 'timescaledb' container running? (docker compose up -d timescaledb)",
         );
       }
       console.error("Fatal: TimescaleDB connection failed. Exiting...");
@@ -82,7 +99,10 @@ class TimescaleStore {
   async insertBar(bar: Bar) {
     if (!this.isConnected || !this.sql) return;
 
-    const vwap = bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close;
+    const vwap =
+      bar.dollarVolume && bar.volume
+        ? bar.dollarVolume / bar.volume
+        : bar.close;
     const timestamp = new Date(bar.startTime);
 
     try {
@@ -116,7 +136,10 @@ class TimescaleStore {
         low: bar.low,
         close: bar.close,
         volume: bar.volume,
-        vwap: bar.dollarVolume && bar.volume ? bar.dollarVolume / bar.volume : bar.close,
+        vwap:
+          bar.dollarVolume && bar.volume
+            ? bar.dollarVolume / bar.volume
+            : bar.close,
         timestamp: new Date(bar.startTime),
       }));
 
@@ -143,7 +166,11 @@ class TimescaleStore {
    * 3. For current month: Query DB directly (no long-term cache)
    * 4. Combine and filter
    */
-  async getHistory(symbol: string, startMs: number, endMs: number): Promise<Bar[]> {
+  async getHistory(
+    symbol: string,
+    startMs: number,
+    endMs: number,
+  ): Promise<Bar[]> {
     if (!this.isConnected || !this.sql) return [];
 
     const startDate = new Date(startMs);
@@ -160,9 +187,11 @@ class TimescaleStore {
 
     while (
       iterYear < endDate.getUTCFullYear() ||
-      (iterYear === endDate.getUTCFullYear() && iterMonth <= endDate.getUTCMonth())
+      (iterYear === endDate.getUTCFullYear() &&
+        iterMonth <= endDate.getUTCMonth())
     ) {
-      const isCurrentMonth = iterYear === currentYear && iterMonth === currentMonth;
+      const isCurrentMonth =
+        iterYear === currentYear && iterMonth === currentMonth;
       const monthKey = `history:${symbol}:${iterYear}-${(iterMonth + 1)
         .toString()
         .padStart(2, "0")}`;
@@ -188,7 +217,9 @@ class TimescaleStore {
       if (monthBars.length === 0) {
         // Calculate month start/end
         const monthStart = new Date(Date.UTC(iterYear, iterMonth, 1));
-        const monthEnd = new Date(Date.UTC(iterYear, iterMonth + 1, 0, 23, 59, 59, 999));
+        const monthEnd = new Date(
+          Date.UTC(iterYear, iterMonth + 1, 0, 23, 59, 59, 999),
+        );
 
         try {
           const result = await this.sql`
@@ -234,7 +265,10 @@ class TimescaleStore {
             // await redisStore.redis.expire(monthKey, 60 * 60 * 24 * 365);
           }
         } catch (err) {
-          console.error(`DB query failed for ${symbol} ${iterYear}-${iterMonth}:`, err);
+          console.error(
+            `DB query failed for ${symbol} ${iterYear}-${iterMonth}:`,
+            err,
+          );
         }
       }
 

@@ -15,7 +15,7 @@ import {
  */
 async function fetchAggregates(
   symbol: string,
-  dateStr: string
+  dateStr: string,
 ): Promise<Bar[]> {
   const url = `${POLYGON_API_URL}/v2/aggs/ticker/${symbol}/range/1/minute/${dateStr}/${dateStr}?adjusted=true&sort=asc&limit=50000&apiKey=${POLYGON_API_KEY}`;
 
@@ -23,7 +23,7 @@ async function fetchAggregates(
     const response = await fetch(url);
     if (!response.ok) {
       console.error(
-        `Failed to fetch history for ${symbol} on ${dateStr}: ${response.status} ${response.statusText}`
+        `Failed to fetch history for ${symbol} on ${dateStr}: ${response.status} ${response.statusText}`,
       );
       return [];
     }
@@ -79,7 +79,7 @@ export class HistorySyncJob {
     // 1. Determine "Yesterday" in ET
     const now = new Date();
     const etNow = new Date(
-      now.toLocaleString("en-US", { timeZone: "America/New_York" })
+      now.toLocaleString("en-US", { timeZone: "America/New_York" }),
     );
     etNow.setDate(etNow.getDate() - 1);
     const dateStr = etNow.toISOString().split("T")[0] || ""; // YYYY-MM-DD

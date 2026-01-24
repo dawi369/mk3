@@ -1,10 +1,12 @@
 import { redisStore } from "@/server/data/redis_store.js";
+import { timescaleStore } from "@/server/data/timescale_store.js";
 import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
 import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
 import type { Server, ServerWebSocket } from "bun";
+import { logger } from "@/utils/logger.js";
 
 let polygonClient: PolygonWSClient | null = null;
 
@@ -42,7 +44,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
 
   const server = Bun.serve({
     port: HUB_PORT,
-    fetch(req: Request, server: Server<undefined>) {
+    async fetch(req: Request, server: Server<undefined>) {
       const url = new URL(req.url);
       const path = url.pathname;
       const method = req.method;
@@ -52,171 +54,26 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
         return undefined; // do not return a Response
       }
 
-      // Handle CORS preflight
+      // Handle CORS preflight (don't log these)
       if (method === "OPTIONS") {
         return new Response(null, {
           headers: corsHeaders,
         });
       }
 
-      // --- Public Routes ---
+      // Start timing for request logging
+      const startTime = performance.now();
+      const response = await handleRequest(method, path, req);
+      const durationMs = Math.round(performance.now() - startTime);
 
-      if (method === "GET" && path === "/health") {
-        return (async () => {
-          const redisStats = await redisStore.getStats();
-          const symbols = await redisStore.getSymbols();
-          const clearJobStatus = dailyClearJob.getStatus();
-          const refreshJobStatus = monthlySubscriptionJob.getStatus();
+      // Log the request
+      logger.request(method, path, response.status, durationMs);
 
-          return jsonResponse({
-            status: "ok",
-            timestamp: Date.now(),
-            symbols: symbols,
-            symbolCount: redisStats.symbolCount,
-            redis: redisStats,
-            dailyClearJob: clearJobStatus,
-            subscriptionRefreshJob: refreshJobStatus,
-          });
-        })();
-      }
-
-      if (method === "GET" && path === "/bars/latest") {
-        return (async () => {
-          const bars = await redisStore.getAllLatestArray();
-          return jsonResponse({ bars, count: bars.length });
-        })();
-      }
-
-      // Match /bars/latest/:symbol
-      const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
-      if (method === "GET" && latestMatch) {
-        return (async () => {
-          const symbol = latestMatch[1];
-          if (!symbol) return errorResponse("Invalid symbol", 400);
-
-          const bar = await redisStore.getLatest(symbol);
-          if (!bar) {
-            return errorResponse("Symbol not found", 404);
-          }
-          return jsonResponse(bar);
-        })();
-      }
-
-      // Match /bars/today/:symbol
-      const todayMatch = path.match(/^\/bars\/today\/([^\/]+)$/);
-      if (method === "GET" && todayMatch) {
-        return (async () => {
-          const symbol = todayMatch[1];
-          if (!symbol) return errorResponse("Invalid symbol", 400);
-
-          const bars = await redisStore.getTodayBars(symbol);
-          return jsonResponse({ symbol, bars, count: bars.length });
-        })();
-      }
-
-      if (method === "GET" && path === "/symbols") {
-        return (async () => {
-          const symbols = await redisStore.getSymbols();
-          return jsonResponse({ symbols, count: symbols.length });
-        })();
-      }
-
-      // Front months endpoint (public - no auth required)
-      if (method === "GET" && path === "/front-months") {
-        const cache = frontMonthJob.getCache();
-        if (!cache) {
-          return jsonResponse({
-            lastUpdated: null,
-            products: {},
-            message:
-              "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
-          });
-        }
-        return jsonResponse(cache);
-      }
-
-      // --- Protected Routes ---
-
-      // Check auth for all /admin routes
-      if (path.startsWith("/admin")) {
-        if (!isAuthorized(req)) {
-          return errorResponse("Unauthorized", 401);
-        }
-
-        if (method === "POST" && path === "/admin/clear-redis") {
-          return (async () => {
-            await dailyClearJob.runClear();
-            const status = dailyClearJob.getStatus();
-            return jsonResponse({ message: "Manual clear triggered", status });
-          })();
-        }
-
-        if (method === "POST" && path === "/admin/refresh-subscriptions") {
-          return (async () => {
-            try {
-              await monthlySubscriptionJob.runRefresh();
-              const status = monthlySubscriptionJob.getStatus();
-              return jsonResponse({
-                message: "Manual subscription refresh triggered",
-                status,
-              });
-            } catch (err) {
-              return jsonResponse(
-                {
-                  error: "Refresh failed",
-                  details: err instanceof Error ? err.message : String(err),
-                },
-                500,
-              );
-            }
-          })();
-        }
-
-        if (method === "GET" && path === "/admin/subscriptions") {
-          if (!polygonClient) {
-            return errorResponse("Polygon client not initialized", 503);
-          }
-
-          const subscriptions = polygonClient.getSubscriptions();
-          return jsonResponse({
-            subscriptions,
-            count: subscriptions.length,
-            totalSymbols: subscriptions.reduce(
-              (sum, sub) => sum + sub.symbols.length,
-              0,
-            ),
-          });
-        }
-
-        if (method === "POST" && path === "/admin/refresh-front-months") {
-          return (async () => {
-            try {
-              await frontMonthJob.runRefresh();
-              const status = frontMonthJob.getStatus();
-              const cache = frontMonthJob.getCache();
-              return jsonResponse({
-                message: "Front month refresh triggered",
-                status,
-                cache,
-              });
-            } catch (err) {
-              return jsonResponse(
-                {
-                  error: "Refresh failed",
-                  details: err instanceof Error ? err.message : String(err),
-                },
-                500,
-              );
-            }
-          })();
-        }
-      }
-
-      return errorResponse("Not Found", 404);
+      return response;
     },
     websocket: {
       async open(ws: ServerWebSocket<unknown>) {
-        console.log("Client connected to Hub WebSocket");
+        logger.info("WebSocket client connected");
         ws.subscribe("market_data");
         ws.send(
           JSON.stringify({
@@ -227,7 +84,6 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
 
         // Send recent history as snapshot (last 100 messages)
         try {
-          // Use redisStore's redis instance directly
           const recentMessages = await redisStore.redis.xrevrange(
             "market_data",
             "+",
@@ -256,29 +112,208 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
             ws.send(payload);
           }
         } catch (error) {
-          console.error("Error sending snapshot:", error);
+          logger.error("Error sending WebSocket snapshot", {
+            error: String(error),
+          });
         }
       },
       message(ws: ServerWebSocket<unknown>, message: string | Buffer) {
         // Handle incoming messages if needed
       },
       close(ws: ServerWebSocket<unknown>) {
-        console.log("Client disconnected from Hub WebSocket");
+        logger.info("WebSocket client disconnected");
       },
     },
   });
 
-  console.log(`Hub REST & WebSocket API listening on port ${server.port}`);
+  logger.info(`Hub REST & WebSocket API listening on port ${server.port}`);
 
   // Start Redis Stream Consumer for Broadcasting
-  // We use a separate Redis connection for blocking XREAD to avoid blocking the main one
   startStreamBroadcaster(server);
 
   return Promise.resolve();
 }
 
+/**
+ * Handle incoming HTTP requests
+ */
+async function handleRequest(
+  method: string,
+  path: string,
+  req: Request,
+): Promise<Response> {
+  // --- Public Routes ---
+
+  if (method === "GET" && path === "/health") {
+    // Check database connections
+    let redisOk = false;
+    let timescaleOk = false;
+
+    try {
+      const pong = await redisStore.ping();
+      redisOk = pong === "PONG";
+    } catch {
+      redisOk = false;
+    }
+
+    try {
+      timescaleOk = await timescaleStore.ping();
+    } catch {
+      timescaleOk = false;
+    }
+
+    // Get stats and job statuses
+    const redisStats = await redisStore.getStats();
+    const symbols = await redisStore.getSymbols();
+    const clearJobStatus = dailyClearJob.getStatus();
+    const refreshJobStatus = monthlySubscriptionJob.getStatus();
+
+    // Check WebSocket connection
+    const wsConnected = polygonClient !== null;
+
+    // Determine overall status
+    const allHealthy = redisOk && timescaleOk && wsConnected;
+    const status = allHealthy ? "ok" : "degraded";
+
+    return jsonResponse({
+      status,
+      timestamp: Date.now(),
+      services: {
+        redis: redisOk ? "connected" : "disconnected",
+        timescaledb: timescaleOk ? "connected" : "disconnected",
+        polygonWs: wsConnected ? "connected" : "disconnected",
+      },
+      symbols: symbols,
+      symbolCount: redisStats.symbolCount,
+      redis: redisStats,
+      dailyClearJob: clearJobStatus,
+      subscriptionRefreshJob: refreshJobStatus,
+    });
+  }
+
+  if (method === "GET" && path === "/bars/latest") {
+    const bars = await redisStore.getAllLatestArray();
+    return jsonResponse({ bars, count: bars.length });
+  }
+
+  // Match /bars/latest/:symbol
+  const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
+  if (method === "GET" && latestMatch) {
+    const symbol = latestMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const bar = await redisStore.getLatest(symbol);
+    if (!bar) {
+      return errorResponse("Symbol not found", 404);
+    }
+    return jsonResponse(bar);
+  }
+
+  // Match /bars/today/:symbol
+  const todayMatch = path.match(/^\/bars\/today\/([^\/]+)$/);
+  if (method === "GET" && todayMatch) {
+    const symbol = todayMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const bars = await redisStore.getTodayBars(symbol);
+    return jsonResponse({ symbol, bars, count: bars.length });
+  }
+
+  if (method === "GET" && path === "/symbols") {
+    const symbols = await redisStore.getSymbols();
+    return jsonResponse({ symbols, count: symbols.length });
+  }
+
+  // Front months endpoint (public - no auth required)
+  if (method === "GET" && path === "/front-months") {
+    const cache = frontMonthJob.getCache();
+    if (!cache) {
+      return jsonResponse({
+        lastUpdated: null,
+        products: {},
+        message:
+          "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
+      });
+    }
+    return jsonResponse(cache);
+  }
+
+  // --- Protected Routes ---
+
+  // Check auth for all /admin routes
+  if (path.startsWith("/admin")) {
+    if (!isAuthorized(req)) {
+      return errorResponse("Unauthorized", 401);
+    }
+
+    if (method === "POST" && path === "/admin/clear-redis") {
+      await dailyClearJob.runClear();
+      const status = dailyClearJob.getStatus();
+      return jsonResponse({ message: "Manual clear triggered", status });
+    }
+
+    if (method === "POST" && path === "/admin/refresh-subscriptions") {
+      try {
+        await monthlySubscriptionJob.runRefresh();
+        const status = monthlySubscriptionJob.getStatus();
+        return jsonResponse({
+          message: "Manual subscription refresh triggered",
+          status,
+        });
+      } catch (err) {
+        return jsonResponse(
+          {
+            error: "Refresh failed",
+            details: err instanceof Error ? err.message : String(err),
+          },
+          500,
+        );
+      }
+    }
+
+    if (method === "GET" && path === "/admin/subscriptions") {
+      if (!polygonClient) {
+        return errorResponse("Polygon client not initialized", 503);
+      }
+
+      const subscriptions = polygonClient.getSubscriptions();
+      return jsonResponse({
+        subscriptions,
+        count: subscriptions.length,
+        totalSymbols: subscriptions.reduce(
+          (sum, sub) => sum + sub.symbols.length,
+          0,
+        ),
+      });
+    }
+
+    if (method === "POST" && path === "/admin/refresh-front-months") {
+      try {
+        await frontMonthJob.runRefresh();
+        const status = frontMonthJob.getStatus();
+        const cache = frontMonthJob.getCache();
+        return jsonResponse({
+          message: "Front month refresh triggered",
+          status,
+          cache,
+        });
+      } catch (err) {
+        return jsonResponse(
+          {
+            error: "Refresh failed",
+            details: err instanceof Error ? err.message : String(err),
+          },
+          500,
+        );
+      }
+    }
+  }
+
+  return errorResponse("Not Found", 404);
+}
+
 async function startStreamBroadcaster(server: Server<undefined>) {
-  console.log("Starting Redis Stream Broadcaster...");
+  logger.info("Starting Redis Stream Broadcaster...");
   // Create a dedicated Redis client for blocking operations
   const subRedis = redisStore.redis.duplicate();
   let lastId = "$"; // Start reading from new messages
@@ -322,7 +357,7 @@ async function startStreamBroadcaster(server: Server<undefined>) {
         }
       }
     } catch (error) {
-      console.error("Error in Stream Broadcaster:", error);
+      logger.error("Error in Stream Broadcaster", { error: String(error) });
       await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait before retrying
     }
   }

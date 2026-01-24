@@ -9,7 +9,10 @@ import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
 // import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
-import { POLYGON_ASSET_CLASS_LIST } from "@/utils/consts.js";
+
+// Global reference for graceful shutdown
+let polygonClient: PolygonWSClient | null = null;
+let statsInterval: Timer | null = null;
 
 /**
  * Main Hub server startup
@@ -22,7 +25,7 @@ async function startHubServer() {
     // Initialize TimescaleDB
     await timescaleStore.init();
 
-    const polygonClient = new PolygonWSClient();
+    polygonClient = new PolygonWSClient();
     const futuresMarket: PolygonMarketType = "futures";
 
     await polygonClient.connect(futuresMarket);
@@ -46,12 +49,6 @@ async function startHubServer() {
     // await polygonClient.subscribe(grainsReq);
     // await polygonClient.subscribe(softsReq);
 
-    // All in parallel
-    // for (const cls of POLYGON_ASSET_CLASS_LIST) {
-    //   const req = await scheduleBuilder.buildRequestAsync(cls, "A");
-    //   await polygonClient.subscribe(req);
-    // }
-
     // Brief pause before continuing
     await Bun.sleep(1000);
 
@@ -60,7 +57,7 @@ async function startHubServer() {
     await monthlySubscriptionJob.loadStatus();
     await frontMonthJob.loadStatus();
 
-    // Schedule jobs
+    // Schedule jobs (disabled for now)
     // dailyClearJob.schedule();
     // monthlySubscriptionJob.schedule(polygonClient);
     // historySyncJob.schedule();
@@ -71,7 +68,7 @@ async function startHubServer() {
     console.log("Hub server running\n");
 
     // Log stats every 5 seconds
-    setInterval(async () => {
+    statsInterval = setInterval(async () => {
       const stats = await redisStore.getStats();
       console.log(
         `[Stats] Date: ${stats.date} | Symbols: ${stats.symbolCount} | Bars: ${stats.barCount}`,
@@ -79,23 +76,48 @@ async function startHubServer() {
     }, 5000);
   } catch (err) {
     console.error("Hub server startup failed:", err);
-    console.error("Retrying in 10 seconds...");
+    const retrySeconds = 10;
+    console.error(`Retrying in ${retrySeconds} seconds...`);
     setTimeout(() => {
       startHubServer();
-    }, 19000);
+    }, retrySeconds * 1000);
   }
 }
 
-// Handle process exit
-process.on("SIGINT", () => {
-  console.log("\nShutting down Hub server...");
-  process.exit(0);
-});
+/**
+ * Graceful shutdown - cleanup all connections
+ */
+async function gracefulShutdown(signal: string) {
+  console.log(`\n[${signal}] Graceful shutdown initiated...`);
 
-process.on("SIGTERM", () => {
-  console.log("\nShutting down Hub server...");
+  // Stop stats logging
+  if (statsInterval) {
+    clearInterval(statsInterval);
+    statsInterval = null;
+  }
+
+  // Disconnect Polygon WebSocket
+  if (polygonClient) {
+    console.log("Disconnecting Polygon WebSocket...");
+    polygonClient.disconnect();
+    polygonClient = null;
+  }
+
+  // Close TimescaleDB connections
+  console.log("Closing TimescaleDB connections...");
+  await timescaleStore.close();
+
+  // Close Redis connection
+  console.log("Closing Redis connection...");
+  await redisStore.redis.quit();
+
+  console.log("Shutdown complete.");
   process.exit(0);
-});
+}
+
+// Handle process exit signals
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 // Start server
 startHubServer();

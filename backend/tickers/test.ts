@@ -1,6 +1,5 @@
 import allTickers from "./all.json";
-
-const API_KEY = "OFppwBA23w4CTOjMNUm02eeNLziPtIMc";
+import { POLYGON_API_KEY } from "@/config/env.js";
 
 // All 12 month codes for futures contracts
 const MONTHS = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"];
@@ -14,7 +13,7 @@ interface TickerResult {
 
 async function checkContract(ticker: string, month: string): Promise<boolean> {
   const contract = `${ticker}${month}${YEAR}`;
-  const url = `https://api.massive.com/futures/vX/contracts/${contract}?apiKey=${API_KEY}`;
+  const url = `https://api.massive.com/futures/vX/contracts/${contract}?apiKey=${POLYGON_API_KEY}`;
 
   try {
     const response = await fetch(url);
@@ -48,7 +47,10 @@ async function checkTicker(ticker: string): Promise<TickerResult> {
 }
 
 async function main() {
-  const results: { valid: string[]; invalid: string[] } = { valid: [], invalid: [] };
+  const results: { valid: string[]; invalid: string[] } = {
+    valid: [],
+    invalid: [],
+  };
 
   for (const [assetClass, tickers] of Object.entries(allTickers)) {
     console.log(`\n--- ${assetClass.toUpperCase()} ---`);

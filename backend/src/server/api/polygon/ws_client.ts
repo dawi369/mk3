@@ -21,6 +21,32 @@ import { ConnectionState } from "@/types/polygon.types.js";
 import type { WSHealth } from "@/types/polygon.types.js";
 import { isMarketHours } from "@/utils/polygon.utils.js";
 
+// Timeout configuration (ms)
+const WS_TIMEOUT = {
+  AUTH: 15000,
+  SUBSCRIBE: 15000,
+  UNSUBSCRIBE: 10000,
+} as const;
+
+/**
+ * Wrap a promise with a timeout
+ */
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  operation: string,
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${operation} timed out after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ]);
+}
+
 export class PolygonWSClient {
   private ws: WebSocket | null = null;
   private health: WSHealth = {
@@ -49,7 +75,7 @@ export class PolygonWSClient {
     const marketStatus = isMarketHours();
     if (!marketStatus.isOpen) {
       console.warn(
-        `⚠️  Market closed: ${marketStatus.reason}. No live data expected.`
+        `⚠️  Market closed: ${marketStatus.reason}. No live data expected.`,
       );
     }
 
@@ -65,7 +91,7 @@ export class PolygonWSClient {
     this.ws.onopen = () => {
       // Send auth message immediately after connection opens
       this.ws?.send(
-        JSON.stringify({ action: "auth", params: POLYGON_API_KEY })
+        JSON.stringify({ action: "auth", params: POLYGON_API_KEY }),
       );
     };
 
@@ -89,8 +115,8 @@ export class PolygonWSClient {
       this.scheduleReconnect();
     };
 
-    // Wait for authentication before returning
-    await authPromise;
+    // Wait for authentication before returning (with timeout)
+    await withTimeout(authPromise, WS_TIMEOUT.AUTH, "Polygon authentication");
   }
 
   private handleMessage(msg: MessageEvent): PolygonStatusMessage | void {
@@ -168,7 +194,7 @@ export class PolygonWSClient {
       // Handle quote events (top of book)
       if (isQuoteEvent(m)) {
         console.log(
-          `Quote: ${m.sym} - Bid: ${m.bp}x${m.bs}, Ask: ${m.ap}x${m.as}`
+          `Quote: ${m.sym} - Bid: ${m.bp}x${m.bs}, Ask: ${m.ap}x${m.as}`,
         );
         return;
       }
@@ -192,7 +218,7 @@ export class PolygonWSClient {
       !this.subscriptions.find(
         (s) =>
           s.ev === request.ev &&
-          JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
+          JSON.stringify(s.symbols) === JSON.stringify(request.symbols),
       )
     ) {
       this.subscriptions.push(request);
@@ -210,13 +236,17 @@ export class PolygonWSClient {
       JSON.stringify({
         action: "subscribe",
         params,
-      })
+      }),
     );
 
     this.health.subscriptionCount = request.symbols.length;
 
-    // Wait for subscription confirmation before returning
-    await subscribePromise;
+    // Wait for subscription confirmation before returning (with timeout)
+    await withTimeout(
+      subscribePromise,
+      WS_TIMEOUT.SUBSCRIBE,
+      `Subscribe to ${request.symbols.length} symbols`,
+    );
   }
 
   async unsubscribe(request: PolygonWsRequest): Promise<void> {
@@ -228,7 +258,7 @@ export class PolygonWSClient {
           !(
             s.ev === request.ev &&
             JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
-          )
+          ),
       );
       return;
     }
@@ -245,11 +275,15 @@ export class PolygonWSClient {
       JSON.stringify({
         action: "unsubscribe",
         params,
-      })
+      }),
     );
 
-    // Wait for unsubscription confirmation before removing from tracking
-    await unsubscribePromise;
+    // Wait for unsubscription confirmation (with timeout)
+    await withTimeout(
+      unsubscribePromise,
+      WS_TIMEOUT.UNSUBSCRIBE,
+      `Unsubscribe from ${request.symbols.length} symbols`,
+    );
 
     // Remove from tracked subscriptions
     this.subscriptions = this.subscriptions.filter(
@@ -257,19 +291,19 @@ export class PolygonWSClient {
         !(
           s.ev === request.ev &&
           JSON.stringify(s.symbols) === JSON.stringify(request.symbols)
-        )
+        ),
     );
 
     // Update subscription count
     this.health.subscriptionCount = this.subscriptions.reduce(
       (total, sub) => total + sub.symbols.length,
-      0
+      0,
     );
   }
 
   async updateSubscription(
     old: PolygonWsRequest,
-    newRequest: PolygonWsRequest
+    newRequest: PolygonWsRequest,
   ): Promise<void> {
     const oldSymbols = old.symbols.sort().join(",");
     const newSymbols = newRequest.symbols.sort().join(",");
@@ -280,7 +314,7 @@ export class PolygonWSClient {
     }
 
     console.log(
-      `Updating subscription: ${old.symbols.length} symbols → ${newRequest.symbols.length} symbols`
+      `Updating subscription: ${old.symbols.length} symbols → ${newRequest.symbols.length} symbols`,
     );
 
     // Unsubscribe from old
@@ -296,12 +330,12 @@ export class PolygonWSClient {
       } catch (err) {
         console.error(
           `Subscribe attempt ${attempt}/${maxRetries} failed:`,
-          err
+          err,
         );
 
         if (attempt === maxRetries) {
           throw new Error(
-            `Failed to subscribe after ${maxRetries} attempts: ${err}`
+            `Failed to subscribe after ${maxRetries} attempts: ${err}`,
           );
         }
 
@@ -347,7 +381,7 @@ export class PolygonWSClient {
       const start = Date.now();
 
       const response = await fetch(
-        `https://api.polygon.io/v3/reference/tickers?active=true&limit=1&apiKey=${POLYGON_API_KEY}`
+        `https://api.polygon.io/v3/reference/tickers?active=true&limit=1&apiKey=${POLYGON_API_KEY}`,
       );
 
       if (response.ok) {
@@ -380,7 +414,7 @@ export class PolygonWSClient {
     const delay = Math.min(500 * Math.pow(2, this.reconnectAttempts), 20_000);
 
     console.log(
-      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`
+      `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts + 1})`,
     );
 
     this.reconnectTimer = setTimeout(() => {

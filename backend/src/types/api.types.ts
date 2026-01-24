@@ -1,14 +1,19 @@
 // Purpose: Type definitions for WebSocket server
 
-import type { WebSocket } from "ws";
 import type { Bar } from "@/types/common.types.js";
+
+// Generic WebSocket type that works with Bun's ServerWebSocket
+type GenericWebSocket = {
+  send(data: string | ArrayBuffer): void;
+  close(): void;
+};
 
 /**
  * Client connection tracking
  */
 export interface ClientConnection {
   id: string;
-  ws: WebSocket;
+  ws: GenericWebSocket;
   subscriptions: Set<string>; // Symbol subscriptions, ['*'] = all
   delaySeconds: number; // Time delay (0 = real-time)
   lastSentTimestamp: number; // Last bar timestamp sent (for delayed clients)
