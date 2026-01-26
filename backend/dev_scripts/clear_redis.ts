@@ -12,7 +12,7 @@ const HUB_API_KEY = Bun.env.HUB_API_KEY;
 
 if (!HUB_API_KEY) {
   console.error("❌ HUB_API_KEY not set in .env");
-  process.exit(1);
+  process.exit(1);  
 }
 
 const url = `http://localhost:${HUB_PORT}/admin/clear-redis`;

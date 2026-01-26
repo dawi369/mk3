@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CommandDialog,
@@ -98,9 +98,13 @@ function useDefaultCommands(): SpotlightCommand[] {
 export function Spotlight() {
   const { isOpen, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
   const defaultCommands = useDefaultCommands();
+  
+  // Prevent hydration mismatch - Radix Dialog generates different IDs on server vs client
+  const [mounted, setMounted] = useState(false);
 
   // Register default commands on mount
   useEffect(() => {
+    setMounted(true);
     registerCommands(defaultCommands);
     return () => {
       unregisterCommands(defaultCommands.map((c) => c.id));
@@ -131,6 +135,9 @@ export function Spotlight() {
     }
     return groups;
   }, [commands]);
+
+  // Don't render dialog on server - prevents Radix ID hydration mismatch
+  if (!mounted) return null;
 
   return (
     <CommandDialog

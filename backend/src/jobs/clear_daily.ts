@@ -42,14 +42,14 @@ class DailyClearJob {
     }
   }
 
-  async runClear(): Promise<void> {
+  async runClear(force = false): Promise<void> {
     console.log("--- DailyClearJob ---");
-    console.log("Running daily Redis clear job...");
+    console.log(`Running Redis clear job... (force: ${force})`);
     this.status.totalRuns++;
     this.status.lastRunTime = Date.now();
 
     try {
-      const result = await redisStore.clearTodayData();
+      const result = await redisStore.clearTodayData(force);
 
       this.status.lastSuccess = true;
       this.status.lastError = null;

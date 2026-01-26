@@ -26,7 +26,7 @@ export function TerminalHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-background/95 border-b border-white/5 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md">
       <div className="flex h-14 items-center px-4">
         {/* Logo - left aligned */}
         <div className="w-48 shrink-0">

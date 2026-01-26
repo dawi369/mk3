@@ -183,18 +183,20 @@ class RedisStore {
    * Clear today's data (run at 2 AM ET daily)
    * - Deletes bar:latest hash (single key now!)
    * - Deletes all bar:today:* lists
+   * - Deletes market_data stream
+   * @param force - If true, bypasses the "already cleared today" check
    */
-  async clearTodayData(): Promise<{ cleared: number; newDate: string }> {
+  async clearTodayData(force = false): Promise<{ cleared: number; newDate: string }> {
     const today = new Date().toISOString().split("T")[0]!;
     const lastClear = (await this.redis.get(KEYS.META_DATE)) || "";
 
-    if (lastClear === today) {
-      console.log("Already cleared today, skipping");
+    if (!force && lastClear === today) {
+      console.log("Already cleared today, skipping (use force=true to override)");
       return { cleared: 0, newDate: today };
     }
 
     console.log(
-      `Clearing Redis data (last clear: ${lastClear || "never"}, new date: ${today})`,
+      `Clearing Redis data (last clear: ${lastClear || "never"}, new date: ${today}, force: ${force})`,
     );
 
     let clearedCount = 0;
@@ -202,6 +204,10 @@ class RedisStore {
     // Clear latest hash (single key)
     const latestDeleted = await this.redis.del(KEYS.LATEST_HASH);
     clearedCount += latestDeleted;
+
+    // Clear market_data stream
+    const streamDeleted = await this.redis.del(KEYS.STREAM);
+    clearedCount += streamDeleted;
 
     // Clear today's bars (still need scan for bar:today:* pattern)
     const todayKeys = await this.scanKeys(`${KEYS.TODAY_PREFIX}*`);

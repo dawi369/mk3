@@ -247,7 +247,8 @@ async function handleRequest(
     }
 
     if (method === "POST" && path === "/admin/clear-redis") {
-      await dailyClearJob.runClear();
+      // Manual clear always uses force=true to bypass daily check
+      await dailyClearJob.runClear(true);
       const status = dailyClearJob.getStatus();
       return jsonResponse({ message: "Manual clear triggered", status });
     }

@@ -321,7 +321,7 @@ export const TerminalCard = React.memo(({ data, onClick }: TerminalCardProps) =>
 
   return (
     <Card
-      className="h-full bg-card border-2 border-white/20 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden"
+      className="h-full w-full bg-card border-2 border-white/20 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden"
       onClick={onClick}
     >
       {/* Header */}
@@ -332,7 +332,7 @@ export const TerminalCard = React.memo(({ data, onClick }: TerminalCardProps) =>
         <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
       </div>
 
-      <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] h-full min-h-0">
+      <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] min-h-0">
         {/* Left Column: Gainers */}
         <div className="border-r border-white/20 p-1 -mt-6 flex flex-col gap-0 overflow-hidden">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5 px-1">
