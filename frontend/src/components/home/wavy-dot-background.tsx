@@ -10,7 +10,7 @@ interface WavyDotBackgroundProps {
 
 export function WavyDotBackground({
   isHovering = false,
-  speed = 1.0,
+  speed = 0.6,
   darknessMultiplier = 1.0,
 }: WavyDotBackgroundProps) {
   return (
