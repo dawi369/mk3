@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const { data, error } = await resend.emails.send({
-      from: "Swordfish <onboarding@resend.dev>",
+      from: "Swordfish <onboarding@resend.dev>", // TODO, change to verified domain when we get it
       to: FEATURE_REQUEST_EMAIL,
       subject: `Swordfish Feature Request from ${userName || "Anonymous User"}`,
       html: `
