@@ -40,12 +40,16 @@ export function GlobalBackground() {
 
   const speed = isHomePage ? 1.0 : 0.5;
   const darknessMultiplier = isHomePage ? 1.0 : 4.0;
+  // Apply a subtle blur on non-home pages to improve text readability
+  // const blur = isHomePage ? 0 : 4;
+  const blur = 2;
 
   return (
     <WavyDotBackground
       isHovering={isHoveringBackground}
       speed={speed}
       darknessMultiplier={darknessMultiplier}
+      blur={blur}
     />
   );
 }
