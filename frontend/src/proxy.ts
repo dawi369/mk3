@@ -6,6 +6,18 @@ import {
 } from "@/config/env";
 
 export async function proxy(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const hostname = request.headers.get("host") || "";
+
+  // Extract subdomain (e.g., "waitlist" from "waitlist.swordfish.com")
+  const subdomain = hostname.split(".")[0];
+
+  // Handle waitlist subdomain routing
+  if (subdomain === "waitlist" && !url.pathname.startsWith("/waitlist")) {
+    url.pathname = `/waitlist${url.pathname === "/" ? "" : url.pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
