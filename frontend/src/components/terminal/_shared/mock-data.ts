@@ -23,6 +23,7 @@ export interface AssetClassData {
   losers: MarketMover[];
   rvol: number; // Relative Volume (e.g., 1.2 = 120% of average)
   sentiment: number; // 0-100 (50 neutral, >50 bullish, <50 bearish)
+  avgChange: number; // Average percentage change of the sector
 }
 
 const generateSparklineData = (basePrice: number, points: number = 50): number[] => {
@@ -52,6 +53,7 @@ export const mockTerminalData: AssetClassData[] = [
     nextMonth: "MAR 26",
     rvol: 1.45,
     sentiment: 65,
+    avgChange: 0.85,
     winners: [
       {
         ticker: "YMZ5",
@@ -106,6 +108,7 @@ export const mockTerminalData: AssetClassData[] = [
     nextMonth: "FEB 26",
     rvol: 0.85,
     sentiment: 55,
+    avgChange: 0.12,
     winners: [
       {
         ticker: "GCZ5",
@@ -160,6 +163,7 @@ export const mockTerminalData: AssetClassData[] = [
     nextMonth: "MAR 26",
     rvol: 0.6,
     sentiment: 40,
+    avgChange: -0.3,
     winners: [
       {
         ticker: "ZCZ5",
@@ -214,6 +218,7 @@ export const mockTerminalData: AssetClassData[] = [
     nextMonth: "MAR 26",
     rvol: 1.05,
     sentiment: 48,
+    avgChange: 0.05,
     winners: [
       {
         ticker: "6EZ5",
@@ -268,6 +273,7 @@ export const mockTerminalData: AssetClassData[] = [
     nextMonth: "JAN 26",
     rvol: 3.5,
     sentiment: 20,
+    avgChange: 2.1,
     winners: [
       {
         ticker: "VIX",

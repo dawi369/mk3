@@ -27,6 +27,7 @@ export function useTerminalData() {
         losers: [],
         rvol: 1.0, // Placeholder
         sentiment: 50, // Placeholder
+        avgChange: 0,
       };
     });
 
@@ -77,7 +78,15 @@ export function useTerminalData() {
     // Sort winners and losers
     Object.values(dataByClass).forEach((ac) => {
       ac.winners.sort((a, b) => b.change - a.change); // Descending
+      ac.winners.sort((a, b) => b.change - a.change); // Descending
       ac.losers.sort((a, b) => a.change - b.change); // Ascending (most negative first)
+      
+      // Calculate Average Change
+      const allMovers = [...ac.winners, ...ac.losers];
+      if (allMovers.length > 0) {
+        const totalChange = allMovers.reduce((sum, m) => sum + m.change, 0);
+        ac.avgChange = totalChange / allMovers.length;
+      }
     });
 
     // Convert to array in the order of ASSET_CLASSES

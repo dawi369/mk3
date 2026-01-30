@@ -2,7 +2,7 @@ import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
 import { RootProvider } from "@/providers/root-provider";
 import "@/styles/globals.css";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, JetBrains_Mono, Roboto } from "next/font/google";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +16,17 @@ const geistMono = Geist_Mono({
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+});
+
+const roboto = Roboto({
+  variable: "--font-roboto",
+  weight: ["400", "500", "700"],
   subsets: ["latin"],
 });
 
@@ -101,7 +112,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${roboto.variable} antialiased min-h-screen flex flex-col`}
         suppressHydrationWarning
       >
         <RootProvider>{children}</RootProvider>
