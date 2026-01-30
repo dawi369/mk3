@@ -34,8 +34,9 @@ export function SectorContainer({
         // bg-card (Level 2) is lighter than bg-panel (Level 1/Base) in our definitions
         // Removed border completely as requested
         "relative flex flex-col h-full overflow-hidden rounded-lg",
-        "bg-terminal-card bg-gradient-to-b from-white/5 to-transparent", // Gradient Sheen
-        "border border-white/5 shadow-2xl backdrop-blur-sm", // High-tech definition
+        "bg-terminal-card bg-gradient-to-b from-white/5 to-transparent",
+        "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] shadow-2xl backdrop-blur-sm", // Inner Highlight + Deep Shadow
+        "ring-1 ring-white/10", // Crisp Separation Edge
         "group/sector",
         className
       )}
