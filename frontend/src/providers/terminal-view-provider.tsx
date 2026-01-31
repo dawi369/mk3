@@ -33,7 +33,7 @@ export function useTerminalView() {
   return context;
 }
 
-const VALID_VIEWS: TerminalViewType[] = ["terminal", "sentiment", "ai-lab"];
+const VALID_VIEWS: TerminalViewType[] = ["terminal", "sentiment", "ai-lab", "backtesting", "stream"];
 
 function isValidView(view: string | null): view is TerminalViewType {
   return view !== null && VALID_VIEWS.includes(view as TerminalViewType);

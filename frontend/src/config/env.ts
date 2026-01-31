@@ -24,3 +24,6 @@ export const NEXT_PUBLIC_HUB_URL = requireEnv(
   "NEXT_PUBLIC_HUB_URL",
   process.env.NEXT_PUBLIC_HUB_URL,
 );
+
+export const NEXT_PUBLIC_MASSIVE_API_KEY =
+  process.env.NEXT_PUBLIC_MASSIVE_API_KEY || "pUDIi5dPFpkd4mbcIyMAQGzz09EMgBlu";

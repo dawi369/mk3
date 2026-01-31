@@ -10,12 +10,22 @@ import { PlatformDemoSection } from "@/components/home/platform-demo-section";
 import { ANIMATION_CONFIG, SCRAMBLE_DELAYS } from "@/app/(homeAmarketing)/constants";
 import { useUIStore } from "@/store/use-ui-store";
 
+import { Tooltip } from "@/components/ui/tooltip-card";
+import {
+  FuturesCard,
+  SentimentCard,
+  LabsCard,
+  BacktestingCard,
+  useMarketStatus,
+} from "@/components/home/feature-tooltip-cards";
+
 const { fadeInUp, stagger } = ANIMATION_CONFIG;
 export default function Home() {
   const { setIsHoveringBackground } = useUIStore();
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 100]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const marketStatus = useMarketStatus();
 
   return (
     <div className="min-h-screen text-white selection:bg-primary/30 selection:text-primary-foreground overflow-x-hidden">
@@ -47,14 +57,36 @@ export default function Home() {
             </motion.h1>
 
             {/* Description */}
-            <motion.p
+            <motion.div
               variants={fadeInUp}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-light leading-relaxed"
             >
-              Turn market noise into institutional clarity. The professional high-fidelity terminal
-              for futures, powered by real-time data, market-wide contextual sentiment, AI-driven
-              labs, and precision backtesting.
-            </motion.p>
+              Turn market noise into institutional clarity. The professional high-fidelity terminal for{" "}
+              <Tooltip content={<FuturesCard marketStatus={marketStatus} />}>
+                <span className="font-medium text-foreground cursor-pointer decoration-dotted underline decoration-white/20 hover:decoration-white/50 underline-offset-4 transition-all">
+                  futures
+                </span>
+              </Tooltip>
+              , powered by real-time data, market-wide{" "}
+              <Tooltip content={<SentimentCard />}>
+                <span className="font-medium text-foreground cursor-pointer decoration-dotted underline decoration-white/20 hover:decoration-white/50 underline-offset-4 transition-all">
+                  contextual sentiment
+                </span>
+              </Tooltip>
+              ,{" "}
+              <Tooltip content={<LabsCard />}>
+                <span className="font-medium text-foreground cursor-pointer decoration-dotted underline decoration-white/20 hover:decoration-white/50 underline-offset-4 transition-all">
+                  AI-driven labs
+                </span>
+              </Tooltip>
+              , and{" "}
+              <Tooltip content={<BacktestingCard />}>
+                <span className="font-medium text-foreground cursor-pointer decoration-dotted underline decoration-white/20 hover:decoration-white/50 underline-offset-4 transition-all">
+                  precision backtesting
+                </span>
+              </Tooltip>
+              .
+            </motion.div>
 
             {/* CTA Group */}
             <motion.div
