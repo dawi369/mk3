@@ -10,9 +10,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart2, TrendingUp } from "lucide-react";
 
+import { useState } from "react";
+// ... (keep other imports)
+
 export function TerminalHeader() {
   const { navContent: manualNavContent } = useHeader();
   const { activeView } = useTerminalView();
+  const [viewMode, setViewMode] = useState<"front" | "curve">("front");
 
   // Declarative navigation mapping
   const renderNavContent = () => {
@@ -22,35 +26,66 @@ export function TerminalHeader() {
     switch (activeView) {
       case "terminal":
         return (
-          <div className="flex items-center gap-6">
+          // Add layout root to the container to coordinate shared layout animations
+          // Removed gap-6 to manual handle spacing in the collapsible section for perfect centering
+          <motion.div layout className="flex items-center overflow-hidden">
             {/* View Mode Toggle */}
-            <ToggleGroup type="single" defaultValue="normal" className="bg-muted/50 p-1 rounded-lg border border-white/5">
-              <ToggleGroupItem value="normal" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                <BarChart2 className="w-3.5 h-3.5 mr-2" />
-                Normal
-              </ToggleGroupItem>
-              <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                <TrendingUp className="w-3.5 h-3.5 mr-2" />
-                Curve
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <motion.div layout="position">
+              <ToggleGroup 
+                type="single" 
+                value={viewMode}
+                onValueChange={(val) => val && setViewMode(val as "front" | "curve")}
+                className="bg-muted/50 p-1 rounded-lg border border-white/5"
+              >
+                <ToggleGroupItem value="front" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                  <BarChart2 className="w-3.5 h-3.5 mr-2" />
+                  Front
+                </ToggleGroupItem>
+                <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                  <TrendingUp className="w-3.5 h-3.5 mr-2" />
+                  Curve
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </motion.div>
 
-            {/* Separator */}
-            <div className="w-px h-4 bg-border/50" />
+            {/* Collapsible Section: Separator + Month Nav */}
+            <motion.div
+              layout
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ 
+                width: viewMode === "curve" ? "auto" : 0,
+                opacity: viewMode === "curve" ? 1 : 0,
+              }}
+              transition={{ 
+                duration: 0.3, 
+                ease: "circOut" 
+              }}
+              style={{ 
+                pointerEvents: viewMode === "curve" ? "auto" : "none" 
+              }}
+              className="flex items-center overflow-hidden whitespace-nowrap"
+            >
+               {/* Inner container with fixed spacing/padding to ensure layout consistency when expanded */}
+               {/* pl-6 simulates the gap-6 we removed from parent. gap-6 puts space between separator and nav */}
+               <div className="flex items-center pl-6 gap-6">
+                  {/* Separator */}
+                  <div className="w-px h-4 bg-border/50 origin-center" />
 
-            {/* Month Navigation */}
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="text-sm font-mono font-bold bg-muted/30 px-3 py-1.5 rounded-md border border-white/5 min-w-[80px] text-center">
-                DEC 25
-              </span>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+                  {/* Month Navigation */}
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm font-mono font-bold bg-muted/30 px-3 py-1.5 rounded-md border border-white/5 min-w-[80px] text-center">
+                      DEC 25
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+               </div>
+            </motion.div>
+          </motion.div>
         );
       case "sentiment":
       case "ai-lab":

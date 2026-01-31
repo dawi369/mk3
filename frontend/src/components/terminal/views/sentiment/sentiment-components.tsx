@@ -21,7 +21,7 @@ export const MacroGauge = ({ value }: { value: number }) => {
   const isPositive = value >= 50;
 
   return (
-    <div className="flex flex-col items-center justify-center p-8 bg-white/3 border border-white/5 rounded-4xl relative overflow-hidden group">
+    <Card className="flex flex-col items-center justify-center p-8 bg-terminal-card border-none shadow-none rounded-lg relative overflow-hidden group">
       <div className="absolute inset-0 bg-radial-at-t from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
       <div className="relative z-10 text-center">
@@ -49,54 +49,56 @@ export const MacroGauge = ({ value }: { value: number }) => {
           transition={{ duration: 1.5, ease: "circOut" }}
         />
       </div>
-    </div>
+    </Card>
   );
 };
 
 export const AssetSentimentRow = ({ item }: { item: SentimentAssetData }) => {
   return (
-    <div className="flex items-center justify-between p-4 bg-white/2 border border-white/5 rounded-2xl hover:bg-white/5 transition-colors">
-      <div className="flex flex-col">
-        <span className="text-sm font-bold tracking-tight">{item.symbol}</span>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
-          {item.name}
-        </span>
-      </div>
+    <Card className="bg-terminal-card border-none shadow-none rounded-lg hover:bg-white/5 transition-colors">
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="flex flex-col">
+          <span className="text-sm font-bold tracking-tight">{item.symbol}</span>
+          <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+            {item.name}
+          </span>
+        </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex flex-col items-end">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-base font-mono font-black",
-                item.sentiment > 60
-                  ? "text-emerald-500"
-                  : item.sentiment < 40
-                  ? "text-rose-500"
-                  : "text-white"
-              )}
-            >
-              {item.sentiment}
-            </span>
-            <div className="text-muted-foreground/30">
-              {item.trend === "improving" ? (
-                <TrendingUp className="w-3 h-3 text-emerald-500" />
-              ) : item.trend === "deteriorating" ? (
-                <TrendingDown className="w-3 h-3 text-rose-500" />
-              ) : (
-                <Minus className="w-3 h-3" />
-              )}
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "text-base font-mono font-black",
+                  item.sentiment > 60
+                    ? "text-emerald-500"
+                    : item.sentiment < 40
+                    ? "text-rose-500"
+                    : "text-white"
+                )}
+              >
+                {item.sentiment}
+              </span>
+              <div className="text-muted-foreground/30">
+                {item.trend === "improving" ? (
+                  <TrendingUp className="w-3 h-3 text-emerald-500" />
+                ) : item.trend === "deteriorating" ? (
+                  <TrendingDown className="w-3 h-3 text-rose-500" />
+                ) : (
+                  <Minus className="w-3 h-3" />
+                )}
+              </div>
+            </div>
+            <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden mt-1">
+              <div
+                className={cn("h-full", item.sentiment > 50 ? "bg-emerald-500" : "bg-rose-500")}
+                style={{ width: `${item.sentiment}%` }}
+              />
             </div>
           </div>
-          <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden mt-1">
-            <div
-              className={cn("h-full", item.sentiment > 50 ? "bg-emerald-500" : "bg-rose-500")}
-              style={{ width: `${item.sentiment}%` }}
-            />
-          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -104,7 +106,7 @@ export const ThemeCard = ({ theme }: { theme: SentimentTheme }) => {
   const isImpactPositive = theme.impact > 0;
 
   return (
-    <div className="p-5 bg-neutral-900/50 border border-white/5 rounded-3xl relative overflow-hidden group">
+    <Card className="p-5 bg-terminal-card border-none shadow-none rounded-lg relative overflow-hidden group">
       <div className="flex items-start justify-between mb-4">
         <div className="flex flex-col">
           <div className="flex items-center gap-2 mb-1">
@@ -144,7 +146,7 @@ export const ThemeCard = ({ theme }: { theme: SentimentTheme }) => {
           />
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -161,7 +163,7 @@ interface GaugeProps {
 
 export function StatusGauge({ label, value, percent, icon, subLabel, statusColor }: GaugeProps) {
   return (
-    <div className="p-4 rounded-2xl bg-white/3 border border-white/5 flex flex-col gap-3 relative overflow-hidden group">
+    <Card className="p-4 rounded-lg bg-terminal-card border-none shadow-none flex flex-col gap-3 relative overflow-hidden group">
       <div className="flex items-center justify-between relative z-10">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-neutral-900 border border-white/5 text-muted-foreground group-hover:text-white transition-colors">
@@ -194,7 +196,7 @@ export function StatusGauge({ label, value, percent, icon, subLabel, statusColor
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -208,7 +210,7 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, change, changeType, icon }: MetricCardProps) {
   return (
-    <Card className="relative overflow-hidden border-2 border-white/20 bg-card shadow-lg h-full">
+    <Card className="relative overflow-hidden border-none shadow-none bg-terminal-card rounded-lg h-full">
       <div
         className={cn(
           "absolute top-0 left-0 w-1 h-full",

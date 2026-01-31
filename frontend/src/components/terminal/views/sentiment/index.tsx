@@ -12,7 +12,17 @@ export function SentimentView() {
   const { indicators } = mockSentimentData;
 
   return (
-    <div className="h-full w-full overflow-hidden flex flex-col gap-6">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+        width: "100%",
+        height: "100%",
+        padding: "0.0rem",
+        overflow: "hidden",
+      }}
+    >
       {/* Top Row: Overview Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
         <MetricCard
@@ -80,14 +90,14 @@ export function SentimentView() {
             />
           </div>
 
-          <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1">
+          {/* <div className="flex-1 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-1">
             <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] px-1 sticky top-0 bg-background/50 backdrop-blur pb-2 z-10">
               Asset Sentiment
             </h3>
             {mockSentimentData.assets.map((asset) => (
               <AssetSentimentRow key={asset.symbol} item={asset} />
             ))}
-          </div>
+          </div> */}
         </div>
 
         {/* Right Column: Themes & Narratives (7 columns) */}

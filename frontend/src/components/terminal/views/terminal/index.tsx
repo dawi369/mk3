@@ -17,7 +17,7 @@ export function TerminalView() {
         gap: "0.6rem",
         width: "100%",
         height: "100%",
-        padding: "0.6rem",
+        padding: "0.0rem",
         overflow: "hidden",
       }}
     >
