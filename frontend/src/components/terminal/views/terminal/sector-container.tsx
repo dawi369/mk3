@@ -30,7 +30,7 @@ export function SectorContainer({
   return (
     <Card className={cn("flex flex-col h-full overflow-hidden border-none shadow-none bg-terminal-card gap-0 p-0 rounded-sm", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2! px-3 pt-2 border-b border-white/5">
-        <CardTitle className="font-roboto font-bold text-sm tracking-wide text-foreground/90 uppercase">
+        <CardTitle className="font-bold text-sm tracking-wide text-foreground/90 uppercase">
           {title}
         </CardTitle>
         
