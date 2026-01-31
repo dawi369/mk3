@@ -8,7 +8,7 @@ import { AuthIndicator } from "@/components/common/auth-indicator";
 import { useTerminalView } from "@/providers/terminal-view-provider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, BarChart2, TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, BarChart2, TrendingUp, Spline, Zap } from "lucide-react";
 
 import { useState } from "react";
 // ... (keep other imports)
@@ -38,18 +38,18 @@ export function TerminalHeader() {
                 className="bg-muted/50 p-1 rounded-lg border border-white/5"
               >
                 <ToggleGroupItem value="front" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                  <BarChart2 className="w-3.5 h-3.5 mr-2" />
+                  <Zap className="w-3.5 h-3.5 mr-2" />
                   Front
                 </ToggleGroupItem>
                 <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                  <TrendingUp className="w-3.5 h-3.5 mr-2" />
+                  <Spline className="w-3.5 h-3.5 mr-2" />
                   Curve
                 </ToggleGroupItem>
               </ToggleGroup>
             </motion.div>
 
-            {/* Collapsible Section: Separator + Month Nav */}
-            <motion.div
+            {/* Collapsible Section: Separator + Month Nav (Commented out for now) */}
+            {/* <motion.div
               layout
               initial={{ width: 0, opacity: 0 }}
               animate={{ 
@@ -65,13 +65,9 @@ export function TerminalHeader() {
               }}
               className="flex items-center overflow-hidden whitespace-nowrap"
             >
-               {/* Inner container with fixed spacing/padding to ensure layout consistency when expanded */}
-               {/* pl-6 simulates the gap-6 we removed from parent. gap-6 puts space between separator and nav */}
                <div className="flex items-center pl-6 gap-6">
-                  {/* Separator */}
                   <div className="w-px h-4 bg-border/50 origin-center" />
 
-                  {/* Month Navigation */}
                   <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0">
                       <ChevronLeft className="w-4 h-4" />
@@ -84,7 +80,7 @@ export function TerminalHeader() {
                     </Button>
                   </div>
                </div>
-            </motion.div>
+            </motion.div> */}
           </motion.div>
         );
       case "sentiment":
