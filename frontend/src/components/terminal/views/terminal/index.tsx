@@ -26,7 +26,7 @@ export function TerminalView() {
           <ErrorBoundary name={data.title}>
             <SectorContainer
               title={data.title}
-              rvol={data.rvol}
+              openInterest={data.openInterest}
               avgChange={data.avgChange}
               isUpdating={false}
               className="h-full w-full"

@@ -12,7 +12,7 @@ import {
 
 interface SectorContainerProps {
   title: string;
-  rvol?: number;
+  openInterest?: number;
   avgChange?: number;
   isUpdating?: boolean; 
   children?: React.ReactNode;
@@ -21,15 +21,15 @@ interface SectorContainerProps {
 
 export function SectorContainer({
   title,
-  rvol,
+  openInterest,
   avgChange,
   isUpdating,
   children,
   className,
 }: SectorContainerProps) {
   return (
-    <Card className={cn("flex flex-col h-full overflow-hidden border-none shadow-none bg-terminal-card gap-0 p-0", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3">
+    <Card className={cn("flex flex-col h-full overflow-hidden border-none shadow-none bg-terminal-card gap-0 p-0 rounded-sm", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3 border-b border-white/5">
         <CardTitle className="font-roboto font-bold text-sm tracking-wide text-foreground/90 uppercase">
           {title}
         </CardTitle>
@@ -47,12 +47,12 @@ export function SectorContainer({
             </span>
           )}
 
-          {rvol !== undefined && (
+          {openInterest !== undefined && (
             <span className={cn(
                 "font-mono text-xs uppercase font-bold tracking-wider transition-colors duration-300",
                  isUpdating ? "text-white" : "text-muted-foreground/70"
             )}>
-              Vol: {(rvol * 100).toFixed(0)}%
+              OPEN INT: {(openInterest * 100).toFixed(0)}%
             </span>
           )}
         </div>

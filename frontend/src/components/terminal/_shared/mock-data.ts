@@ -21,7 +21,7 @@ export interface AssetClassData {
   nextMonth: string;
   winners: MarketMover[];
   losers: MarketMover[];
-  rvol: number; // Relative Volume (e.g., 1.2 = 120% of average)
+  openInterest: number; // Open Interest (relative or absolute metric)
   sentiment: number; // 0-100 (50 neutral, >50 bullish, <50 bearish)
   avgChange: number; // Average percentage change of the sector
 }
@@ -51,7 +51,7 @@ export const mockTerminalData: AssetClassData[] = [
     title: "US Indices",
     activeMonth: "DEC 25",
     nextMonth: "MAR 26",
-    rvol: 1.45,
+    openInterest: 1.45,
     sentiment: 65,
     avgChange: 0.85,
     winners: [
@@ -106,7 +106,7 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Metals",
     activeMonth: "DEC 25",
     nextMonth: "FEB 26",
-    rvol: 0.85,
+    openInterest: 0.85,
     sentiment: 55,
     avgChange: 0.12,
     winners: [
@@ -161,7 +161,7 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Grains",
     activeMonth: "DEC 25",
     nextMonth: "MAR 26",
-    rvol: 0.6,
+    openInterest: 0.6,
     sentiment: 40,
     avgChange: -0.3,
     winners: [
@@ -216,7 +216,7 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Currencies",
     activeMonth: "DEC 25",
     nextMonth: "MAR 26",
-    rvol: 1.05,
+    openInterest: 1.05,
     sentiment: 48,
     avgChange: 0.05,
     winners: [
@@ -271,7 +271,7 @@ export const mockTerminalData: AssetClassData[] = [
     title: "Volatiles",
     activeMonth: "DEC 25",
     nextMonth: "JAN 26",
-    rvol: 3.5,
+    openInterest: 3.5,
     sentiment: 20,
     avgChange: 2.1,
     winners: [

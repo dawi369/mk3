@@ -25,7 +25,7 @@ export function useTerminalData() {
         nextMonth: "MAR 26", // Placeholder
         winners: [],
         losers: [],
-        rvol: 1.0, // Placeholder
+        openInterest: 1.0, // Placeholder
         sentiment: 50, // Placeholder
         avgChange: 0,
       };
