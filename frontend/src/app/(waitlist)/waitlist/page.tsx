@@ -37,6 +37,9 @@ export default function WaitlistPage() {
         <form onSubmit={handleSubmit} className="relative z-10 mt-4">
           <input
             type="email"
+            id="email"
+            name="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="your@email.com"
