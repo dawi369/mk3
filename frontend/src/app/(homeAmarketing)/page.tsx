@@ -16,6 +16,7 @@ import {
   SentimentCard,
   LabsCard,
   BacktestingCard,
+  useMarketStatus,
 } from "@/components/home/feature-tooltip-cards";
 
 const { fadeInUp, stagger } = ANIMATION_CONFIG;
@@ -24,6 +25,7 @@ export default function Home() {
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 100]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const marketStatus = useMarketStatus();
 
   return (
     <div className="min-h-screen text-white selection:bg-primary/30 selection:text-primary-foreground overflow-x-hidden">
@@ -60,7 +62,7 @@ export default function Home() {
               className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-light leading-relaxed"
             >
               Turn market noise into institutional clarity. The professional high-fidelity terminal for{" "}
-              <Tooltip content={<FuturesCard />}>
+              <Tooltip content={<FuturesCard marketStatus={marketStatus} />}>
                 <span className="font-medium text-foreground cursor-pointer decoration-dotted underline decoration-white/20 hover:decoration-white/50 underline-offset-4 transition-all">
                   futures
                 </span>

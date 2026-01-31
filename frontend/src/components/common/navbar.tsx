@@ -50,7 +50,7 @@ export function Navbar() {
                   </NavigationMenuLink>
                 </li>
                 {/* <ListItem href="/terminal?view=indicators" title="Indicators" icon={ChartLine}> */}
-                <ListItem href="/backtesting" title="Backtesting" icon={FlaskConical}>
+                <ListItem href="/terminal?view=backtesting" title="Backtesting" icon={FlaskConical}>
                   Test your edge. Run historical simulations and validate strategies.
                 </ListItem>
                 {/* <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Activity}> */}

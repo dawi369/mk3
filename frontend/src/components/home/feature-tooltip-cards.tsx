@@ -7,9 +7,9 @@ import Image from "next/image";
 import { NEXT_PUBLIC_MASSIVE_API_KEY } from "@/config/env";
 import { useEffect, useState } from "react";
 
-export const FuturesCard = () => {
+// Hook to preload market status
+export const useMarketStatus = () => {
   const [marketStatus, setMarketStatus] = useState<string>("open");
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchMarketStatus = async () => {
@@ -27,14 +27,16 @@ export const FuturesCard = () => {
       } catch (error) {
         console.error("Failed to fetch market status:", error);
         setMarketStatus("open");
-      } finally {
-        setIsLoading(false);
       }
     };
 
     fetchMarketStatus();
   }, []);
 
+  return marketStatus;
+};
+
+export const FuturesCard = ({ marketStatus = "open" }: { marketStatus?: string }) => {
   const isMarketOpen = marketStatus.toLowerCase() === "open";
 
   return (
