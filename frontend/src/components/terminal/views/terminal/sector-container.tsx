@@ -17,7 +17,12 @@ interface SectorContainerProps {
   isUpdating?: boolean; 
   children?: React.ReactNode;
   className?: string;
+  // --- TEMPORARY: This prop controls how many rows of TickerEntry are visible ---
+  visibleRows?: 3 | 4;
 }
+
+// Gap between items in px
+const GRID_GAP = 4; // gap-1 = 4px
 
 export function SectorContainer({
   title,
@@ -26,7 +31,12 @@ export function SectorContainer({
   isUpdating,
   children,
   className,
+  visibleRows = 3,
 }: SectorContainerProps) {
+  // Calculate height for each row: (100% - gaps) / rows
+  // Using CSS calc: grid-auto-rows: calc((100% - (rows-1)*gap) / rows)
+  const rowHeight = `calc((100% - ${(visibleRows - 1) * GRID_GAP}px) / ${visibleRows})`;
+
   return (
     <Card className={cn("flex flex-col h-full overflow-hidden border-none shadow-none bg-terminal-card gap-0 p-0 rounded-sm", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2! px-3 pt-2 border-b border-white/5">
@@ -60,7 +70,13 @@ export function SectorContainer({
       
       <CardContent className="flex-1 min-h-0 p-1">
         {children ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] content-start gap-1 h-full overflow-y-auto pr-0.5 pb-1 custom-scrollbar">
+            <div 
+              className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] content-start gap-1 h-full overflow-y-auto pr-0.5 pb-1 custom-scrollbar"
+              style={{
+                // --- TEMPORARY: Dynamic row height based on visibleRows ---
+                gridAutoRows: rowHeight,
+              }}
+            >
               {children}
             </div>
         ) : (
@@ -75,3 +91,4 @@ export function SectorContainer({
     </Card>
   );
 }
+

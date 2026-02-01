@@ -3,6 +3,7 @@
 import { SectorContainer } from "@/components/terminal/views/terminal/sector-container";
 import { useTerminalData } from "@/hooks/use-terminal-data";
 import { ErrorBoundary } from "@/components/common/error-boundary";
+import { TickerEntry } from "@/components/terminal/views/terminal/ticker-entry";
 
 export function TerminalView() {
   const terminalData = useTerminalData();
@@ -31,7 +32,14 @@ export function TerminalView() {
               isUpdating={false}
               className="h-full w-full"
               // Removed specific showPagination filter to show arrows for all as requested
-            />
+            >
+              {/* --- TEMPORARY: DELETE THIS BLOCK START --- */}
+              {/* Force rendering of TickerEntry components to check layout */}
+              {Array.from({ length: 10 }).map((_, i) => (
+                <TickerEntry key={`temp-${i}`} />
+              ))}
+              {/* --- TEMPORARY: DELETE THIS BLOCK END --- */}
+            </SectorContainer>
           </ErrorBoundary>
         </div>
       ))}

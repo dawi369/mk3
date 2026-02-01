@@ -38,7 +38,7 @@ export function TerminalHeader() {
                 className="bg-muted/50 p-1 rounded-lg border border-white/5"
               >
                 <ToggleGroupItem value="front" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                  <Zap className="w-3.5 h-3.5 mr-2" />
+                  <TrendingUp className="w-3.5 h-3.5 mr-2" />
                   Front
                 </ToggleGroupItem>
                 <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
