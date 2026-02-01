@@ -14,7 +14,7 @@ import { useState } from "react";
 // ... (keep other imports)
 
 export function TerminalHeader() {
-  const { navContent: manualNavContent } = useHeader();
+  const { navContent: manualNavContent, visibleRows, setVisibleRows } = useHeader();
   const { activeView } = useTerminalView();
   const [viewMode, setViewMode] = useState<"front" | "curve">("front");
 
@@ -128,8 +128,24 @@ export function TerminalHeader() {
           </AnimatePresence>
         </div>
 
-        {/* Auth indicator - right aligned */}
-        <div className="w-48 shrink-0 flex justify-end">
+        {/* Auth indicator + density toggle - right aligned */}
+        <div className="w-48 shrink-0 flex items-center justify-end gap-3">
+          {/* --- Row Density Toggle --- */}
+          {activeView === "terminal" && (
+            <ToggleGroup 
+              type="single" 
+              value={String(visibleRows)}
+              onValueChange={(val) => val && setVisibleRows(Number(val) as 3 | 4)}
+              className="bg-muted/50 p-0.5 rounded-md border border-white/5"
+            >
+              <ToggleGroupItem value="3" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                3
+              </ToggleGroupItem>
+              <ToggleGroupItem value="4" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                4
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
           <motion.div layoutId="header-auth" layout="position" className="will-change-transform">
             <AuthIndicator align="right" />
           </motion.div>

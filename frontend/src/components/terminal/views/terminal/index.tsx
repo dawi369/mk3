@@ -4,9 +4,11 @@ import { SectorContainer } from "@/components/terminal/views/terminal/sector-con
 import { useTerminalData } from "@/hooks/use-terminal-data";
 import { ErrorBoundary } from "@/components/common/error-boundary";
 import { TickerEntry } from "@/components/terminal/views/terminal/ticker-entry";
+import { useHeader } from "@/components/terminal/layout/header-provider";
 
 export function TerminalView() {
   const terminalData = useTerminalData();
+  const { visibleRows } = useHeader();
 
   return (
     // Terminal 2.0 View Container
@@ -31,6 +33,7 @@ export function TerminalView() {
               avgChange={data.avgChange}
               isUpdating={false}
               className="h-full w-full"
+              visibleRows={visibleRows}
               // Removed specific showPagination filter to show arrows for all as requested
             >
               {/* --- TEMPORARY: DELETE THIS BLOCK START --- */}
