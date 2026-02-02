@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart2, TrendingUp, Spline, Zap } from "lucide-react";
 
 import { useState } from "react";
-// ... (keep other imports)
+
+// --- Centralized Header Animation Config ---
+const HEADER_ANIMATION = {
+  initial: { opacity: 0, y: -5 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 5 },
+  transition: { duration: 0.15 },
+};
 
 export function TerminalHeader() {
   const { navContent: manualNavContent, visibleRows, setVisibleRows } = useHeader();
@@ -118,10 +125,7 @@ export function TerminalHeader() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView + (manualNavContent ? "-manual" : "")}
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-              transition={{ duration: 0.15 }}
+              {...HEADER_ANIMATION}
             >
               {renderNavContent()}
             </motion.div>
@@ -131,21 +135,35 @@ export function TerminalHeader() {
         {/* Auth indicator + density toggle - right aligned */}
         <div className="w-48 shrink-0 flex items-center justify-end gap-3">
           {/* --- Row Density Toggle --- */}
-          {activeView === "terminal" && (
-            <ToggleGroup 
-              type="single" 
-              value={String(visibleRows)}
-              onValueChange={(val) => val && setVisibleRows(Number(val) as 3 | 4)}
-              className="bg-muted/50 p-0.5 rounded-md border border-white/5"
-            >
-              <ToggleGroupItem value="3" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                3
-              </ToggleGroupItem>
-              <ToggleGroupItem value="4" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                4
-              </ToggleGroupItem>
-            </ToggleGroup>
-          )}
+          <AnimatePresence mode="wait">
+            {activeView === "terminal" && (
+              <motion.div
+                key="density-toggle"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.55 } }}
+                exit={{ opacity: 0, y: 5, transition: { duration: 0.15 } }}
+              >
+                {/* Match Front/Curve layout structure */}
+                <motion.div layout className="flex items-center overflow-hidden">
+                  <motion.div layout="position">
+                    <ToggleGroup 
+                      type="single" 
+                      value={String(visibleRows)}
+                      onValueChange={(val) => val && setVisibleRows(Number(val) as 3 | 4)}
+                      className="bg-muted/50 p-0.5 rounded-md border border-white/5"
+                    >
+                      <ToggleGroupItem value="3" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                        3
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="4" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                        4
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <motion.div layoutId="header-auth" layout="position" className="will-change-transform">
             <AuthIndicator align="right" />
           </motion.div>
