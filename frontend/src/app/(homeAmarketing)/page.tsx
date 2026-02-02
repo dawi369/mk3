@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { ArrowRight, Zap, Shield, BarChart3, Globe, Sparkles, Cpu } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -22,9 +22,7 @@ import {
 const { fadeInUp, stagger } = ANIMATION_CONFIG;
 export default function Home() {
   const { setIsHoveringBackground } = useUIStore();
-  const { scrollY } = useScroll();
-  const y1 = useTransform(scrollY, [0, 500], [0, 100]);
-  const opacity = useTransform(scrollY, [0, 300], [1, 0]);
+
   const marketStatus = useMarketStatus();
 
   return (
@@ -111,7 +109,6 @@ export default function Home() {
 
           {/* Hero Graphic Section */}
           <motion.div
-            style={{ y: y1 }}
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 1, ease: [0.22, 1, 0.36, 1] }}
