@@ -207,6 +207,7 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
   const entity = useTickerStore((state) => state.entitiesByMode[mode][symbol]);
   const bars = useTickerStore((state) => state.seriesByMode[mode][symbol]);
   const selection = useTickerStore((state) => state.selectionByMode[mode]);
+  const isModalOpen = useTickerStore((state) => state.isModalOpen);
   const openPrimary = useTickerStore((state) => state.openPrimary);
   const toggleSelectShift = useTickerStore((state) => state.toggleSelectShift);
 
@@ -215,8 +216,8 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
     [symbol, bars, entity?.latestBar]
   );
 
-  const isSelected = selection.selected.includes(symbol);
-  const isPrimary = selection.primary === symbol;
+  const isSelected = selection.selected.includes(symbol) && !isModalOpen;
+  const isPrimary = selection.primary === symbol && !isModalOpen;
 
   const handleClick = useCallback(
     (event: React.MouseEvent) => {
@@ -241,6 +242,7 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
         "hover:bg-[#1a1a1a] hover:border-white/8 transition-all duration-150 cursor-pointer",
         // Subtle inner glow on hover
         "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]",
+        "select-none cursor-default",
         isSelected && "border-white/20 bg-[#171717]",
         isPrimary && "border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]",
         className

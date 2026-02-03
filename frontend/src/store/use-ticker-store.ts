@@ -299,7 +299,21 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
       };
     }),
 
-  closeModal: () => set({ isModalOpen: false }),
+  closeModal: () =>
+    set((state) => {
+      const mode = state.mode;
+      return {
+        isModalOpen: false,
+        selectionByMode: {
+          ...state.selectionByMode,
+          [mode]: {
+            ...state.selectionByMode[mode],
+            primary: null,
+            selected: [],
+          },
+        },
+      };
+    }),
 
   setTimeframe: (tf) => set({ timeframe: tf }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),

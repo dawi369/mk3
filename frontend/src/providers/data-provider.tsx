@@ -75,7 +75,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [subscribe, handleMarketUpdate, setIsLoading]);
+  }, [subscribe, upsertBar, setIsLoading]);
 
   const getLatestBar = (symbol: string) => {
     return entities[symbol]?.latestBar;
