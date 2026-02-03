@@ -4,8 +4,8 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card";
 import { AssetClassData, MarketMover } from "@/components/terminal/_shared/mock-data";
 import { cn } from "@/lib/utils";
-import { Sparkline } from "@/components/terminal/views/terminal/sparkline";
-import { MonthSelector } from "@/components/terminal/views/terminal/month-selector";
+// import { Sparkline } from "@/components/terminal/views/terminal/sparkline";
+// import { MonthSelector } from "@/components/terminal/views/terminal/month-selector";
 import { filterByMonth, extractRoot } from "@/lib/month-utils";
 import { BorderTrail } from "@/components/ui/border-trail";
 import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
@@ -329,7 +329,7 @@ export const TerminalCard = React.memo(({ data, onClick }: TerminalCardProps) =>
         <h3 className="font-semibold text-base tracking-tight text-foreground leading-none -mt-5">
           {data.title}
         </h3>
-        <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />
+        {/* <MonthSelector selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} /> */}
       </div>
 
       <CardContent className="flex-1 p-0 grid grid-cols-[1fr_1fr_1.4fr] min-h-0">
@@ -346,7 +346,7 @@ export const TerminalCard = React.memo(({ data, onClick }: TerminalCardProps) =>
             onSelect={handleTickerSelect}
             onOpen={handleTickerOpen}
           />
-          <RVolIndicator rvol={data.rvol} />
+          {/* <RVolIndicator rvol={data.rvol} /> */}
         </div>
 
         {/* Middle Column: Losers */}
@@ -387,12 +387,12 @@ export const TerminalCard = React.memo(({ data, onClick }: TerminalCardProps) =>
           </div>
 
           <div className="flex-1 flex items-center justify-center py-1">
-            <Sparkline
+            {/* <Sparkline
               data={selectedTicker.sparklineData}
               width={140}
               height={40}
               color={selectedTicker.change >= 0 ? "#10b981" : "#f43f5e"}
-            />
+            /> */}
           </div>
 
           <div className="grid grid-cols-2 gap-x-3 gap-y-1">

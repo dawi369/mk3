@@ -10,16 +10,23 @@ import { TIER_CONFIG, isSubscriptionActive } from "@/types/billing.types";
 
 interface PlanCardProps {
   tier: SubscriptionTier;
-  subscription: Subscription | null;
+  subscription?: Subscription | null;
   onUpgrade?: () => void;
   onManage?: () => void;
   className?: string;
+  ctaLabel?: string;
 }
 
-export function PlanCard({ tier, subscription, onUpgrade, onManage, className }: PlanCardProps) {
+export function PlanCard({
+  tier,
+  subscription = null,
+  onUpgrade,
+  onManage,
+  className,
+  ctaLabel,
+}: PlanCardProps) {
   const config = TIER_CONFIG[tier];
   const isCurrentPlan = subscription?.tier === tier;
-  const isActive = isCurrentPlan && isSubscriptionActive(subscription);
   const isPro = tier === "pro";
 
   return (
@@ -28,7 +35,7 @@ export function PlanCard({ tier, subscription, onUpgrade, onManage, className }:
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-card p-6 transition-all duration-200",
+        "relative overflow-hidden rounded-xl border bg-card p-6 transition-colors duration-200",
         isPro ? "border-primary/30 bg-linear-to-br from-card to-primary/5" : "border-border",
         isCurrentPlan && "ring-2 ring-primary/30",
         className
@@ -85,7 +92,15 @@ export function PlanCard({ tier, subscription, onUpgrade, onManage, className }:
       </ul>
 
       {/* Action Button */}
-      {isCurrentPlan ? (
+      {ctaLabel ? (
+        <Button
+          variant={isPro ? "default" : "outline"}
+          className="w-full"
+          onClick={onUpgrade}
+        >
+          {ctaLabel}
+        </Button>
+      ) : isCurrentPlan ? (
         <Button variant="outline" className="w-full" onClick={onManage} disabled={tier === "free"}>
           {tier === "free" ? "Current Plan" : "Manage Subscription"}
         </Button>

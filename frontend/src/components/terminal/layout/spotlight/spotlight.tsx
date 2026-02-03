@@ -9,13 +9,14 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandShortcut,
 } from "@/components/ui/command";
-import { Terminal, Activity, Scale, Sparkles, Settings, Search, FlaskConical } from "lucide-react";
+import { Terminal, Activity, Scale, Sparkles, Settings, FlaskConical } from "lucide-react";
 import {
   useSpotlight,
   SpotlightCommand,
 } from "@/components/terminal/layout/spotlight/spotlight-provider";
+import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import { searchTickers, TickerSearchResult } from "@/lib/data/tickers";
 
 // Default navigation commands available in all views
 function useDefaultCommands(): SpotlightCommand[] {
@@ -78,29 +79,20 @@ function useDefaultCommands(): SpotlightCommand[] {
           close();
         },
       },
-      {
-        id: "action-search-symbol",
-        label: "Search Symbol...",
-        icon: <Search className="size-4" />,
-        shortcut: "/",
-        group: "Actions",
-        action: () => {
-          // TODO: Switch to symbol search mode
-          console.log("Symbol search...");
-          close();
-        },
-      },
     ],
     [router, close]
   );
 }
 
 export function Spotlight() {
-  const { isOpen, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
+  const { isOpen, open, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
+  const { open: openTicker } = useTickerModal();
   const defaultCommands = useDefaultCommands();
   
   // Prevent hydration mismatch - Radix Dialog generates different IDs on server vs client
   const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState("");
+  const [tickerResults, setTickerResults] = useState<TickerSearchResult[]>([]);
 
   // Register default commands on mount
   useEffect(() => {
@@ -111,53 +103,141 @@ export function Spotlight() {
     };
   }, [defaultCommands, registerCommands, unregisterCommands]);
 
+  // Handle ticker search
+  useEffect(() => {
+    if (query) {
+      const results = searchTickers(query);
+      setTickerResults(results);
+    } else {
+      setTickerResults([]);
+    }
+  }, [query]);
+
   // Keyboard shortcut handler - Ctrl+K or Cmd+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+      // Toggle spotlight
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         toggle();
+        return;
+      }
+      
+      // Global type-to-search
+      // If not in an input, and typing a letter/number, open spotlight with that char
+      if (
+        !isOpen &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        e.key.length === 1 &&
+        /^[a-zA-Z0-9]$/.test(e.key) &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement)
+      ) {
+        // e.preventDefault(); // Optional: might prevent typing in the newly opened input if we're not careful
+        open();
+        setQuery(e.key);
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [toggle]);
+  }, [isOpen, toggle, open]);
 
   // Group commands by their group property
   const groupedCommands = useMemo(() => {
     const groups: Record<string, SpotlightCommand[]> = {};
     for (const cmd of commands) {
+      // Filter commands if query exists (simple local filter for non-ticker commands)
+      if (query && !cmd.label.toLowerCase().includes(query.toLowerCase()) && !cmd.group.toLowerCase().includes(query.toLowerCase())) {
+        continue;
+      }
+
       if (!groups[cmd.group]) {
         groups[cmd.group] = [];
       }
       groups[cmd.group].push(cmd);
     }
     return groups;
-  }, [commands]);
+  }, [commands, query]);
 
   // Don't render dialog on server - prevents Radix ID hydration mismatch
   if (!mounted) return null;
 
+  const handleTickerSelect = (t: TickerSearchResult) => {
+    openTicker({
+      ticker: t.symbol,
+      price: t.lastPrice,
+      change: t.changePercent,
+      stats: {
+        open: t.lastPrice,
+        high: t.lastPrice,
+        low: t.lastPrice,
+        prevClose: t.lastPrice,
+        volume: t.volume,
+      },
+      sparklineData: [],
+    });
+    close();
+    setQuery("");
+  };
+
   return (
     <CommandDialog
       open={isOpen}
-      onOpenChange={(open) => !open && close()}
+      onOpenChange={(open) => {
+        if (!open) {
+          close();
+          setQuery("");
+        }
+      }}
       title="Command Palette"
       description="Search for commands, navigate, or perform actions."
       showCloseButton={false}
-      className="border-white/20 bg-card/95 backdrop-blur-lg max-w-lg"
+      className="border-white/20 bg-card/95 backdrop-blur-lg max-w-m!"
     >
-      <CommandInput placeholder="Type a command or search..." />
-      <CommandList>
+      <CommandInput 
+        placeholder="Type a command or search..." 
+        value={query}
+        onValueChange={setQuery}
+      />
+      <CommandList className="max-h-[500px]">
         <CommandEmpty>No results found.</CommandEmpty>
+        
+        {/* Ticker Results */}
+        {tickerResults.length > 0 && (
+          <CommandGroup heading="Tickers">
+            {tickerResults.map((t) => (
+              <CommandItem 
+                key={`ticker-${t.symbol}`} 
+                onSelect={() => handleTickerSelect(t)} 
+                className="cursor-pointer flex justify-between items-center"
+                value={`ticker-${t.symbol} ${t.name}`} // Ensure value helps with filtering/selection
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="size-4 text-muted-foreground" />
+                  <span className="font-bold">{t.symbol}</span>
+                  <span className="text-muted-foreground text-xs">{t.name}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span>{t.lastPrice.toLocaleString()}</span>
+                  <span className={t.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                    {t.changePercent >= 0 ? "+" : ""}{(t.changePercent * 100).toFixed(2)}%
+                  </span>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {/* Regular Commands */}
         {Object.entries(groupedCommands).map(([group, cmds]) => (
           <CommandGroup key={group} heading={group}>
             {cmds.map((cmd) => (
-              <CommandItem key={cmd.id} onSelect={cmd.action} className="cursor-pointer">
+              <CommandItem key={cmd.id} onSelect={cmd.action} className="cursor-pointer" value={cmd.label}>
                 {cmd.icon}
                 <span>{cmd.label}</span>
-                {cmd.shortcut && <CommandShortcut>⌘{cmd.shortcut}</CommandShortcut>}
               </CommandItem>
             ))}
           </CommandGroup>
