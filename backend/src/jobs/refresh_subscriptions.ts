@@ -143,7 +143,6 @@ class MonthlySubscriptionJob {
       // But let's assume config is > 0.
 
       refreshTasks.push(this.refreshAssetClass(assetClass, "A"));
-      // refreshTasks.push(this.refreshAssetClass(assetClass, "AM"));
     }
 
     // Execute all refreshes

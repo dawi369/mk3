@@ -11,7 +11,7 @@ import type {
 } from "@/types/front_month.types.js";
 import type { PolygonAssetClass } from "@/types/polygon.types.js";
 
-const POLYGON_SNAPSHOT_URL = "https://api.massive.com/futures/vX/snapshot";
+const POLYGON_SNAPSHOT_URL = "https://api.polygon.io/futures/vX/snapshot";
 const REDIS_CACHE_KEY = "cache:front-months";
 const REDIS_STATUS_KEY = "job:front-months:status";
 
@@ -71,17 +71,37 @@ function analyzeContracts(
   const outrights = contracts
     .filter((c) => !c.details.ticker.includes("-"))
     .map((c) => {
-      const settlementDate = new Date(c.details.settlement_date / 1_000_000);
-      const daysToExpiry = Math.ceil(
-        (settlementDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      // Parse settlement_date - can be string (YYYY-MM-DD) or number (ns/ms)
+      let settlementDate: Date;
+      let expiryDateStr = "";
+      const rawDate = c.details.settlement_date;
+
+      if (typeof rawDate === "string") {
+        settlementDate = new Date(rawDate);
+        expiryDateStr = rawDate;
+      } else if (typeof rawDate === "number") {
+        // Try nanoseconds first (very large number), then milliseconds
+        const ms = rawDate > 1e15 ? rawDate / 1_000_000 : rawDate;
+        settlementDate = new Date(ms);
+        if (!isNaN(settlementDate.getTime())) {
+          expiryDateStr = settlementDate.toISOString().split("T")[0]!;
+        }
+      } else {
+        settlementDate = new Date(NaN);
+      }
+
+      const daysToExpiry = isNaN(settlementDate.getTime())
+        ? -1
+        : Math.ceil(
+            (settlementDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+          );
 
       return {
         ticker: c.details.ticker,
         volume: c.session?.volume || 0,
         daysToExpiry,
         lastPrice: c.last_trade?.price || c.session?.close || null,
-        expiryDate: settlementDate.toISOString().split("T")[0],
+        expiryDate: expiryDateStr,
       };
     })
     .filter((c) => c.daysToExpiry > 0); // Only future contracts

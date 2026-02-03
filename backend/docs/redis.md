@@ -15,7 +15,7 @@ Redis serves as the **hot data layer** for real-time market data distribution an
 | `market_data` | **STREAM** | Real-time event bus (~10M max) | Cleared daily |
 | `bars` | **PUB/SUB** | Legacy channel (maintained for compatibility) | N/A |
 
-### Contract Snapshots (Planned)
+### Contract Snapshots
 
 | Key Pattern | Type | Description | Source |
 |-------------|------|-------------|--------|
@@ -31,14 +31,12 @@ Redis serves as the **hot data layer** for real-time market data distribution an
 | `job:clear:status` | **STRING (JSON)** | Daily clear job status |
 | `job:refresh:status` | **STRING (JSON)** | Monthly subscription refresh job status |
 | `job:front-months:status` | **STRING (JSON)** | Front month detection job status |
+| `job:snapshot:status` | **STRING (JSON)** | Snapshot fetch job status |
 | `cache:front-months` | **STRING (JSON)** | Front month contract cache |
 
 ---
 
-## Snapshot Keyspace (Planned Implementation)
-
-> [!IMPORTANT]
-> This section documents the **planned** keyspace for contract snapshots. Implementation is pending.
+## Snapshot Keyspace
 
 > [!CAUTION]
 > **Polygon Futures Beta Limitations:**
@@ -73,9 +71,9 @@ We only use `details` and `session` from the snapshot response. Real-time fields
 
 ### Refresh Strategy
 
-> [!WARNING]
-> **Current:** Refresh at session open (timing TBD per exchange).  
-> **Future:** Needs per-product session handling. See `TODO.md`.
+> [!NOTE]
+> Snapshots are fetched at 2:05 AM ET via `snapshot_job.ts` (after daily clear at 2 AM).  
+> Future: Needs per-product session handling. See `TODO.md`.
 
 ### `snapshot:{symbol}` Hash
 
@@ -89,12 +87,11 @@ Populated from Polygon Snapshot API at session open.
 | `sessionHigh` | number | Session high |
 | `sessionLow` | number | Session low |
 | `sessionClose` | number | Session close (prev session) |
-| `sessionVolume` | number | Session volume |
 | `settlementPrice` | number | Official settlement price |
 | `prevSettlement` | number | Previous session settlement |
 | `change` | number | Price change ($) |
 | `changePct` | number | Price change (%) |
-| `openInterest` | number | Open interest (if available) |
+| `openInterest` | number \| null | Open interest (if available) |
 | `timestamp` | number | Snapshot timestamp (epoch ms) |
 
 ### `session:{symbol}` Hash
@@ -109,6 +106,8 @@ Rolling intraday calculations computed from incoming bars.
 | `dayHigh` | number | Session high (rolling) |
 | `dayLow` | number | Session low (rolling) |
 | `dayOpen` | number | First bar open of session |
+| `cumPriceVolume` | number | Running total for VWAP calc |
+| `cumVolume` | number | Running total for VWAP calc |
 | `timestamp` | number | Last update (epoch ms) |
 
 ### Calculation Logic
@@ -138,13 +137,13 @@ Polygon WS → ws_client.ts → Redis
                               └── PUBLISH bars
 ```
 
-### Planned (Snapshots)
+### With Snapshots
 
 ```
 Polygon Snapshot API → snapshot_job.ts → Redis
                                           └── HSET snapshot:{symbol}
 
-bar:latest updates → session_calc.ts → Redis
+bar:latest updates → redis_store.updateSession() → Redis
                                         └── HSET session:{symbol}
 ```
 
@@ -200,7 +199,7 @@ LRANGE bar:today:ESH6 0 -1
 HGETALL snapshot:ESH6
 HGET snapshot:ESH6 settlementPrice
 
-# Session data (planned)
+# Session data
 HGETALL session:ESH6
 HGET session:ESH6 vwap
 
@@ -235,16 +234,27 @@ const history = await redisStore.getTodayBars("ESH6");
 const stats = await redisStore.getStats();  // { date, barCount, symbolCount }
 ```
 
-### Planned APIs
-
-```typescript
 // Snapshot data
 const snap = await redisStore.getSnapshot("ESH6");
 const allSnaps = await redisStore.getAllSnapshots();
 
 // Session calculations
 const session = await redisStore.getSession("ESH6");
+const allSessions = await redisStore.getAllSessions();
+
+// Write snapshot (used by snapshot_job)
+await redisStore.writeSnapshot("ESH6", snapshotData);
 ```
+
+### REST Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/session/:symbol` | GET | No | Session data (VWAP, CVOL, etc.) |
+| `/sessions` | GET | No | All session data |
+| `/snapshot/:symbol` | GET | No | Snapshot for symbol |
+| `/snapshots` | GET | No | All snapshots |
+| `/admin/refresh-snapshots` | POST | Yes | Trigger snapshot refresh |
 
 ---
 
@@ -254,9 +264,9 @@ The `clearTodayData()` function:
 - Deletes `bar:latest` hash
 - Deletes all `bar:today:*` lists
 - Deletes `market_data` stream
+- Deletes all `session:*` hashes
 - Resets `meta:bar_count` to 0
 - Updates `meta:trading_date`
-- **Planned:** Resets `session:*` hashes
 
 ---
 

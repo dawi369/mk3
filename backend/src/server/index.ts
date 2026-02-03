@@ -7,7 +7,6 @@ import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
 import { snapshotJob } from "@/jobs/snapshot_job.js";
-// import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
 // Global reference for graceful shutdown
@@ -56,11 +55,10 @@ async function startHubServer() {
     await frontMonthJob.loadStatus();
     await snapshotJob.loadStatus();
 
-    // Schedule jobs (disabled for now)
+    // TODO: Enable job scheduling in production
     // dailyClearJob.schedule();
     // monthlySubscriptionJob.schedule(polygonClient);
     // snapshotJob.schedule();
-    // historySyncJob.schedule();
 
     // Start Hub REST API (pass polygon client for subscription management)
     await startHubRESTApi(polygonClient);

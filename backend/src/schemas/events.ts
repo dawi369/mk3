@@ -17,7 +17,8 @@ export const PolygonAggregateEventSchema = z.object({
 
 export type PolygonAggregateEvent = z.infer<typeof PolygonAggregateEventSchema>;
 
-// Normalized Bar Schema
+// Normalized Bar Schema (for validation)
+// NOTE: For the Bar type, use @/types/common.types.ts
 export const BarSchema = z.object({
   symbol: z.string(),
   open: z.number(),
@@ -30,5 +31,3 @@ export const BarSchema = z.object({
   startTime: z.number(),
   endTime: z.number(),
 });
-
-export type Bar = z.infer<typeof BarSchema>;

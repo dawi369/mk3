@@ -13,18 +13,18 @@ interface TickerResult {
 
 async function checkContract(ticker: string, month: string): Promise<boolean> {
   const contract = `${ticker}${month}${YEAR}`;
-  const url = `https://api.massive.com/futures/vX/contracts/${contract}?apiKey=${POLYGON_API_KEY}`;
+  const url = `https://api.polygon.io/futures/vX/contracts/${contract}?apiKey=${POLYGON_API_KEY}`;
 
   try {
     const response = await fetch(url);
-    const data = await response.json();
+    const data = await response.json() as { status?: string };
 
     // Invalid if status is NOT_FOUND
     if (data?.status === "NOT_FOUND") {
       return false;
     }
 
-    return response.ok && data && Object.keys(data).length > 0;
+    return response.ok && data && Object.keys(data as object).length > 0;
   } catch {
     return false;
   }

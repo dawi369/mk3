@@ -23,6 +23,8 @@ describe("RedisStore", () => {
     // Clean up test data
     await redisStore.redis.hdel("bar:latest", testSymbol);
     await redisStore.redis.del(`bar:today:${testSymbol}`);
+    await redisStore.redis.del(`session:${testSymbol}`);
+    await redisStore.redis.del(`snapshot:${testSymbol}`);
   });
 
   describe("ping", () => {
@@ -143,6 +145,86 @@ describe("RedisStore", () => {
       expect(stats).toHaveProperty("barCount");
       expect(stats).toHaveProperty("symbolCount");
       expect(typeof stats.symbolCount).toBe("number");
+    });
+  });
+
+  describe("session data", () => {
+    test("getSession returns null for non-existent symbol", async () => {
+      const result = await redisStore.getSession("NONEXISTENT_SESSION_XYZ");
+      expect(result).toBeNull();
+    });
+
+    test("writeBar creates session data", async () => {
+      // Write a bar - this should also create session data
+      const bar: Bar = {
+        symbol: testSymbol,
+        open: 5100,
+        high: 5110,
+        low: 5090,
+        close: 5105,
+        volume: 500,
+        trades: 25,
+        startTime: Date.now(),
+        endTime: Date.now() + 60000,
+        dollarVolume: 2552500,
+      };
+
+      await redisStore.writeBar(bar);
+
+      const session = await redisStore.getSession(testSymbol);
+      expect(session).not.toBeNull();
+      expect(typeof session!.dayOpen).toBe("number");
+      expect(session!.dayHigh).toBeGreaterThanOrEqual(bar.high);
+      expect(session!.dayLow).toBeLessThanOrEqual(bar.low);
+      expect(session!.cvol).toBeGreaterThan(0);
+      expect(session!.vwap).toBeGreaterThan(0);
+    });
+
+    test("getAllSessions returns object of sessions", async () => {
+      const sessions = await redisStore.getAllSessions();
+      expect(typeof sessions).toBe("object");
+      // Should include our test symbol
+      if (testSymbol in sessions) {
+        expect(sessions[testSymbol]!.dayOpen).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe("snapshot data", () => {
+    test("getSnapshot returns null for non-existent symbol", async () => {
+      const result = await redisStore.getSnapshot("NONEXISTENT_SNAP_XYZ");
+      expect(result).toBeNull();
+    });
+
+    test("writeSnapshot and getSnapshot work together", async () => {
+      const snapshotData = {
+        productCode: "TEST",
+        settlementDate: "2026-03-20",
+        sessionOpen: 5000,
+        sessionHigh: 5050,
+        sessionLow: 4950,
+        sessionClose: 5020,
+        settlementPrice: 5015,
+        prevSettlement: 5010,
+        change: 5,
+        changePct: 0.1,
+        openInterest: 12345,
+        timestamp: Date.now(),
+      };
+
+      await redisStore.writeSnapshot(testSymbol, snapshotData);
+
+      const retrieved = await redisStore.getSnapshot(testSymbol);
+      expect(retrieved).not.toBeNull();
+      expect(retrieved!.productCode).toBe("TEST");
+      expect(retrieved!.settlementPrice).toBe(5015);
+      expect(retrieved!.prevSettlement).toBe(5010);
+      expect(retrieved!.openInterest).toBe(12345);
+    });
+
+    test("getAllSnapshots returns object of snapshots", async () => {
+      const snapshots = await redisStore.getAllSnapshots();
+      expect(typeof snapshots).toBe("object");
     });
   });
 });
