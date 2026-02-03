@@ -6,6 +6,7 @@ import { startHubRESTApi } from "@/server/api/rest_client.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
+import { snapshotJob } from "@/jobs/snapshot_job.js";
 // import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
@@ -53,10 +54,12 @@ async function startHubServer() {
     await dailyClearJob.loadStatus();
     await monthlySubscriptionJob.loadStatus();
     await frontMonthJob.loadStatus();
+    await snapshotJob.loadStatus();
 
     // Schedule jobs (disabled for now)
     // dailyClearJob.schedule();
     // monthlySubscriptionJob.schedule(polygonClient);
+    // snapshotJob.schedule();
     // historySyncJob.schedule();
 
     // Start Hub REST API (pass polygon client for subscription management)

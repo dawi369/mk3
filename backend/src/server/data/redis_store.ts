@@ -1,6 +1,6 @@
 import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
-import type { Bar } from "@/types/common.types.js";
+import type { Bar, SessionData, SnapshotData } from "@/types/common.types.js";
 import { Redis } from "ioredis";
 
 // Redis Key Constants
@@ -11,6 +11,8 @@ const KEYS = {
   PUBSUB_CHANNEL: "bars", // PUB/SUB: legacy support
   META_DATE: "meta:trading_date",
   META_COUNT: "meta:bar_count",
+  SESSION_PREFIX: "session:", // HASH per symbol: session:{symbol}
+  SNAPSHOT_PREFIX: "snapshot:", // HASH per symbol: snapshot:{symbol}
 } as const;
 
 class RedisStore {
@@ -79,8 +81,59 @@ class RedisStore {
 
     await multi.exec();
 
+    // Update session calculations (VWAP, CVOL, High/Low)
+    await this.updateSession(bar);
+
     // Legacy pub/sub for Edge servers
     await this.redis.publish(KEYS.PUBSUB_CHANNEL, barJson);
+  }
+
+  /**
+   * Update session calculations for a symbol
+   * Called on every bar to maintain running VWAP, CVOL, High/Low
+   */
+  private async updateSession(bar: Bar): Promise<void> {
+    const key = `${KEYS.SESSION_PREFIX}${bar.symbol}`;
+
+    // Get current session data (may not exist yet)
+    const existing = await this.redis.hgetall(key);
+
+    const now = Date.now();
+    const priceVolume = bar.close * bar.volume;
+
+    if (Object.keys(existing).length === 0) {
+      // First bar of session - initialize
+      const session: SessionData = {
+        dayOpen: bar.open,
+        dayHigh: bar.high,
+        dayLow: bar.low,
+        vwap: bar.close, // First bar: VWAP = close
+        cvol: bar.volume,
+        tradeCount: bar.trades,
+        cumPriceVolume: priceVolume,
+        cumVolume: bar.volume,
+        timestamp: now,
+      };
+      await this.redis.hset(key, session as unknown as Record<string, string>);
+    } else {
+      // Update running calculations
+      const cumPriceVolume = parseFloat(existing.cumPriceVolume || "0") + priceVolume;
+      const cumVolume = parseFloat(existing.cumVolume || "0") + bar.volume;
+      const vwap = cumVolume > 0 ? cumPriceVolume / cumVolume : 0;
+
+      const updates: Record<string, string | number> = {
+        dayHigh: Math.max(parseFloat(existing.dayHigh || "0"), bar.high),
+        dayLow: Math.min(parseFloat(existing.dayLow || String(bar.low)), bar.low),
+        vwap,
+        cvol: parseFloat(existing.cvol || "0") + bar.volume,
+        tradeCount: parseInt(existing.tradeCount || "0") + bar.trades,
+        cumPriceVolume,
+        cumVolume,
+        timestamp: now,
+      };
+
+      await this.redis.hset(key, updates);
+    }
   }
 
   /**
@@ -130,6 +183,89 @@ class RedisStore {
       -1,
     );
     return data.map((d) => JSON.parse(d));
+  }
+
+  /**
+   * Get session data for a symbol (VWAP, CVOL, High/Low)
+   */
+  async getSession(symbol: string): Promise<SessionData | null> {
+    const data = await this.redis.hgetall(`${KEYS.SESSION_PREFIX}${symbol}`);
+    if (Object.keys(data).length === 0) return null;
+
+    return {
+      dayOpen: parseFloat(data.dayOpen || "0"),
+      dayHigh: parseFloat(data.dayHigh || "0"),
+      dayLow: parseFloat(data.dayLow || "0"),
+      vwap: parseFloat(data.vwap || "0"),
+      cvol: parseFloat(data.cvol || "0"),
+      tradeCount: parseInt(data.tradeCount || "0"),
+      cumPriceVolume: parseFloat(data.cumPriceVolume || "0"),
+      cumVolume: parseFloat(data.cumVolume || "0"),
+      timestamp: parseInt(data.timestamp || "0"),
+    };
+  }
+
+  /**
+   * Get all sessions as a map
+   */
+  async getAllSessions(): Promise<Record<string, SessionData>> {
+    const keys = await this.scanKeys(`${KEYS.SESSION_PREFIX}*`);
+    const result: Record<string, SessionData> = {};
+
+    for (const key of keys) {
+      const symbol = key.replace(KEYS.SESSION_PREFIX, "");
+      const session = await this.getSession(symbol);
+      if (session) result[symbol] = session;
+    }
+
+    return result;
+  }
+
+  /**
+   * Get snapshot data for a symbol (from Polygon REST API)
+   */
+  async getSnapshot(symbol: string): Promise<SnapshotData | null> {
+    const data = await this.redis.hgetall(`${KEYS.SNAPSHOT_PREFIX}${symbol}`);
+    if (Object.keys(data).length === 0) return null;
+
+    return {
+      productCode: data.productCode || "",
+      settlementDate: data.settlementDate || "",
+      sessionOpen: parseFloat(data.sessionOpen || "0"),
+      sessionHigh: parseFloat(data.sessionHigh || "0"),
+      sessionLow: parseFloat(data.sessionLow || "0"),
+      sessionClose: parseFloat(data.sessionClose || "0"),
+      settlementPrice: parseFloat(data.settlementPrice || "0"),
+      prevSettlement: parseFloat(data.prevSettlement || "0"),
+      change: parseFloat(data.change || "0"),
+      changePct: parseFloat(data.changePct || "0"),
+      openInterest: data.openInterest ? parseInt(data.openInterest) : null,
+      timestamp: parseInt(data.timestamp || "0"),
+    };
+  }
+
+  /**
+   * Get all snapshots as a map
+   */
+  async getAllSnapshots(): Promise<Record<string, SnapshotData>> {
+    const keys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    const result: Record<string, SnapshotData> = {};
+
+    for (const key of keys) {
+      const symbol = key.replace(KEYS.SNAPSHOT_PREFIX, "");
+      const snapshot = await this.getSnapshot(symbol);
+      if (snapshot) result[symbol] = snapshot;
+    }
+
+    return result;
+  }
+
+  /**
+   * Write snapshot data for a symbol
+   */
+  async writeSnapshot(symbol: string, snapshot: SnapshotData): Promise<void> {
+    const key = `${KEYS.SNAPSHOT_PREFIX}${symbol}`;
+    await this.redis.hset(key, snapshot as unknown as Record<string, string>);
   }
 
   async getStats(): Promise<{
@@ -213,6 +349,12 @@ class RedisStore {
     const todayKeys = await this.scanKeys(`${KEYS.TODAY_PREFIX}*`);
     if (todayKeys.length > 0) {
       clearedCount += await this.deleteInBatches(todayKeys);
+    }
+
+    // Clear session data
+    const sessionKeys = await this.scanKeys(`${KEYS.SESSION_PREFIX}*`);
+    if (sessionKeys.length > 0) {
+      clearedCount += await this.deleteInBatches(sessionKeys);
     }
 
     // Update metadata

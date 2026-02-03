@@ -65,7 +65,11 @@ export interface PolygonSnapshotContract {
     close?: number;
     volume?: number;
     settlement_price?: number;
+    previous_settlement?: number;
+    change?: number;
+    change_percent?: number;
   };
+  open_interest?: number;
   last_trade?: {
     price: number;
     size: number;

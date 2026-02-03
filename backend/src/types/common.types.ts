@@ -55,3 +55,40 @@ export interface RefreshJobStatus {
   lastRefreshDetails: RefreshDetails[];
   totalRuns: number;
 }
+
+/**
+ * Rolling intraday session calculations
+ * Stored in Redis at session:{symbol}
+ */
+export interface SessionData {
+  dayOpen: number;
+  dayHigh: number;
+  dayLow: number;
+  vwap: number;
+  cvol: number;
+  tradeCount: number;
+  // Internal running totals for VWAP calculation
+  cumPriceVolume: number;
+  cumVolume: number;
+  timestamp: number;
+}
+
+/**
+ * Exchange session snapshot from Polygon REST API
+ * Stored in Redis at snapshot:{symbol}
+ */
+export interface SnapshotData {
+  productCode: string;
+  settlementDate: string;
+  sessionOpen: number;
+  sessionHigh: number;
+  sessionLow: number;
+  sessionClose: number;
+  settlementPrice: number;
+  prevSettlement: number;
+  change: number;
+  changePct: number;
+  openInterest: number | null;
+  timestamp: number;
+}
+

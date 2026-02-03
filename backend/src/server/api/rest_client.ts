@@ -4,6 +4,7 @@ import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
+import { snapshotJob } from "@/jobs/snapshot_job.js";
 import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
 import type { Server, ServerWebSocket } from "bun";
 import { logger } from "@/utils/logger.js";
@@ -238,6 +239,44 @@ async function handleRequest(
     return jsonResponse(cache);
   }
 
+  // Session data endpoint (public - no auth required)
+  if (method === "GET" && path === "/sessions") {
+    const sessions = await redisStore.getAllSessions();
+    return jsonResponse({ sessions, count: Object.keys(sessions).length });
+  }
+
+  // Match /session/:symbol
+  const sessionMatch = path.match(/^\/session\/([^\/]+)$/);
+  if (method === "GET" && sessionMatch) {
+    const symbol = sessionMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const session = await redisStore.getSession(symbol);
+    if (!session) {
+      return errorResponse("Session not found", 404);
+    }
+    return jsonResponse(session);
+  }
+
+  // Snapshot data endpoint (public - no auth required)
+  if (method === "GET" && path === "/snapshots") {
+    const snapshots = await redisStore.getAllSnapshots();
+    return jsonResponse({ snapshots, count: Object.keys(snapshots).length });
+  }
+
+  // Match /snapshot/:symbol
+  const snapshotMatch = path.match(/^\/snapshot\/([^\/]+)$/);
+  if (method === "GET" && snapshotMatch) {
+    const symbol = snapshotMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const snapshot = await redisStore.getSnapshot(symbol);
+    if (!snapshot) {
+      return errorResponse("Snapshot not found", 404);
+    }
+    return jsonResponse(snapshot);
+  }
+
   // --- Protected Routes ---
 
   // Check auth for all /admin routes
@@ -307,6 +346,18 @@ async function handleRequest(
           500,
         );
       }
+    }
+
+    if (method === "POST" && path === "/admin/refresh-snapshots") {
+      // Run job in background (don't await) - prevents HTTP timeout
+      snapshotJob.runRefresh().catch((err) => {
+        console.error("[SnapshotJob] Background refresh failed:", err);
+      });
+
+      return jsonResponse({
+        message: "Snapshot refresh started (running in background)",
+        status: snapshotJob.getStatus(),
+      });
     }
   }
 
