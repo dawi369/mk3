@@ -3,117 +3,64 @@
 ## Problem
 
 Futures contracts expire and roll to new contracts. The system must handle:
-
 - Contract expiration (quarterly or monthly depending on asset)
-- Automatic subscription updates as contracts change
-- Multiple active contracts during roll periods
+- Automatic subscription updates when contracts change
 
-## Architecture
+## Solution
 
-### Hub Server (Current Implementation)
+### Contract Builders (`src/utils/cbs/schedule_cb.ts`)
 
-**Role:** Subscribe to all relevant contract data from Polygon
-
-**Implemented:**
-
-- Dynamic contract builders (US indices, metals)
-- Automated monthly subscription refresh
-- Configurable contract counts
-- No front month logic (raw data only)
-
-### Edge Server (Future)
-
-**Role:** Add intelligence for user-facing features
-
-**Planned:**
-
-- Front month detection (by volume)
-- User-friendly symbol mapping (ES → ESZ25)
-- Continuous price series for charts
-
-### Historical Data Handling
-
-- **Challenge:** Futures contracts expire, but charts need continuous history (e.g., "ES" continuous contract).
-- **Solution:**
-  - **TimescaleDB:** Stores individual contract history (e.g., `ESZ24`, `ESH25`).
-  - **Stitching:** Hub queries TimescaleDB for the relevant contracts to build a continuous series.
-  - **Caching:** Stitched monthly chunks are cached in Redis (`history:ES:2024-11`).
-  - **Updates:** Real-time data is written to TimescaleDB as it arrives. Daily sync ensures data completeness.
-
----
-
-## Implementation
-
-### Contract Builders
-
-**US Indices** (`src/utils/cbs/us_indices_cb.ts`)
-
-- Quarterly contracts: H (Mar), M (Jun), U (Sep), Z (Dec)
-- Determines current quarter from date
-- Generates N quarters ahead (configurable)
-- Example: `buildQuarterlyRequest('A', 1)` → ESZ25, NQZ25, YMZ25, RTYZ25
-
-**Metals** (`src/utils/cbs/metals_cb.ts`)
-
-- Monthly contracts: All 12 months (F, G, H, J, K, M, N, Q, U, V, X, Z)
-- Example: `buildMonthlyRequest('A', 1)` → GCX25, SIX25, HGX25, PLX25, PAX25, MGCX25
-
-**Configuration** (`src/config/subscriptions.ts`)
+Uses Polygon API to dynamically fetch active contracts:
 
 ```typescript
-export const SUBSCRIPTION_CONFIG = {
-  US_INDICES_QUARTERS: 1, // 1 = current, 2 = current + next
-  METALS_MONTHS: 1,
-} as const;
+const request = await scheduleBuilder.buildRequestAsync("us_indices", "A");
+// Returns: { ev: "A", symbols: ["ESH6", "NQH6", ...], assetClass: "us_indices" }
 ```
 
----
+### Supported Asset Classes
+
+| Asset Class | Cycle | Products |
+|-------------|-------|----------|
+| `us_indices` | Quarterly (H, M, U, Z) | ES, NQ, YM, RTY |
+| `metals` | Quarterly | GC, SI, HG, PL, PA, MGC |
+| `currencies` | Quarterly | 6E, 6J, 6B, 6C, 6A, 6S |
+| `grains` | Monthly | ZC, ZW, ZS, ZM, ZL |
+| `softs` | Monthly | KC, CT, SB, CC, OJ, TT |
+| `volatiles` | Monthly | VX |
 
 ## Subscription Refresh
 
-### Problem
+Monthly cron job (`refresh_subscriptions.ts`) handles updates:
 
-Contract subscriptions built at startup become stale after the first roll period (1 month for metals, 1 quarter for indices).
+- **Schedule:** 1st of month @ 00:05 ET
+- **Logic:** Rebuilds requests using current date, compares with active subscriptions
+- **Zero downtime:** WS stays connected during update
 
-### Solution
+### Manual Trigger
 
-Automated monthly cron job (`MonthlySubscriptionJob`) refreshes subscriptions:
+```bash
+curl -X POST http://localhost:3001/admin/refresh-subscriptions | jq
+```
 
-- Schedule: 1st of month @ 00:05 ET
-- Quarterly check for indices (Mar/Jun/Sep/Dec only)
-- Monthly check for metals (every month)
-- Zero downtime, WS stays connected
+### Check Status
 
-### How It Works
+```bash
+curl http://localhost:3001/health | jq '.subscriptionRefreshJob'
+```
 
-1. Calculate new contract symbols using builders
-2. Compare with current subscriptions (by asset class metadata)
-3. Unsubscribe from old if changed
-4. Subscribe to new
-5. Log changes to Redis
+## Configuration
 
-### Features
+Edit `src/config/subscriptions.ts`:
 
-- Partial success handling (some assets can fail)
-- Status persistence across restarts
-- Manual trigger via `POST /admin/refresh-subscriptions`
-- Health endpoint includes refresh job status
+```typescript
+export const SUBSCRIPTION_CONFIG = {
+  US_INDICES_QUARTERS: 1,  // 1 = current, 2 = current + next
+  METALS_QUARTERS: 1,
+  CURRENCY_QUARTERS: 1,
+  GRAINS_MONTHS: 1,
+  SOFTS_MONTHS: 1,
+  VOLATILES_MONTHS: 1,
+} as const;
+```
 
----
-
-## Current Status
-
-Phase 1 complete:
-
-- US indices (quarterly) and metals (monthly) contract builders
-- Automated subscription refresh (monthly cron job)
-- Configurable contract counts via `SUBSCRIPTION_CONFIG`
-- Status persistence across restarts
-
-Next: Multi-asset expansion (softs, energies, grains, treasuries)
-
-## Related Documentation
-
-- [system-overview.md](./system-overview.md) - Complete roadmap
-- [architecture.md](./architecture.md) - Technical details
-- [subscription-refresh-implementation.md](./subscription-refresh-implementation.md) - Implementation details
+For roll coverage, change values to `2` and restart Hub.

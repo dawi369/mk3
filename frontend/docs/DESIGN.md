@@ -100,4 +100,26 @@ Using **Framer Motion**:
 
 ---
 
-*Last updated: January 2026*
+## UI Standardization
+
+Popout elements (dropdowns, tooltips, hover cards) follow a consistent style via **Radix UI** primitives.
+
+### Standard Classes
+
+| Property | Class |
+|----------|-------|
+| Background | `bg-muted` |
+| Text | `text-foreground` |
+| Border | `border` |
+| Shadow | `shadow` |
+| Radius | `rounded-md` |
+
+### Guidelines
+
+1. **Use Radix UI** — `HoverCard`, `Popover`, `DropdownMenu` via `src/components/ui`
+2. **Match the classes** — Custom components should use standard classes above
+3. **No hardcoded colors** — Use semantic tokens (`bg-background`, `bg-muted`, `bg-card`)
+
+---
+
+*Last updated: February 2026*
