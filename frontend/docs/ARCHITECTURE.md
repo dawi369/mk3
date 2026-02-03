@@ -127,6 +127,60 @@ interface Bar {
 
 ---
 
+## Indicators
+
+> [!NOTE]
+> Indicators are read from Redis via backend REST endpoints. Backend populates Redis; frontend reads only.
+
+> [!CAUTION]
+> **Beta Limitations:** Depth of book and options on futures are NOT available from Polygon. Do not implement.
+
+### Price Reference
+
+| Indicator | Description | Redis Source | Status |
+|-----------|-------------|--------------|--------|
+| **Last Price** | Current/latest trade price | `bar:latest` (WS) | ✅ Live |
+| **Previous Close** | Last session close | `snapshot:{symbol}` | 🔲 Planned |
+| **Previous Settlement** | Official prev settlement | `snapshot:{symbol}` | 🔲 Planned |
+| **Day Open** | First bar of current session | `session:{symbol}` | 🔲 Planned |
+| **Day High** | Session high (rolling) | `session:{symbol}` | 🔲 Planned |
+| **Day Low** | Session low (rolling) | `session:{symbol}` | 🔲 Planned |
+| **Settlement** | Official settlement price | `snapshot:{symbol}` | 🔲 Planned |
+
+### Change Metrics
+
+| Indicator | Description | Calculation | Status |
+|-----------|-------------|-------------|--------|
+| **Change ($)** | Dollar change from prev settlement | `last - prevSettlement` | 🔲 Planned |
+| **Change (%)** | Percent change | `(last - prevSettlement) / prevSettlement * 100` | 🔲 Planned |
+| **Range %** | Session volatility | `(high - low) / prevSettlement * 100` | 🔲 Planned |
+
+### Volume & Liquidity
+
+| Indicator | Description | Redis Source | Status |
+|-----------|-------------|--------------|--------|
+| **VWAP** | Volume-Weighted Average Price | `session:{symbol}.vwap` | 🔲 Planned |
+| **CVOL** | Cumulative session volume | `session:{symbol}.cvol` | 🔲 Planned |
+| **Open Interest (OI)** | Outstanding contracts | `snapshot:{symbol}.openInterest` | 🔲 Planned |
+| **OI Change** | Δ OI from previous day | Computed client-side | 🔲 Planned |
+
+### Contract-Specific
+
+| Indicator | Description | Redis Source | Status |
+|-----------|-------------|--------------|--------|
+| **DTE** | Days to expiry | `cache:front-months` | ✅ Live |
+| **Front Month** | Most liquid contract | `cache:front-months` | ✅ Live |
+| **Is Rolling** | Volume migrating to next contract | `cache:front-months` | ✅ Live |
+| **Product Code** | Root symbol (ES, NQ, etc.) | `snapshot:{symbol}` | 🔲 Planned |
+
+### Priority (Implementation Order)
+
+1. **P0 (Core):** Change $, Change %, VWAP, CVOL, Day High/Low
+2. **P1 (Important):** Open Interest, Settlement, Range %
+3. **P2 (Later):** OI Change, Product Code
+
+---
+
 ## Terminal Views
 
 The terminal has 3 switchable views via bottom dock:
