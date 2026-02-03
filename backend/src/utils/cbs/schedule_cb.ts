@@ -1,7 +1,7 @@
 import type { PolygonWsRequest, PolygonAssetClass } from "@/types/polygon.types.js";
 import { Tickers } from "@/utils/tickers.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
-import activeMonthsData from "./active.json" with { type: "json" };
+import activeMonthsData from "../../../tickers/active_months.json" with { type: "json" };
 
 // Month code to month number mapping
 const MONTH_ORDER: Record<string, number> = {

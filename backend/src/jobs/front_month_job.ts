@@ -1,7 +1,7 @@
 import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
 import { POLYGON_API_KEY } from "@/config/env.js";
-import activeMonthsData from "@/utils/cbs/active.json" with { type: "json" };
+import activeMonthsData from "../../tickers/active_months.json" with { type: "json" };
 import type {
   FrontMonthInfo,
   FrontMonthCache,
