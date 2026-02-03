@@ -4,6 +4,15 @@ Items requiring longer-term data (>1-2 days) that are out of scope for initial i
 
 ---
 
+## Security (High Priority)
+
+**Protect all Redis and Backend endpoints.**
+- Implement JWT (for users) or Dev Token (for internal tools) protection.
+- Ensure no data endpoints are exposed without authentication.
+- Reference: `server/api/rest_client.ts` currently uses `X-API-Key` for admin routes only.
+
+---
+
 ## Historical Reference Data
 
 These features require TimescaleDB queries and Redis caching strategy:
