@@ -36,6 +36,7 @@ export function SectorContainer({
   // Calculate height for each row: (100% - gaps) / rows
   // Using CSS calc: grid-auto-rows: calc((100% - (rows-1)*gap) / rows)
   const rowHeight = `calc((100% - ${(visibleRows - 1) * GRID_GAP}px) / ${visibleRows})`;
+  const hasChildren = React.Children.count(children) > 0;
 
   return (
     <Card className={cn("flex flex-col h-full overflow-hidden border-none shadow-none bg-terminal-card gap-0 p-0 rounded-sm", className)}>
@@ -69,7 +70,7 @@ export function SectorContainer({
       </CardHeader>
       
       <CardContent className="flex-1 min-h-0 p-1">
-        {children ? (
+        {hasChildren ? (
             <div 
               className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] content-start gap-1 h-full overflow-y-auto pr-0.5 pb-1 custom-scrollbar"
               style={{
@@ -91,4 +92,3 @@ export function SectorContainer({
     </Card>
   );
 }
-

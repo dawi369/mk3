@@ -1,11 +1,12 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { useMarketStore } from "@/store/use-market-store";
+import { useTickerStore } from "@/store/use-ticker-store";
 import { useConnection } from "@/providers/connection-provider";
 
 export function StreamView() {
-  const marketData = useMarketStore((state) => state.marketData);
+  const mode = useTickerStore((state) => state.mode);
+  const marketData = useTickerStore((state) => state.seriesByMode[mode]);
   const { status } = useConnection();
 
   // Flatten all bars for display

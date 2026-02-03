@@ -11,11 +11,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { useTickerModal, TIMEFRAMES, type Timeframe } from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import { TIMEFRAMES, type Timeframe } from "@/types/ticker.types";
 import { cn } from "@/lib/utils";
+import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-provider";
 
 export function ChartToolbar() {
   const { timeframe, setTimeframe, isSidebarOpen, toggleSidebar } = useTickerModal();
+  const { openWithMode } = useSpotlight();
 
   return (
     <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 bg-black/20">
@@ -27,8 +30,7 @@ export function ChartToolbar() {
           size="sm"
           className="h-7 px-2 text-xs gap-1"
           onClick={() => {
-            // TODO: Open spotlight in symbol search mode
-            console.log("Open symbol search");
+            openWithMode("ticker-compare");
           }}
         >
           <Plus className="w-3.5 h-3.5" />

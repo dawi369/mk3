@@ -11,9 +11,13 @@ export interface SpotlightCommand {
   group: string;
 }
 
+export type SpotlightMode = "default" | "ticker-primary" | "ticker-compare";
+
 interface SpotlightContextValue {
   isOpen: boolean;
+  mode: SpotlightMode;
   open: () => void;
+  openWithMode: (mode: SpotlightMode) => void;
   close: () => void;
   toggle: () => void;
   commands: SpotlightCommand[];
@@ -38,9 +42,22 @@ interface SpotlightProviderProps {
 export function SpotlightProvider({ children }: SpotlightProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [commands, setCommands] = useState<SpotlightCommand[]>([]);
+  const [mode, setMode] = useState<SpotlightMode>("default");
 
-  const open = useCallback(() => setIsOpen(true), []);
-  const close = useCallback(() => setIsOpen(false), []);
+  const open = useCallback(() => {
+    setMode("default");
+    setIsOpen(true);
+  }, []);
+
+  const openWithMode = useCallback((nextMode: SpotlightMode) => {
+    setMode(nextMode);
+    setIsOpen(true);
+  }, []);
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setMode("default");
+  }, []);
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
 
   const registerCommands = useCallback((newCommands: SpotlightCommand[]) => {
@@ -59,14 +76,16 @@ export function SpotlightProvider({ children }: SpotlightProviderProps) {
   const value = useMemo(
     () => ({
       isOpen,
+      mode,
       open,
+      openWithMode,
       close,
       toggle,
       commands,
       registerCommands,
       unregisterCommands,
     }),
-    [isOpen, open, close, toggle, commands, registerCommands, unregisterCommands]
+    [isOpen, mode, open, openWithMode, close, toggle, commands, registerCommands, unregisterCommands]
   );
 
   return <SpotlightContext.Provider value={value}>{children}</SpotlightContext.Provider>;

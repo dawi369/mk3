@@ -100,14 +100,75 @@ ConnectionProvider
 DataProvider
     │
     ▼ handleMarketUpdate()
-useMarketStore (Zustand)
+ TickerRegistry (Zustand)
     │
     ▼ state subscription
-useTerminalData hook
+ useTerminalData hook
     │
     ▼ transforms by asset class, throttles 100ms
 TerminalCard components
 ```
+
+---
+
+## Ticker Registry & Modes
+
+The frontend maintains an **in-memory registry** of tickers that powers:
+- Terminal cards (click + multi-select)
+- Spotlight search (open or compare)
+- Drawer/chart (primary + comparisons + spread)
+
+### Modes
+
+| Mode | Symbol Type | Purpose | Status |
+|------|-------------|---------|--------|
+| **Front** | Contract (e.g., `ESH6`) | Live interaction, charts, comparisons | ✅ Implemented |
+| **Curve** | Product root (e.g., `ES`) | Term structure / curve view | 🧭 Scaffold only |
+
+> Curve mode is indexed in the registry, but UI behavior is **not implemented** yet.
+
+### Registry Shape (Front Mode)
+
+```
+TickerRegistry
+├── mode: "front" | "curve"
+├── entitiesByMode[mode][symbol]
+│   └── TickerEntity { symbol, productCode, assetClass, name, latestBar, ... }
+├── seriesByMode[mode][symbol]
+│   └── Bar[] (bounded history for charts)
+└── selectionByMode[mode]
+    ├── primary: symbol | null
+    ├── selected: symbol[]
+    ├── comparisons: symbol[]
+    └── spreadEnabled: boolean
+```
+
+### Mode Indexing Sources
+
+**Front mode** indices are built from:
+1. **REST `/symbols`** (all subscribed contract symbols)
+2. **WebSocket bars** (creates/updates entities as data flows)
+3. **Ticker metadata** from `tickers/*.json` (product name, asset class)
+
+**Curve mode** uses product root metadata only (no runtime wiring yet).
+
+### Interaction Flow (Front Mode)
+
+```
+Shift+Click (multi-select)
+    ▼
+selectionByMode.front.selected[]
+    ▼ (>=2 selections)
+open Drawer with primary + comparisons
+
+Single Click
+    ▼
+set primary + clear selection
+    ▼
+open Drawer
+```
+
+When the drawer is open, comparisons are added via **drawer controls** or **spotlight**.
 
 ### Key Types
 

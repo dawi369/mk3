@@ -1,9 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { useConnection } from "./connection-provider";
 import { Bar } from "@/types/common.types";
-import { useMarketStore } from "@/store/use-market-store";
+import { useTickerStore } from "@/store/use-ticker-store";
+import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
+import { getAllProductCodes } from "@/lib/ticker-mapping";
 
 interface MarketData {
   [symbol: string]: Bar[];
@@ -19,12 +21,34 @@ const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, status } = useConnection();
-  const handleMarketUpdate = useMarketStore(
-    (state) => state.handleMarketUpdate,
-  );
-  const setIsLoading = useMarketStore((state) => state.setIsLoading);
-  const marketData = useMarketStore((state) => state.marketData);
-  const isLoading = useMarketStore((state) => state.isLoading);
+  const mode = useTickerStore((state) => state.mode);
+  const registerSymbols = useTickerStore((state) => state.registerSymbols);
+  const upsertBar = useTickerStore((state) => state.upsertBar);
+  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
+  const series = useTickerStore((state) => state.seriesByMode[mode]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSymbols = async () => {
+      try {
+        registerSymbols("curve", getAllProductCodes());
+        const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/symbols`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!mounted || !Array.isArray(data)) return;
+        registerSymbols("front", data);
+      } catch (err) {
+        console.warn("[DataProvider] Failed to load symbols", err);
+      }
+    };
+
+    loadSymbols();
+    return () => {
+      mounted = false;
+    };
+  }, [registerSymbols]);
 
   useEffect(() => {
     // Subscribe to WebSocket messages
@@ -45,8 +69,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Update the global store instead of local state
-        handleMarketUpdate(symbol, { symbol, ...barData });
+        upsertBar("front", { symbol, ...barData });
         setIsLoading(false);
       }
     });
@@ -55,14 +78,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [subscribe, handleMarketUpdate, setIsLoading]);
 
   const getLatestBar = (symbol: string) => {
-    const bars = marketData[symbol];
-    return bars ? bars[bars.length - 1] : undefined;
+    return entities[symbol]?.latestBar;
   };
 
   return (
     <DataContext.Provider
       value={{
-        marketData,
+        marketData: series,
         isLoading: isLoading && status !== "connected",
         getLatestBar,
       }}

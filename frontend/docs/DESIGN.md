@@ -71,6 +71,46 @@ Located in `components/ui/`. Key components:
 
 ---
 
+## Ticker Modes
+
+The terminal supports two **visual modes**:
+
+1. **Front Mode (Active)**
+   - Tickers represent **contracts** (e.g., `ESH6`)
+   - Used for drawer charts, comparisons, and spreads
+   - Spotlight results show contract symbols
+
+2. **Curve Mode (Scaffolded)**
+   - Tickers represent **product roots** (e.g., `ES`)
+   - Reserved for term structure/curve UI
+   - Indexed in the registry but **no interaction wiring yet**
+
+The mode is controlled globally from the **Terminal Header**.
+
+---
+
+## Ticker Interactions (Front Mode)
+
+### Single Click
+- Sets **primary** ticker
+- Opens the drawer
+
+### Shift+Click (Multi-Select)
+- Toggles selection
+- Does **not** open the drawer until 2+ tickers are selected
+- When 2+ are selected, drawer opens with comparisons
+
+### Drawer / Spotlight
+- Once the drawer is open, additional symbols are added via:
+  - **Add Symbol** in the toolbar
+  - **Spotlight** in comparison mode
+
+### Spread Mode (Front Mode)
+- Compares the **primary** against the first comparison
+- Curve-mode spreads are **TBD**
+
+---
+
 ## Animations
 
 Using **Framer Motion**:

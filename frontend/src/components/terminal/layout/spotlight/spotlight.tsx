@@ -15,8 +15,59 @@ import {
   useSpotlight,
   SpotlightCommand,
 } from "@/components/terminal/layout/spotlight/spotlight-provider";
-import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
-import { searchTickers, TickerSearchResult } from "@/lib/data/tickers";
+import { useTickerStore } from "@/store/use-ticker-store";
+import type { TickerSearchResult } from "@/types/ticker.types";
+import type { Bar } from "@/types/common.types";
+
+function summarizeVolume(bars?: Bar[]): number {
+  if (!bars || bars.length === 0) return 0;
+  return bars.reduce((sum, bar) => sum + (bar.volume || 0), 0);
+}
+
+function searchTickers(
+  query: string,
+  entities: Record<string, { symbol: string; name: string; latestBar?: Bar }>,
+  series: Record<string, Bar[]>,
+): TickerSearchResult[] {
+  if (!query) return [];
+  const q = query.toUpperCase();
+
+  const results: TickerSearchResult[] = [];
+
+  for (const entity of Object.values(entities)) {
+    const symbol = entity.symbol.toUpperCase();
+    const name = entity.name.toUpperCase();
+    if (!symbol.includes(q) && !name.includes(q)) continue;
+
+    const bars = series[entity.symbol];
+    const latest = entity.latestBar || bars?.[bars.length - 1];
+    const base = bars?.[0]?.open || latest?.open || latest?.close || 0;
+    const lastPrice = latest?.close || 0;
+    const change = base ? lastPrice - base : 0;
+    const changePercent = base ? change / base : 0;
+    const volume = summarizeVolume(bars) || latest?.volume || 0;
+
+    let rank = 3;
+    if (symbol === q) rank = 0;
+    else if (symbol.startsWith(q)) rank = 1;
+    else if (name.includes(q)) rank = 2;
+
+    results.push({
+      symbol: entity.symbol,
+      name: entity.name,
+      lastPrice,
+      change,
+      changePercent,
+      volume,
+      rank,
+    });
+  }
+
+  return results.sort((a, b) => {
+    if (a.rank !== b.rank) return a.rank - b.rank;
+    return b.volume - a.volume;
+  });
+}
 
 // Default navigation commands available in all views
 function useDefaultCommands(): SpotlightCommand[] {
@@ -85,8 +136,12 @@ function useDefaultCommands(): SpotlightCommand[] {
 }
 
 export function Spotlight() {
-  const { isOpen, open, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
-  const { open: openTicker } = useTickerModal();
+  const { isOpen, mode: spotlightMode, open, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
+  const mode = useTickerStore((state) => state.mode);
+  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
+  const series = useTickerStore((state) => state.seriesByMode[mode]);
+  const openPrimary = useTickerStore((state) => state.openPrimary);
+  const addComparison = useTickerStore((state) => state.addComparison);
   const defaultCommands = useDefaultCommands();
   
   // Prevent hydration mismatch - Radix Dialog generates different IDs on server vs client
@@ -106,12 +161,12 @@ export function Spotlight() {
   // Handle ticker search
   useEffect(() => {
     if (query) {
-      const results = searchTickers(query);
+      const results = searchTickers(query, entities, series);
       setTickerResults(results);
     } else {
       setTickerResults([]);
     }
-  }, [query]);
+  }, [query, entities, series]);
 
   // Keyboard shortcut handler - Ctrl+K or Cmd+K
   useEffect(() => {
@@ -166,19 +221,11 @@ export function Spotlight() {
   if (!mounted) return null;
 
   const handleTickerSelect = (t: TickerSearchResult) => {
-    openTicker({
-      ticker: t.symbol,
-      price: t.lastPrice,
-      change: t.changePercent,
-      stats: {
-        open: t.lastPrice,
-        high: t.lastPrice,
-        low: t.lastPrice,
-        prevClose: t.lastPrice,
-        volume: t.volume,
-      },
-      sparklineData: [],
-    });
+    if (spotlightMode === "ticker-compare") {
+      addComparison(t.symbol);
+    } else {
+      openPrimary(t.symbol);
+    }
     close();
     setQuery("");
   };
@@ -198,7 +245,11 @@ export function Spotlight() {
       className="border-white/20 bg-card/95 backdrop-blur-lg max-w-m!"
     >
       <CommandInput 
-        placeholder="Type a command or search..." 
+        placeholder={
+          spotlightMode === "ticker-compare"
+            ? "Add a symbol to compare..."
+            : "Type a command or search..."
+        }
         value={query}
         onValueChange={setQuery}
       />
@@ -221,13 +272,13 @@ export function Spotlight() {
                   <span className="text-muted-foreground text-xs">{t.name}</span>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span>{t.lastPrice.toLocaleString()}</span>
-                  <span className={t.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"}>
+                   <span>{t.lastPrice ? t.lastPrice.toLocaleString() : "--"}</span>
+                   <span className={t.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"}>
                     {t.changePercent >= 0 ? "+" : ""}{(t.changePercent * 100).toFixed(2)}%
-                  </span>
-                </div>
-              </CommandItem>
-            ))}
+                   </span>
+                 </div>
+               </CommandItem>
+             ))}
           </CommandGroup>
         )}
 

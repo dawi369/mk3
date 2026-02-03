@@ -10,7 +10,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart2, TrendingUp, Spline, Zap } from "lucide-react";
 
-import { useState } from "react";
+import { useTickerStore } from "@/store/use-ticker-store";
 
 // --- Centralized Header Animation Config ---
 const HEADER_ANIMATION = {
@@ -23,7 +23,8 @@ const HEADER_ANIMATION = {
 export function TerminalHeader() {
   const { navContent: manualNavContent, visibleRows, setVisibleRows } = useHeader();
   const { activeView } = useTerminalView();
-  const [viewMode, setViewMode] = useState<"front" | "curve">("front");
+  const viewMode = useTickerStore((state) => state.mode);
+  const setMode = useTickerStore((state) => state.setMode);
 
   // Declarative navigation mapping
   const renderNavContent = () => {
@@ -41,7 +42,7 @@ export function TerminalHeader() {
               <ToggleGroup 
                 type="single" 
                 value={viewMode}
-                onValueChange={(val) => val && setViewMode(val as "front" | "curve")}
+                onValueChange={(val) => val && setMode(val as "front" | "curve")}
                 className="bg-muted/50 p-1 rounded-lg border border-white/5"
               >
                 <ToggleGroupItem value="front" size="sm" className="h-7 px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm">

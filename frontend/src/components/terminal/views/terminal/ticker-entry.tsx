@@ -3,31 +3,16 @@
 import React, { useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
-import type { MarketMover, AssetStats } from "@/components/terminal/_shared/mock-data";
+import { useTickerStore } from "@/store/use-ticker-store";
+import type { TickerSnapshot } from "@/types/ticker.types";
+import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * Session snapshot for a single futures contract.
- * This is the aggregated view, not raw 1-second bars.
- */
-export interface TickerSnapshot {
-  symbol: string;        // Full symbol e.g. "ESH6"
-  last_price: number;    // Current price
-  session_open: number;  // Today's open
-  session_high: number;  // Session high
-  session_low: number;   // Session low
-  prev_close: number;    // Yesterday's settlement
-  cum_volume: number;    // Cumulative session volume
-  vwap?: number;         // Volume-weighted average price (optional)
-}
-
 interface TickerEntryProps {
-  data?: TickerSnapshot;
-  onClick?: () => void;
+  symbol: string;
   className?: string;
 }
 
@@ -73,35 +58,6 @@ function formatChange(change: number): string {
   return `${sign}${change.toFixed(2)}`;
 }
 
-/**
- * Convert TickerSnapshot to MarketMover format for modal compatibility
- */
-function snapshotToMarketMover(snapshot: TickerSnapshot): MarketMover {
-  const change = ((snapshot.last_price - snapshot.prev_close) / snapshot.prev_close) * 100;
-  
-  const stats: AssetStats = {
-    open: snapshot.session_open,
-    high: snapshot.session_high,
-    low: snapshot.session_low,
-    prevClose: snapshot.prev_close,
-    volume: snapshot.cum_volume,
-  };
-
-  // Generate simple sparkline data from session range
-  const sparklineData: number[] = [];
-  const range = snapshot.session_high - snapshot.session_low;
-  for (let i = 0; i < 50; i++) {
-    sparklineData.push(snapshot.session_low + Math.random() * range);
-  }
-
-  return {
-    ticker: snapshot.symbol,
-    change,
-    price: snapshot.last_price,
-    stats,
-    sparklineData,
-  };
-}
 
 // ============================================================================
 // Sub-Components
@@ -246,24 +202,33 @@ PulseBar.displayName = "PulseBar";
 // Main Component
 // ============================================================================
 
-export const TickerEntry = React.memo(({ data, onClick, className }: TickerEntryProps) => {
-  const { open } = useTickerModal();
+export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) => {
+  const mode = useTickerStore((state) => state.mode);
+  const entity = useTickerStore((state) => state.entitiesByMode[mode][symbol]);
+  const bars = useTickerStore((state) => state.seriesByMode[mode][symbol]);
+  const selection = useTickerStore((state) => state.selectionByMode[mode]);
+  const openPrimary = useTickerStore((state) => state.openPrimary);
+  const toggleSelectShift = useTickerStore((state) => state.toggleSelectShift);
 
-  // Generate mock data if none provided (for development)
-  const snapshot = useMemo(() => {
-    if (data) return data;
-    return generateMockSnapshot();
-  }, [data]);
+  const snapshot = useMemo(
+    () => buildTickerSnapshot(symbol, bars, entity?.latestBar),
+    [symbol, bars, entity?.latestBar]
+  );
 
-  // Handle click - convert to MarketMover and open modal
-  const handleClick = useCallback(() => {
-    if (onClick) {
-      onClick();
-    } else {
-      const marketMover = snapshotToMarketMover(snapshot);
-      open(marketMover);
-    }
-  }, [snapshot, onClick, open]);
+  const isSelected = selection.selected.includes(symbol);
+  const isPrimary = selection.primary === symbol;
+
+  const handleClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (event.shiftKey) {
+        toggleSelectShift(symbol);
+        return;
+      }
+
+      openPrimary(symbol);
+    },
+    [symbol, openPrimary, toggleSelectShift]
+  );
 
   return (
     <Card
@@ -276,6 +241,8 @@ export const TickerEntry = React.memo(({ data, onClick, className }: TickerEntry
         "hover:bg-[#1a1a1a] hover:border-white/8 transition-all duration-150 cursor-pointer",
         // Subtle inner glow on hover
         "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]",
+        isSelected && "border-white/20 bg-[#171717]",
+        isPrimary && "border-white/30 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]",
         className
       )}
       onClick={handleClick}
@@ -297,45 +264,3 @@ TickerEntry.displayName = "TickerEntry";
 // ============================================================================
 // Mock Data Generator (for development/testing)
 // ============================================================================
-
-// Sample futures symbols for realistic mock data
-const MOCK_SYMBOLS = [
-  "ESH6", "ESM6", "NQH6", "NQM6", "CLG6", "CLH6", 
-  "GCJ6", "GCM6", "SIH6", "SIK6", "ZBH6", "ZNH6",
-  "ZCH6", "ZSH6", "ZWH6", "NGF6", "NGG6", "HGH6"
-];
-
-let mockIndex = 0;
-
-export function generateMockSnapshot(symbol?: string): TickerSnapshot {
-  // Cycle through symbols if not provided
-  const sym = symbol || MOCK_SYMBOLS[mockIndex++ % MOCK_SYMBOLS.length];
-  
-  // Base prices vary by asset class for realism
-  const basePrices: Record<string, number> = {
-    ES: 52000, NQ: 18500, CL: 72, GC: 2050, SI: 24,
-    ZB: 118, ZN: 110, ZC: 450, ZS: 1200, ZW: 580,
-    NG: 2.8, HG: 385
-  };
-  
-  const root = sym.replace(/[FGHJKMNQUVXZ]\d{1,2}$/, "");
-  const basePrice = basePrices[root] || 1000;
-  
-  const variance = basePrice * 0.015;
-  const prevClose = basePrice + (Math.random() - 0.5) * variance;
-  const sessionOpen = prevClose + (Math.random() - 0.5) * variance * 0.3;
-  const lastPrice = sessionOpen + (Math.random() - 0.5) * variance * 0.8;
-  const sessionHigh = Math.max(sessionOpen, lastPrice) + Math.random() * variance * 0.2;
-  const sessionLow = Math.min(sessionOpen, lastPrice) - Math.random() * variance * 0.2;
-
-  return {
-    symbol: sym,
-    last_price: lastPrice,
-    session_open: sessionOpen,
-    session_high: sessionHigh,
-    session_low: sessionLow,
-    prev_close: prevClose,
-    cum_volume: Math.floor(Math.random() * 1_500_000) + 50_000,
-    vwap: (sessionHigh + sessionLow + lastPrice) / 3,
-  };
-}

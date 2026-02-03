@@ -36,12 +36,9 @@ export function TerminalView() {
               visibleRows={visibleRows}
               // Removed specific showPagination filter to show arrows for all as requested
             >
-              {/* --- TEMPORARY: DELETE THIS BLOCK START --- */}
-              {/* Force rendering of TickerEntry components to check layout */}
-              {Array.from({ length: 10 }).map((_, i) => (
-                <TickerEntry key={`temp-${i}`} />
+              {data.symbols.map((symbol) => (
+                <TickerEntry key={symbol} symbol={symbol} />
               ))}
-              {/* --- TEMPORARY: DELETE THIS BLOCK END --- */}
             </SectorContainer>
           </ErrorBoundary>
         </div>

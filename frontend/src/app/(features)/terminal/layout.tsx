@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import { SpotlightProvider } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import { Spotlight } from "@/components/terminal/layout/spotlight/spotlight";
-import { TickerModalProvider } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { TickerModal } from "@/components/terminal/ticker-modal/ticker-modal";
 import { HeaderProvider } from "@/components/terminal/layout/header-provider";
 import { TerminalHeader } from "@/components/terminal/layout/terminal-header";
@@ -34,9 +33,7 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
         <TerminalViewProvider>
           <HeaderProvider>
             <SpotlightProvider>
-              <TickerModalProvider>
-                <TerminalLayoutContent>{children}</TerminalLayoutContent>
-              </TickerModalProvider>
+              <TerminalLayoutContent>{children}</TerminalLayoutContent>
             </SpotlightProvider>
           </HeaderProvider>
         </TerminalViewProvider>

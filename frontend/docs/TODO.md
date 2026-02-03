@@ -38,6 +38,23 @@
 
 ---
 
+## Ticker Registry (Front Mode)
+
+- [ ] Add ticker registry store (mode-aware, selection-aware)
+- [ ] Seed front-mode entities from `/symbols` + `tickers/*.json`
+- [ ] Ingest WebSocket bars into registry with bounded history
+- [ ] Wire `TickerEntry` + `TerminalView` to registry entities
+- [ ] Wire Spotlight search to registry (mode-aware)
+- [ ] Shift+click multi-select with drawer comparison open
+- [ ] Spread mode (front mode only) — chart + legend
+
+## Curve Mode (Scaffold)
+
+- [ ] Define curve-mode indexing in store/types
+- [ ] Header toggle switches mode (no UI behavior yet)
+
+---
+
 ## Spotlight Search
 
 - [ ] Symbol search mode in spotlight — `components/terminal/layout/spotlight/spotlight.tsx`
