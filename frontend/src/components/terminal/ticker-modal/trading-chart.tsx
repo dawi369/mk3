@@ -16,52 +16,33 @@ import { SYMBOL_COLORS } from "@/components/terminal/ticker-modal/ticker-modal-p
 interface TradingChartProps {
   ticker: string;
   data?: CandlestickData<Time>[];
+  lineData?: LineData<Time>[];
   comparisons?: string[];
+  comparisonData?: Record<string, LineData<Time>[]>;
+  showComparisons?: boolean;
   className?: string;
 }
 
-// Generate mock candlestick data for demo purposes
-function generateMockData(basePrice: number, count = 100): CandlestickData<Time>[] {
-  const data: CandlestickData<Time>[] = [];
-  let currentPrice = basePrice;
-  const now = Math.floor(Date.now() / 1000);
+const emptyCandles: CandlestickData<Time>[] = [];
+const emptyLines: LineData<Time>[] = [];
 
-  for (let i = count; i >= 0; i--) {
-    const time = (now - i * 60) as Time;
-    const volatility = basePrice * 0.002;
-    const open = currentPrice;
-    const close = open + (Math.random() - 0.5) * volatility * 2;
-    const high = Math.max(open, close) + Math.random() * volatility;
-    const low = Math.min(open, close) - Math.random() * volatility;
-
-    data.push({ time, open, high, low, close });
-    currentPrice = close;
-  }
-
-  return data;
-}
-
-// Generate mock line data for comparison symbols
-function generateMockLineData(basePrice: number, count = 100): LineData<Time>[] {
-  const data: LineData<Time>[] = [];
-  let currentPrice = basePrice;
-  const now = Math.floor(Date.now() / 1000);
-
-  for (let i = count; i >= 0; i--) {
-    const time = (now - i * 60) as Time;
-    const volatility = basePrice * 0.003;
-    currentPrice = currentPrice + (Math.random() - 0.5) * volatility * 2;
-    data.push({ time, value: currentPrice });
-  }
-
-  return data;
-}
-
-export function TradingChart({ ticker, data, comparisons = [], className }: TradingChartProps) {
+export function TradingChart({
+  ticker,
+  data,
+  lineData,
+  comparisons = [],
+  comparisonData,
+  showComparisons = true,
+  className,
+}: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const primarySeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const primaryCandleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const primaryLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const seriesTypeRef = useRef<"candlestick" | "line">("candlestick");
+
+  const useLinePrimary = lineData !== undefined;
 
   // Initialize chart
   const initChart = useCallback(() => {
@@ -71,7 +52,8 @@ export function TradingChart({ ticker, data, comparisons = [], className }: Trad
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
-      primarySeriesRef.current = null;
+      primaryCandleRef.current = null;
+      primaryLineRef.current = null;
       comparisonSeriesRef.current.clear();
     }
 
@@ -99,25 +81,33 @@ export function TradingChart({ ticker, data, comparisons = [], className }: Trad
       handleScroll: { vertTouchDrag: false },
     });
 
-    // Primary candlestick series
-    const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: SYMBOL_COLORS[0],
-      downColor: "#f43f5e",
-      borderUpColor: SYMBOL_COLORS[0],
-      borderDownColor: "#f43f5e",
-      wickUpColor: SYMBOL_COLORS[0],
-      wickDownColor: "#f43f5e",
-    });
-
     chartRef.current = chart;
-    primarySeriesRef.current = candlestickSeries;
 
-    // Set primary data
-    const chartData = data || generateMockData(1000, 100);
-    candlestickSeries.setData(chartData);
+    if (useLinePrimary) {
+      const lineSeries = chart.addSeries(LineSeries, {
+        color: SYMBOL_COLORS[0],
+        lineWidth: 2,
+      });
+      primaryLineRef.current = lineSeries;
+      seriesTypeRef.current = "line";
+      lineSeries.setData(lineData ?? emptyLines);
+    } else {
+      const candlestickSeries = chart.addSeries(CandlestickSeries, {
+        upColor: SYMBOL_COLORS[0],
+        downColor: "#f43f5e",
+        borderUpColor: SYMBOL_COLORS[0],
+        borderDownColor: "#f43f5e",
+        wickUpColor: SYMBOL_COLORS[0],
+        wickDownColor: "#f43f5e",
+      });
+      primaryCandleRef.current = candlestickSeries;
+      seriesTypeRef.current = "candlestick";
+      const chartData = data ?? emptyCandles;
+      candlestickSeries.setData(chartData);
+    }
 
     chart.timeScale().fitContent();
-  }, [data]);
+  }, [data, lineData, useLinePrimary]);
 
   // Handle resize
   useEffect(() => {
@@ -141,7 +131,8 @@ export function TradingChart({ ticker, data, comparisons = [], className }: Trad
       if (chartRef.current) {
         chartRef.current.remove();
         chartRef.current = null;
-        primarySeriesRef.current = null;
+        primaryCandleRef.current = null;
+        primaryLineRef.current = null;
         comparisonSeriesRef.current.clear();
       }
     };
@@ -149,21 +140,40 @@ export function TradingChart({ ticker, data, comparisons = [], className }: Trad
 
   // Update data when ticker changes
   useEffect(() => {
-    if (primarySeriesRef.current) {
-      const chartData = data || generateMockData(1000, 100);
-      primarySeriesRef.current.setData(chartData);
-      chartRef.current?.timeScale().fitContent();
+    if (!chartRef.current) return;
+
+    if (useLinePrimary) {
+      if (seriesTypeRef.current !== "line") {
+        initChart();
+        return;
+      }
+      if (primaryLineRef.current) {
+        primaryLineRef.current.setData(lineData ?? emptyLines);
+        chartRef.current.timeScale().fitContent();
+      }
+      return;
     }
-  }, [ticker, data]);
+
+    if (seriesTypeRef.current !== "candlestick") {
+      initChart();
+      return;
+    }
+
+    if (primaryCandleRef.current) {
+      const chartData = data ?? emptyCandles;
+      primaryCandleRef.current.setData(chartData);
+      chartRef.current.timeScale().fitContent();
+    }
+  }, [ticker, data, lineData, useLinePrimary, initChart]);
 
   // Handle comparison symbols
   useEffect(() => {
     if (!chartRef.current) return;
 
-    const currentSymbols = new Set(comparisons);
+    const activeSymbols = showComparisons ? comparisons : [];
+    const currentSymbols = new Set(activeSymbols);
     const existingSymbols = new Set(comparisonSeriesRef.current.keys());
 
-    // Remove series for symbols no longer in comparisons
     for (const symbol of existingSymbols) {
       if (!currentSymbols.has(symbol)) {
         const series = comparisonSeriesRef.current.get(symbol);
@@ -174,24 +184,23 @@ export function TradingChart({ ticker, data, comparisons = [], className }: Trad
       }
     }
 
-    // Add series for new comparison symbols
-    for (let i = 0; i < comparisons.length; i++) {
-      const symbol = comparisons[i];
-      if (!comparisonSeriesRef.current.has(symbol)) {
-        const colorIndex = i + 1; // Skip first color (used by primary)
-        const lineSeries = chartRef.current.addSeries(LineSeries, {
+    for (let i = 0; i < activeSymbols.length; i++) {
+      const symbol = activeSymbols[i];
+      let series = comparisonSeriesRef.current.get(symbol);
+
+      if (!series) {
+        const colorIndex = i + 1;
+        series = chartRef.current.addSeries(LineSeries, {
           color: SYMBOL_COLORS[colorIndex % SYMBOL_COLORS.length],
           lineWidth: 2,
         });
-
-        // Use mock data for now
-        const lineData = generateMockLineData(1000 + (i + 1) * 50, 100);
-        lineSeries.setData(lineData);
-
-        comparisonSeriesRef.current.set(symbol, lineSeries);
+        comparisonSeriesRef.current.set(symbol, series);
       }
+
+      const seriesData = comparisonData?.[symbol] ?? emptyLines;
+      series.setData(seriesData);
     }
-  }, [comparisons]);
+  }, [comparisons, comparisonData, showComparisons]);
 
   return <div ref={containerRef} className={className} style={{ width: "100%", height: "100%" }} />;
 }

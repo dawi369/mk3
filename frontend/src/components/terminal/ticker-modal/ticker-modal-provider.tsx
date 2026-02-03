@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { MAX_COMPARISONS, type Timeframe } from "@/types/ticker.types";
+import type { SpreadLeg, Timeframe } from "@/types/ticker.types";
 import { useTickerStore } from "@/store/use-ticker-store";
 
 // Symbol colors for chart overlay
@@ -16,6 +16,7 @@ interface TickerModalState {
   isOpen: boolean;
   primarySymbol: string | null;
   comparisons: string[];
+  spreadLegs: SpreadLeg[];
   open: (input: string | { ticker: string }) => void;
   close: () => void;
 
@@ -29,6 +30,10 @@ interface TickerModalState {
 
   spreadEnabled: boolean;
   setSpreadEnabled: (enabled: boolean) => void;
+  toggleSpreadLegSign: (symbol: string) => void;
+  moveSpreadLeg: (symbol: string, direction: -1 | 1) => void;
+  reverseSpreadLegs: () => void;
+  applySpreadPreset: (preset: "calendar" | "ratio" | "butterfly" | "condor") => void;
 }
 
 export function useTickerModal(): TickerModalState {
@@ -44,6 +49,10 @@ export function useTickerModal(): TickerModalState {
   const addComparison = useTickerStore((state) => state.addComparison);
   const removeComparison = useTickerStore((state) => state.removeComparison);
   const setSpreadEnabled = useTickerStore((state) => state.setSpreadEnabled);
+  const toggleSpreadLegSign = useTickerStore((state) => state.toggleSpreadLegSign);
+  const moveSpreadLeg = useTickerStore((state) => state.moveSpreadLeg);
+  const reverseSpreadLegs = useTickerStore((state) => state.reverseSpreadLegs);
+  const applySpreadPreset = useTickerStore((state) => state.applySpreadPreset);
 
   const open = (input: string | { ticker: string }) => {
     const symbol = typeof input === "string" ? input : input.ticker;
@@ -58,6 +67,7 @@ export function useTickerModal(): TickerModalState {
     isOpen,
     primarySymbol: selection.primary,
     comparisons,
+    spreadLegs: selection.spreadLegs,
     open,
     close,
     timeframe,
@@ -68,6 +78,10 @@ export function useTickerModal(): TickerModalState {
     removeComparison,
     spreadEnabled: selection.spreadEnabled,
     setSpreadEnabled,
+    toggleSpreadLegSign,
+    moveSpreadLeg,
+    reverseSpreadLegs,
+    applySpreadPreset,
   };
 }
 

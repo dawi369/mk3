@@ -328,24 +328,16 @@ async function handleRequest(
     }
 
     if (method === "POST" && path === "/admin/refresh-front-months") {
-      try {
-        await frontMonthJob.runRefresh();
-        const status = frontMonthJob.getStatus();
-        const cache = frontMonthJob.getCache();
-        return jsonResponse({
-          message: "Front month refresh triggered",
-          status,
-          cache,
-        });
-      } catch (err) {
-        return jsonResponse(
-          {
-            error: "Refresh failed",
-            details: err instanceof Error ? err.message : String(err),
-          },
-          500,
-        );
-      }
+      // Run in background to prevent timeout
+      frontMonthJob.runRefresh().catch((err) => {
+        console.error("[FrontMonthJob] Background refresh failed:", err);
+      });
+
+      return jsonResponse({
+        message: "Front month refresh started (running in background)",
+        status: frontMonthJob.getStatus(),
+        cache: frontMonthJob.getCache(), // Return current cache immediately
+      });
     }
 
     if (method === "POST" && path === "/admin/refresh-snapshots") {

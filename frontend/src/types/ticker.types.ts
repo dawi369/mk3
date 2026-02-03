@@ -31,6 +31,12 @@ export interface TickerSelectionState {
   primary: string | null;
   selected: string[];
   spreadEnabled: boolean;
+  spreadLegs: SpreadLeg[];
+}
+
+export interface SpreadLeg {
+  symbol: string;
+  weight: number;
 }
 
 export interface TickerSeries {
@@ -52,4 +58,4 @@ export interface TickerSearchResult {
 export const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
 
-export const MAX_COMPARISONS = 3;
+export const MAX_SPREAD_LEGS = 4;

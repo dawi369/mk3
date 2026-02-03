@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useConnection } from "./connection-provider";
 import { Bar } from "@/types/common.types";
 import { useTickerStore } from "@/store/use-ticker-store";
@@ -21,12 +21,12 @@ const DataContext = createContext<DataContextType | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, status } = useConnection();
-  const mode = useTickerStore((state) => state.mode);
   const registerSymbols = useTickerStore((state) => state.registerSymbols);
   const upsertBar = useTickerStore((state) => state.upsertBar);
-  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
-  const series = useTickerStore((state) => state.seriesByMode[mode]);
   const [isLoading, setIsLoading] = useState(true);
+  const pendingBarsRef = useRef<Bar[]>([]);
+  const flushHandleRef = useRef<number | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -37,8 +37,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/symbols`);
         if (!response.ok) return;
         const data = await response.json();
-        if (!mounted || !Array.isArray(data)) return;
-        registerSymbols("front", data);
+        if (!mounted) return;
+        const symbols = Array.isArray(data) ? data : data?.symbols;
+        if (!Array.isArray(symbols)) return;
+        registerSymbols("front", symbols);
       } catch (err) {
         console.warn("[DataProvider] Failed to load symbols", err);
       }
@@ -51,11 +53,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [registerSymbols]);
 
   useEffect(() => {
-    // Subscribe to WebSocket messages
+    const flush = () => {
+      flushHandleRef.current = null;
+      const queued = pendingBarsRef.current;
+      if (queued.length === 0) return;
+      pendingBarsRef.current = [];
+      for (const bar of queued) {
+        upsertBar("front", bar);
+      }
+      if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+      }
+    };
+
+    const scheduleFlush = () => {
+      if (flushHandleRef.current !== null) return;
+      flushHandleRef.current = window.requestAnimationFrame(flush);
+    };
+
     const unsubscribe = subscribe((message: any) => {
-      // Handle info messages from backend
       if (message.type === "info") {
-        console.log("ℹ️ [Hub]", message.message);
         return;
       }
 
@@ -69,22 +87,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        upsertBar("front", { symbol, ...barData });
-        setIsLoading(false);
+        pendingBarsRef.current.push({ symbol, ...barData });
+        scheduleFlush();
       }
     });
 
-    return () => unsubscribe();
-  }, [subscribe, upsertBar, setIsLoading]);
+    return () => {
+      if (flushHandleRef.current !== null) {
+        window.cancelAnimationFrame(flushHandleRef.current);
+      }
+      unsubscribe();
+    };
+  }, [subscribe, upsertBar]);
 
   const getLatestBar = (symbol: string) => {
-    return entities[symbol]?.latestBar;
+    return useTickerStore.getState().entitiesByMode.front[symbol]?.latestBar;
   };
 
   return (
     <DataContext.Provider
       value={{
-        marketData: series,
+        marketData: useTickerStore.getState().seriesByMode.front,
         isLoading: isLoading && status !== "connected",
         getLatestBar,
       }}

@@ -140,6 +140,7 @@ export function Spotlight() {
   const mode = useTickerStore((state) => state.mode);
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
   const series = useTickerStore((state) => state.seriesByMode[mode]);
+  const isModalOpen = useTickerStore((state) => state.isModalOpen);
   const openPrimary = useTickerStore((state) => state.openPrimary);
   const addComparison = useTickerStore((state) => state.addComparison);
   const defaultCommands = useDefaultCommands();
@@ -221,7 +222,7 @@ export function Spotlight() {
   if (!mounted) return null;
 
   const handleTickerSelect = (t: TickerSearchResult) => {
-    if (spotlightMode === "ticker-compare") {
+    if (isModalOpen || spotlightMode === "ticker-compare") {
       addComparison(t.symbol);
     } else {
       openPrimary(t.symbol);
@@ -246,7 +247,7 @@ export function Spotlight() {
     >
       <CommandInput 
         placeholder={
-          spotlightMode === "ticker-compare"
+          spotlightMode === "ticker-compare" || isModalOpen
             ? "Add a symbol to compare..."
             : "Type a command or search..."
         }

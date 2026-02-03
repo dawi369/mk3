@@ -4,7 +4,6 @@ import React, { useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useTickerStore } from "@/store/use-ticker-store";
-import type { TickerSnapshot } from "@/types/ticker.types";
 import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
 
 // ============================================================================

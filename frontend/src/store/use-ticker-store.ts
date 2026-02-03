@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import type { Bar } from "@/types/common.types";
-import { MAX_COMPARISONS } from "@/types/ticker.types";
 import type {
+  SpreadLeg,
   Timeframe,
   TickerEntity,
   TickerMode,
   TickerSelectionState,
 } from "@/types/ticker.types";
+import { MAX_SPREAD_LEGS } from "@/types/ticker.types";
 import {
   ASSET_CLASSES,
   getAssetClassForTicker,
@@ -20,6 +21,7 @@ const emptySelection = (): TickerSelectionState => ({
   primary: null,
   selected: [],
   spreadEnabled: false,
+  spreadLegs: [],
 });
 
 const emptyAssetIndex = () =>
@@ -63,6 +65,37 @@ function upsertSeries(current: Bar[] | undefined, nextBar: Bar): Bar[] {
   return updated;
 }
 
+function normalizeLegs(legs: SpreadLeg[], primary: string | null): SpreadLeg[] {
+  const seen = new Set<string>();
+  const normalized: SpreadLeg[] = [];
+
+  for (const leg of legs) {
+    if (!leg.symbol || seen.has(leg.symbol)) continue;
+    if (normalized.length >= MAX_SPREAD_LEGS) break;
+    normalized.push({ symbol: leg.symbol, weight: leg.weight || 1 });
+    seen.add(leg.symbol);
+  }
+
+  if (primary && !seen.has(primary) && normalized.length < MAX_SPREAD_LEGS) {
+    normalized.unshift({ symbol: primary, weight: 1 });
+  }
+
+  return normalized;
+}
+
+function buildDefaultLegs(selected: string[], primary: string | null): SpreadLeg[] {
+  const legs: SpreadLeg[] = [];
+  if (primary) {
+    legs.push({ symbol: primary, weight: 1 });
+  }
+  for (const symbol of selected) {
+    if (symbol === primary) continue;
+    if (legs.length >= MAX_SPREAD_LEGS) break;
+    legs.push({ symbol, weight: -1 });
+  }
+  return legs;
+}
+
 interface TickerStoreState {
   mode: TickerMode;
   isModalOpen: boolean;
@@ -81,6 +114,10 @@ interface TickerStoreState {
   toggleSelectShift: (symbol: string) => void;
   addComparison: (symbol: string) => void;
   removeComparison: (symbol: string) => void;
+  toggleSpreadLegSign: (symbol: string) => void;
+  moveSpreadLeg: (symbol: string, direction: -1 | 1) => void;
+  reverseSpreadLegs: () => void;
+  applySpreadPreset: (preset: "calendar" | "ratio" | "butterfly" | "condor") => void;
   clearSelection: () => void;
   closeModal: () => void;
 
@@ -89,7 +126,7 @@ interface TickerStoreState {
   setSpreadEnabled: (enabled: boolean) => void;
 }
 
-export const useTickerStore = create<TickerStoreState>((set, get) => ({
+export const useTickerStore = create<TickerStoreState>((set) => ({
   mode: "front",
   isModalOpen: false,
   entitiesByMode: { front: {}, curve: {} },
@@ -171,14 +208,20 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
   openPrimary: (symbol) =>
     set((state) => {
       const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const nextSelected = [symbol];
+      const nextSpreadLegs = selection.spreadEnabled
+        ? buildDefaultLegs(nextSelected, symbol)
+        : selection.spreadLegs;
       return {
         isModalOpen: true,
         selectionByMode: {
           ...state.selectionByMode,
           [mode]: {
-            ...state.selectionByMode[mode],
+            ...selection,
             primary: symbol,
-            selected: [symbol],
+            selected: nextSelected,
+            spreadLegs: nextSpreadLegs,
           },
         },
       };
@@ -193,19 +236,31 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
 
       let nextSelected = selected;
       let nextPrimary = selection.primary;
+      let nextLegs = selection.spreadLegs;
 
       if (isSelected) {
         nextSelected = selected.filter((s) => s !== symbol);
         if (selection.primary === symbol) {
           nextPrimary = nextSelected.length > 0 ? nextSelected[0] : null;
         }
+        if (selection.spreadEnabled) {
+          nextLegs = nextLegs.filter((leg) => leg.symbol !== symbol);
+        }
       } else {
         if (!nextPrimary) {
           nextPrimary = symbol;
           nextSelected = [symbol];
-        } else if (selected.length < MAX_COMPARISONS + 1) {
+        } else {
           nextSelected = [...selected, symbol];
         }
+
+        if (selection.spreadEnabled && nextLegs.length < MAX_SPREAD_LEGS) {
+          nextLegs = normalizeLegs([...nextLegs, { symbol, weight: -1 }], nextPrimary);
+        }
+      }
+
+      if (selection.spreadEnabled) {
+        nextLegs = normalizeLegs(nextLegs, nextPrimary);
       }
 
       const shouldOpen = !state.isModalOpen && nextSelected.length >= 2;
@@ -218,6 +273,7 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
             ...selection,
             primary: nextPrimary,
             selected: nextSelected,
+            spreadLegs: nextLegs,
           },
         },
       };
@@ -243,14 +299,18 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
               ...selection,
               primary: symbol,
               selected: [symbol],
+              spreadLegs: selection.spreadEnabled
+                ? buildDefaultLegs([symbol], symbol)
+                : selection.spreadLegs,
             },
           },
         };
       }
 
-      if (selection.selected.length >= MAX_COMPARISONS + 1) {
-        return { isModalOpen: true };
-      }
+      const nextSelected = [...selected, symbol];
+      const nextLegs = selection.spreadEnabled
+        ? normalizeLegs([...selection.spreadLegs, { symbol, weight: -1 }], selection.primary)
+        : selection.spreadLegs;
 
       return {
         isModalOpen: true,
@@ -258,7 +318,8 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
           ...state.selectionByMode,
           [mode]: {
             ...selection,
-            selected: [...selected, symbol],
+            selected: nextSelected,
+            spreadLegs: nextLegs,
           },
         },
       };
@@ -270,6 +331,12 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
       const selection = state.selectionByMode[mode];
       const nextSelected = selection.selected.filter((s) => s !== symbol);
       const nextPrimary = selection.primary === symbol ? nextSelected[0] ?? null : selection.primary;
+      const nextLegs = selection.spreadEnabled
+        ? normalizeLegs(
+            selection.spreadLegs.filter((leg) => leg.symbol !== symbol),
+            nextPrimary
+          )
+        : selection.spreadLegs;
 
       return {
         selectionByMode: {
@@ -278,6 +345,105 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
             ...selection,
             primary: nextPrimary,
             selected: nextSelected,
+            spreadLegs: nextLegs,
+          },
+        },
+      };
+    }),
+
+  toggleSpreadLegSign: (symbol) =>
+    set((state) => {
+      const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const nextLegs = selection.spreadLegs.map((leg) =>
+        leg.symbol === symbol ? { ...leg, weight: leg.weight * -1 } : leg
+      );
+      return {
+        selectionByMode: {
+          ...state.selectionByMode,
+          [mode]: {
+            ...selection,
+            spreadLegs: nextLegs,
+          },
+        },
+      };
+    }),
+
+  moveSpreadLeg: (symbol, direction) =>
+    set((state) => {
+      const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const index = selection.spreadLegs.findIndex((leg) => leg.symbol === symbol);
+      if (index === -1) return {};
+
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= selection.spreadLegs.length) return {};
+
+      const nextLegs = [...selection.spreadLegs];
+      const [leg] = nextLegs.splice(index, 1);
+      nextLegs.splice(nextIndex, 0, leg);
+
+      return {
+        selectionByMode: {
+          ...state.selectionByMode,
+          [mode]: {
+            ...selection,
+            spreadLegs: nextLegs,
+          },
+        },
+      };
+    }),
+
+  reverseSpreadLegs: () =>
+    set((state) => {
+      const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const nextLegs = selection.spreadLegs.map((leg) => ({
+        ...leg,
+        weight: leg.weight * -1,
+      }));
+      return {
+        selectionByMode: {
+          ...state.selectionByMode,
+          [mode]: {
+            ...selection,
+            spreadLegs: nextLegs,
+          },
+        },
+      };
+    }),
+
+  applySpreadPreset: (preset) =>
+    set((state) => {
+      const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const ordered = selection.primary
+        ? [selection.primary, ...selection.selected.filter((s) => s !== selection.primary)]
+        : [...selection.selected];
+
+      const weightsByPreset: Record<typeof preset, number[]> = {
+        calendar: [1, -1],
+        ratio: [1, -1],
+        butterfly: [1, -2, 1],
+        condor: [1, -1, -1, 1],
+      };
+
+      const weights = weightsByPreset[preset];
+      if (ordered.length < weights.length) {
+        return {};
+      }
+
+      const legs = weights.map((weight, idx) => ({
+        symbol: ordered[idx],
+        weight,
+      }));
+
+      return {
+        selectionByMode: {
+          ...state.selectionByMode,
+          [mode]: {
+            ...selection,
+            spreadLegs: normalizeLegs(legs, selection.primary),
           },
         },
       };
@@ -286,14 +452,18 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
   clearSelection: () =>
     set((state) => {
       const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const nextSelected = selection.primary ? [selection.primary as string] : [];
+      const nextLegs = selection.spreadEnabled
+        ? buildDefaultLegs(nextSelected, selection.primary)
+        : selection.spreadLegs;
       return {
         selectionByMode: {
           ...state.selectionByMode,
           [mode]: {
-            ...state.selectionByMode[mode],
-            selected: state.selectionByMode[mode].primary
-              ? [state.selectionByMode[mode].primary as string]
-              : [],
+            ...selection,
+            selected: nextSelected,
+            spreadLegs: nextLegs,
           },
         },
       };
@@ -310,6 +480,7 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
             ...state.selectionByMode[mode],
             primary: null,
             selected: [],
+            spreadLegs: [],
           },
         },
       };
@@ -320,12 +491,22 @@ export const useTickerStore = create<TickerStoreState>((set, get) => ({
   setSpreadEnabled: (enabled) =>
     set((state) => {
       const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const nextLegs = enabled
+        ? normalizeLegs(
+            selection.spreadLegs.length > 0
+              ? selection.spreadLegs
+              : buildDefaultLegs(selection.selected, selection.primary),
+            selection.primary
+          )
+        : selection.spreadLegs;
       return {
         selectionByMode: {
           ...state.selectionByMode,
           [mode]: {
-            ...state.selectionByMode[mode],
+            ...selection,
             spreadEnabled: enabled,
+            spreadLegs: nextLegs,
           },
         },
       };
