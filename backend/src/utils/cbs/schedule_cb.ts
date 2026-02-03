@@ -3,7 +3,7 @@ import { Tickers } from "@/utils/tickers.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 import activeMonthsData from "./active.json" with { type: "json" };
 
-// Month code to month number mapping for sorting
+// Month code to month number mapping
 const MONTH_ORDER: Record<string, number> = {
   F: 1, G: 2, H: 3, J: 4, K: 5, M: 6,
   N: 7, Q: 8, U: 9, V: 10, X: 11, Z: 12,
@@ -54,7 +54,6 @@ function getYearSuffixes(): [string, string] {
 function generateContractSymbols(ticker: string, limit: number): string[] {
   const months = ACTIVE_MONTHS[ticker];
   if (!months || months.length === 0) {
-    console.warn(`[ScheduleBuilder] No active months defined for ${ticker}`);
     return [];
   }
 
@@ -70,7 +69,7 @@ function generateContractSymbols(ticker: string, limit: number): string[] {
     if (monthNum && monthNum >= currentMonth) {
       symbols.push({
         symbol: `${ticker}${monthCode}${currentYearSuffix}`,
-        sortKey: monthNum, // Current year: 1-12
+        sortKey: monthNum,
       });
     }
   }
@@ -81,7 +80,7 @@ function generateContractSymbols(ticker: string, limit: number): string[] {
     if (monthNum) {
       symbols.push({
         symbol: `${ticker}${monthCode}${nextYearSuffix}`,
-        sortKey: monthNum + 12, // Next year: 13-24
+        sortKey: monthNum + 12,
       });
     }
   }
@@ -108,33 +107,15 @@ class ScheduleContractBuilder {
     const tickers = await this.getTickers();
     const tickerRoots = tickers.listCodes(assetClass as any);
     const symbols: string[] = [];
-
-    console.log(`[ScheduleBuilder] Building request for ${assetClass}...`);
-    console.log(`[ScheduleBuilder] Ticker roots for ${assetClass}:`, tickerRoots);
-
-    // Determine limit based on asset class
     const limit = LIMITS_MAP[assetClass] || 1;
-    console.log(`[ScheduleBuilder] Limit for ${assetClass}: ${limit}`);
 
     for (const root of tickerRoots) {
       if (!root) continue;
-
-      // Generate symbols from active months config
       const contractSymbols = generateContractSymbols(root, limit);
-      
-      if (contractSymbols.length === 0) {
-        console.warn(`[ScheduleBuilder] No contracts generated for ${root}`);
-        continue;
-      }
-
-      console.log(
-        `[ScheduleBuilder] Generated ${contractSymbols.length} contracts for ${root}:`,
-        contractSymbols
-      );
       symbols.push(...contractSymbols);
     }
 
-    console.log(`[ScheduleBuilder] Built ${symbols.length} total symbols for ${assetClass}`);
+    console.log(`[ScheduleBuilder] ${assetClass}: ${symbols.length} symbols`);
 
     return {
       ev: eventType,
