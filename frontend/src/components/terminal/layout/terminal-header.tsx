@@ -44,11 +44,11 @@ export function TerminalHeader() {
                 onValueChange={(val) => val && setViewMode(val as "front" | "curve")}
                 className="bg-muted/50 p-1 rounded-lg border border-white/5"
               >
-                <ToggleGroupItem value="front" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="front" size="sm" className="h-7 px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <TrendingUp className="w-3.5 h-3.5 mr-2" />
                   Front
                 </ToggleGroupItem>
-                <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Spline className="w-3.5 h-3.5 mr-2" />
                   Curve
                 </ToggleGroupItem>
@@ -152,10 +152,10 @@ export function TerminalHeader() {
                       onValueChange={(val) => val && setVisibleRows(Number(val) as 3 | 4)}
                       className="bg-muted/50 p-0.5 rounded-md border border-white/5"
                     >
-                      <ToggleGroupItem value="3" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                      <ToggleGroupItem value="3" size="sm" className="h-6 px-2 font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
                         3
                       </ToggleGroupItem>
-                      <ToggleGroupItem value="4" size="sm" className="h-6 px-2 text-[10px] font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                      <ToggleGroupItem value="4" size="sm" className="h-6 px-2 font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
                         4
                       </ToggleGroupItem>
                     </ToggleGroup>

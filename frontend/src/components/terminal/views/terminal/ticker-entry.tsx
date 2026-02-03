@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import type { MarketMover, AssetStats } from "@/components/terminal/_shared/mock-data";
 
 // ============================================================================
 // Types
@@ -71,6 +73,36 @@ function formatChange(change: number): string {
   return `${sign}${change.toFixed(2)}`;
 }
 
+/**
+ * Convert TickerSnapshot to MarketMover format for modal compatibility
+ */
+function snapshotToMarketMover(snapshot: TickerSnapshot): MarketMover {
+  const change = ((snapshot.last_price - snapshot.prev_close) / snapshot.prev_close) * 100;
+  
+  const stats: AssetStats = {
+    open: snapshot.session_open,
+    high: snapshot.session_high,
+    low: snapshot.session_low,
+    prevClose: snapshot.prev_close,
+    volume: snapshot.cum_volume,
+  };
+
+  // Generate simple sparkline data from session range
+  const sparklineData: number[] = [];
+  const range = snapshot.session_high - snapshot.session_low;
+  for (let i = 0; i < 50; i++) {
+    sparklineData.push(snapshot.session_low + Math.random() * range);
+  }
+
+  return {
+    ticker: snapshot.symbol,
+    change,
+    price: snapshot.last_price,
+    stats,
+    sparklineData,
+  };
+}
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
@@ -93,10 +125,10 @@ const DataZone = React.memo(({ data }: DataZoneProps) => {
     <div className="flex flex-col justify-between h-full py-2 pl-2.5 pr-2.5 overflow-hidden min-w-0">
       {/* Row 1: Identity */}
       <div className="flex items-baseline gap-1 overflow-hidden">
-        <span className="text-sm font-bold text-foreground tracking-tight leading-none shrink-0">
+        <span className="text-lg font-bold text-foreground tracking-tight leading-none shrink-0">
           {root}
         </span>
-        <span className="text-[10px] font-mono text-muted-foreground/50 tracking-wide shrink-0">
+        <span className="text-sm font-mono text-muted-foreground/50 tracking-wide shrink-0">
           {expiry}
         </span>
       </div>
@@ -108,7 +140,8 @@ const DataZone = React.memo(({ data }: DataZoneProps) => {
         </span>
         <span
           className={cn(
-            "text-[11px] font-mono font-semibold tabular-nums tracking-tight shrink-0",
+            // TODO figure out how to make it all fit for 55,555.05 +9.999.99
+            "text-[16px] font-mono font-semibold tabular-nums tracking-tight shrink-0",
             isPositive ? "text-emerald-500" : "text-rose-500"
           )}
         >
@@ -118,12 +151,12 @@ const DataZone = React.memo(({ data }: DataZoneProps) => {
 
       {/* Row 3: Liquidity Context */}
       <div className="flex items-center justify-between gap-2 overflow-hidden">
-        <span className="text-[9px] font-mono text-muted-foreground/40 tabular-nums tracking-wider uppercase shrink-0">
+        <span className="text-[11px] font-mono text-muted-foreground/40 tabular-nums tracking-wider uppercase shrink-0">
           Vol {formatVolume(data.cum_volume)}
         </span>
         {data.vwap && (
-          <span className="text-[9px] font-mono text-amber-500/60 tabular-nums shrink-0">
-            {formatPrice(data.vwap)}
+          <span className="text-[11px] font-mono text-amber-500/60 tabular-nums shrink-0">
+            VWAP {formatPrice(data.vwap)}
           </span>
         )}
       </div>
@@ -214,11 +247,23 @@ PulseBar.displayName = "PulseBar";
 // ============================================================================
 
 export const TickerEntry = React.memo(({ data, onClick, className }: TickerEntryProps) => {
+  const { open } = useTickerModal();
+
   // Generate mock data if none provided (for development)
   const snapshot = useMemo(() => {
     if (data) return data;
     return generateMockSnapshot();
   }, [data]);
+
+  // Handle click - convert to MarketMover and open modal
+  const handleClick = useCallback(() => {
+    if (onClick) {
+      onClick();
+    } else {
+      const marketMover = snapshotToMarketMover(snapshot);
+      open(marketMover);
+    }
+  }, [snapshot, onClick, open]);
 
   return (
     <Card
@@ -233,7 +278,7 @@ export const TickerEntry = React.memo(({ data, onClick, className }: TickerEntry
         "hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]",
         className
       )}
-      onClick={onClick}
+      onClick={handleClick}
     >
       {/* Zone 1: Data Cluster */}
       <DataZone data={snapshot} />
