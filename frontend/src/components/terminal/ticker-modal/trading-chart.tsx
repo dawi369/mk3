@@ -172,7 +172,9 @@ export function TradingChart({
 
     if (lastFitKeyRef.current !== nextFitKey && length > 0) {
       if (timeRange) {
-        chartRef.current.timeScale().setVisibleRange(timeRange);
+        if (timeRange.from <= timeRange.to) {
+          chartRef.current.timeScale().setVisibleRange(timeRange);
+        }
         lastFitKeyRef.current = nextFitKey;
         return;
       }
@@ -180,7 +182,9 @@ export function TradingChart({
       const clampedVisible = Math.max(10, visibleBars);
       const to = length - 1;
       const from = Math.max(0, length - clampedVisible);
-      chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+      if (from <= to) {
+        chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+      }
       lastFitKeyRef.current = nextFitKey;
     }
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, timeRange]);

@@ -317,6 +317,9 @@ export function TickerModal() {
     if (!hasRangeData) return undefined;
     const fromMs = sessionStartMs;
     const toMs = nowMs + (nowMs - sessionStartMs) * rightOffsetRatio;
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) {
+      return undefined;
+    }
     return {
       from: Math.floor(fromMs / 1000) as Time,
       to: Math.floor(toMs / 1000) as Time,
