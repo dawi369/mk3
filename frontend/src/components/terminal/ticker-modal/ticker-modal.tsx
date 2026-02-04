@@ -226,6 +226,8 @@ export function TickerModal() {
     return buildSpreadSeries(spreadLegs, seriesBySymbol, timeframe);
   }, [spreadEnabled, spreadLegs, seriesBySymbol, timeframe]);
 
+  const fitKey = `${primarySymbol}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
+
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && close()} handleOnly>
       <DrawerContent className="h-[94vh] max-h-none! rounded-t-2xl [&>div.bg-muted]:hidden">
@@ -519,6 +521,7 @@ export function TickerModal() {
                 comparisons={overlaySymbols}
                 comparisonData={comparisonData}
                 showComparisons={!spreadEnabled || showLegs}
+                fitKey={fitKey}
               />
             </div>
           </div>

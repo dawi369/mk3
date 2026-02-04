@@ -20,6 +20,7 @@ interface TradingChartProps {
   comparisons?: string[];
   comparisonData?: Record<string, LineData<Time>[]>;
   showComparisons?: boolean;
+  fitKey?: string;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ export function TradingChart({
   comparisons = [],
   comparisonData,
   showComparisons = true,
+  fitKey,
   className,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -146,12 +148,12 @@ export function TradingChart({
       primaryCandleRef.current?.setData(data ?? emptyCandles);
     }
 
-    const fitKey = `${ticker}:${useLinePrimary ? "line" : "candle"}`;
-    if (lastFitKeyRef.current !== fitKey) {
+    const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
+    if (lastFitKeyRef.current !== nextFitKey) {
       chartRef.current.timeScale().fitContent();
-      lastFitKeyRef.current = fitKey;
+      lastFitKeyRef.current = nextFitKey;
     }
-  }, [ticker, data, lineData, useLinePrimary]);
+  }, [ticker, data, lineData, useLinePrimary, fitKey]);
 
   // Handle comparison symbols
   useEffect(() => {
