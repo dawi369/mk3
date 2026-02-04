@@ -23,6 +23,7 @@ interface TradingChartProps {
   fitKey?: string;
   visibleBars?: number;
   secondsVisible?: boolean;
+  timeRange?: { from: Time; to: Time };
   className?: string;
 }
 
@@ -39,6 +40,7 @@ export function TradingChart({
   fitKey,
   visibleBars = 200,
   secondsVisible = false,
+  timeRange,
   className,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,6 +114,7 @@ export function TradingChart({
       timeScale: {
         timeVisible: true,
         secondsVisible,
+        rightOffset: Math.floor(visibleBars * 0.2),
       },
     });
   }, []);
@@ -168,13 +171,19 @@ export function TradingChart({
     const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
 
     if (lastFitKeyRef.current !== nextFitKey && length > 0) {
+      if (timeRange) {
+        chartRef.current.timeScale().setVisibleRange(timeRange);
+        lastFitKeyRef.current = nextFitKey;
+        return;
+      }
+
       const clampedVisible = Math.max(10, visibleBars);
       const to = length - 1;
       const from = Math.max(0, length - clampedVisible);
       chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
       lastFitKeyRef.current = nextFitKey;
     }
-  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
+  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, timeRange]);
 
   // Handle comparison symbols
   useEffect(() => {

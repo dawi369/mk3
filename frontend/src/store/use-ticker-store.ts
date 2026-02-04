@@ -15,8 +15,8 @@ import {
 } from "@/lib/ticker-mapping";
 import { extractRoot } from "@/lib/month-utils";
 
-const MAX_BARS_DEFAULT = 7200;
-const MAX_BARS_TRACKED = 36000;
+const MAX_BARS_DEFAULT = 86400;
+const MAX_BARS_TRACKED = 604800;
 
 const emptySelection = (): TickerSelectionState => ({
   primary: null,

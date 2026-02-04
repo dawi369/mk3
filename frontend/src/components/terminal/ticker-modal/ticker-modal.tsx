@@ -25,6 +25,7 @@ import { AISidebar } from "@/components/terminal/ticker-modal/ai-sidebar";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
 import { resampleBars } from "@/lib/bar-resample";
+import { getGlobexSessionStartMs } from "@/lib/session-time";
 import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import {
   MAX_SPREAD_LEGS,
@@ -236,8 +237,31 @@ export function TickerModal() {
   }, [spreadEnabled, spreadLegs, seriesBySymbol, timeframe]);
 
   const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
-  const visibleBars = timeframe.endsWith("s") ? 300 : 200;
+  const visibleBars = 200;
   const secondsVisible = timeframe.endsWith("s");
+  const sessionStartMs = useMemo(() => getGlobexSessionStartMs(new Date()), []);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setNowMs(Date.now());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
+  const rightOffsetRatio = 0.2;
+  const hasRangeData = spreadEnabled
+    ? spreadData.length > 1
+    : resampledPrimary.length > 1;
+
+  const timeRange = useMemo(() => {
+    if (!hasRangeData) return undefined;
+    const fromMs = sessionStartMs;
+    const toMs = nowMs + (nowMs - sessionStartMs) * rightOffsetRatio;
+    return {
+      from: Math.floor(fromMs / 1000) as Time,
+      to: Math.floor(toMs / 1000) as Time,
+    };
+  }, [sessionStartMs, nowMs, hasRangeData]);
 
   if (!primarySymbol) return null;
 
@@ -542,6 +566,7 @@ export function TickerModal() {
                 fitKey={fitKey}
                 visibleBars={visibleBars}
                 secondsVisible={secondsVisible}
+                timeRange={timeRange}
               />
             </div>
           </div>
