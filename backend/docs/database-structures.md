@@ -7,7 +7,7 @@
 | Key Pattern | Type | Description |
 |-------------|------|-------------|
 | `bar:latest` | HASH | Symbol → Bar JSON |
-| `bar:today:{symbol}` | LIST | Today's bars for symbol |
+| `ts:bar:{tf}:{symbol}:{field}` | TIMESERIES | 1s + downsampled bars (7 day retention) |
 | `market_data` | STREAM | Real-time event bus |
 | `meta:trading_date` | STRING | Current date (YYYY-MM-DD) |
 | `meta:bar_count` | STRING | Total bars today |
@@ -45,6 +45,16 @@ XREAD BLOCK 5000 STREAMS market_data $
 XREVRANGE market_data + - COUNT 100
 ```
 
+### TimeSeries Operations
+
+```bash
+# Write (multiple fields at once)
+TS.MADD ts:bar:1s:ESH6:open 1702560000000 5000.25 ts:bar:1s:ESH6:close 1702560000000 5000.75
+
+# Range (1m)
+TS.MRANGE - + FILTER symbol=ESH6 tf=1m
+```
+
 ## TimescaleDB
 
 ### Table: `bars`
@@ -64,6 +74,23 @@ XREVRANGE market_data + - COUNT 100
 
 **Index:** `(symbol, timestamp DESC)`
 
+### Continuous Aggregate: `bars_30m`
+
+Materialized 30-minute OHLCV for analytics + backtesting.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `symbol` | TEXT | Contract ticker |
+| `bucket` | TIMESTAMPTZ | 30-minute bucket start |
+| `open` | DOUBLE PRECISION | First open in bucket |
+| `high` | DOUBLE PRECISION | Max high in bucket |
+| `low` | DOUBLE PRECISION | Min low in bucket |
+| `close` | DOUBLE PRECISION | Last close in bucket |
+| `volume` | DOUBLE PRECISION | Sum volume |
+| `vwap` | DOUBLE PRECISION | Volume-weighted avg price |
+
+**Index:** `(symbol, bucket DESC)`
+
 ### Insert Example
 
 ```sql
@@ -82,7 +109,7 @@ Polygon WS → Hub Server
                │
                ├─→ Redis (real-time)
                │     ├─ HSET bar:latest
-               │     ├─ RPUSH bar:today:{symbol}
+               │     ├─ TS.MADD ts:bar:1s:{symbol}:{field}
                │     └─ XADD market_data
                │
                └─→ TimescaleDB (historical)
@@ -95,7 +122,7 @@ Polygon WS → Hub Server
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `maxHubBars` | 86,400 | Max bars in Redis List per symbol |
+| `redisTsRetentionMs` | 604,800,000 | TimeSeries retention (7 days) |
 | `redisScanBatchSize` | 100 | Batch size for SCAN |
 | `redisDeleteBatchSize` | 100 | Batch size for DEL |
 | `maxStreamLength` | 10,000,000 | Max entries in Stream |

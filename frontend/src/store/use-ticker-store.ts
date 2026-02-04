@@ -16,7 +16,7 @@ import {
 import { extractRoot } from "@/lib/month-utils";
 
 const MAX_BARS_DEFAULT = 86400;
-const MAX_BARS_TRACKED = 604800;
+const MAX_BARS_TRACKED = 86400;
 
 const emptySelection = (): TickerSelectionState => ({
   primary: null,
@@ -65,6 +65,7 @@ function upsertSeries(current: Bar[] | undefined, nextBar: Bar, limit: number): 
   }
   return updated;
 }
+
 
 function normalizeLegs(legs: SpreadLeg[], primary: string | null): SpreadLeg[] {
   const seen = new Set<string>();

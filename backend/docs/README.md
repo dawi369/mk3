@@ -39,6 +39,8 @@ curl http://localhost:3001/admin/subscriptions | jq
 | `/bars/latest` | GET | All latest bars |
 | `/bars/latest/:symbol` | GET | Latest bar for symbol |
 | `/bars/today/:symbol` | GET | Today's bars for symbol |
+| `/bars/week/:symbol` | GET | 7-day range (tf optional) |
+| `/bars/range/:symbol` | GET | TimeSeries range (tf/start/end) |
 | `/symbols` | GET | List of subscribed symbols |
 | `/admin/subscriptions` | GET | Current WS subscriptions |
 | `/admin/refresh-subscriptions` | POST | Manual subscription refresh |

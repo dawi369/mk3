@@ -18,6 +18,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
 };
 
+const ALLOWED_TIMEFRAMES = new Set([
+  "1s",
+  "5s",
+  "30s",
+  "1m",
+  "5m",
+  "15m",
+  "1h",
+  "4h",
+  "1d",
+]);
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function parseTimeframe(value: string | null, fallback: string): string {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  return ALLOWED_TIMEFRAMES.has(trimmed) ? trimmed : fallback;
+}
+
+function parseMsParam(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function jsonResponse(data: any, status = 200) {
   return Response.json(data, {
     status,
@@ -143,6 +169,7 @@ async function handleRequest(
   path: string,
   req: Request,
 ): Promise<Response> {
+  const url = new URL(req.url);
   // --- Public Routes ---
 
   if (method === "GET" && path === "/health") {
@@ -197,6 +224,37 @@ async function handleRequest(
     return jsonResponse({ bars, count: bars.length });
   }
 
+  // Match /bars/range/:symbol
+  const rangeMatch = path.match(/^\/bars\/range\/([^\/]+)$/);
+  if (method === "GET" && rangeMatch) {
+    const symbol = rangeMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const start = parseMsParam(url.searchParams.get("start"));
+    const end = parseMsParam(url.searchParams.get("end"));
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
+
+    if (start === null || end === null) {
+      return errorResponse("start and end query params are required (ms)", 400);
+    }
+
+    const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
+    return jsonResponse({ symbol, tf, start, end, bars, count: bars.length });
+  }
+
+  // Match /bars/week/:symbol
+  const weekMatch = path.match(/^\/bars\/week\/([^\/]+)$/);
+  if (method === "GET" && weekMatch) {
+    const symbol = weekMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
+    const end = Date.now();
+    const start = end - ONE_WEEK_MS;
+    const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
+    return jsonResponse({ symbol, tf, start, end, bars, count: bars.length });
+  }
+
   // Match /bars/latest/:symbol
   const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
   if (method === "GET" && latestMatch) {
@@ -216,8 +274,9 @@ async function handleRequest(
     const symbol = todayMatch[1];
     if (!symbol) return errorResponse("Invalid symbol", 400);
 
-    const bars = await redisStore.getTodayBars(symbol);
-    return jsonResponse({ symbol, bars, count: bars.length });
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1s");
+    const bars = await redisStore.getTodayBars(symbol, tf as any);
+    return jsonResponse({ symbol, tf, bars, count: bars.length });
   }
 
   if (method === "GET" && path === "/symbols") {

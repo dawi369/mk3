@@ -42,7 +42,7 @@
 ```
 Polygon WS → ws_client.ts (normalize + validate)
                 │
-                ├─→ Redis (bar:latest, bar:today:*, market_data stream)
+                ├─→ Redis (bar:latest, ts:bar:* TimeSeries, market_data stream)
                 └─→ TimescaleDB (historical storage)
 ```
 
@@ -57,7 +57,7 @@ Polygon WS → ws_client.ts (normalize + validate)
 ### Redis Store (`src/server/data/redis_store.ts`)
 
 - `bar:latest` - HASH with latest bar per symbol
-- `bar:today:{symbol}` - LIST with today's bars
+- `ts:bar:{tf}:{symbol}:{field}` - RedisTimeSeries for 1s + downsampled bars
 - `market_data` - STREAM for real-time consumers
 
 ### TimescaleDB Store (`src/server/data/timescale_store.ts`)
@@ -140,7 +140,7 @@ export const SUBSCRIPTION_CONFIG = {
 
 ```typescript
 export const LIMITS = {
-  maxHubBars: 86_400,        // Max bars in Redis List per symbol
+  redisTsRetentionMs: 7 * 24 * 60 * 60 * 1000,
   redisScanBatchSize: 100,
   redisDeleteBatchSize: 100,
   maxStreamLength: 10_000_000,

@@ -6,14 +6,18 @@ Redis serves as the **hot data layer** for real-time market data distribution an
 
 ## Key Structure Overview
 
-### Real-Time Bar Data (Current)
+### Real-Time Bar Data (TimeSeries + Stream)
 
 | Key Pattern | Type | Description | TTL |
 |-------------|------|-------------|-----|
 | `bar:latest` | **HASH** | Symbol → Bar JSON (all latest bars in one hash) | Cleared daily |
-| `bar:today:{symbol}` | **LIST** | Today's bars for a specific symbol | Cleared daily |
+| `ts:bar:{tf}:{symbol}:{field}` | **TIMESERIES** | 1s bars + downsampled timeframes | 7 days (retention) |
 | `market_data` | **STREAM** | Real-time event bus (~10M max) | Cleared daily |
 | `bars` | **PUB/SUB** | Legacy channel (maintained for compatibility) | N/A |
+
+**Timeframes:** `1s`, `5s`, `30s`, `1m`, `5m`, `15m`, `1h`, `4h`, `1d`
+
+**Fields:** `open`, `high`, `low`, `close`, `volume`, `trades`
 
 ### Contract Snapshots
 
@@ -132,7 +136,8 @@ vwap = cumPriceVolume / cumVolume;
 ```
 Polygon WS → ws_client.ts → Redis
                               ├── HSET bar:latest
-                              ├── RPUSH bar:today:{symbol}
+                              ├── TS.MADD ts:bar:1s:{symbol}:{field}
+                              ├── TS.CREATERULE (downsample to 5s/30s/1m/5m/15m/1h/4h/1d)
                               ├── XADD market_data
                               └── PUBLISH bars
 ```
@@ -193,7 +198,9 @@ interface Bar {
 # Real-time bars
 HGET bar:latest ESH6
 HGETALL bar:latest
-LRANGE bar:today:ESH6 0 -1
+
+# TimeSeries range (1m)
+TS.MRANGE - + FILTER symbol=ESH6 tf=1m
 
 # Snapshots (planned)
 HGETALL snapshot:ESH6
@@ -250,6 +257,9 @@ await redisStore.writeSnapshot("ESH6", snapshotData);
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
+| `/bars/range/:symbol` | GET | No | TimeSeries range query (tf/start/end) |
+| `/bars/week/:symbol` | GET | No | 7-day range (tf optional) |
+| `/bars/today/:symbol` | GET | No | Today range (tf optional) |
 | `/session/:symbol` | GET | No | Session data (VWAP, CVOL, etc.) |
 | `/sessions` | GET | No | All session data |
 | `/snapshot/:symbol` | GET | No | Snapshot for symbol |
@@ -262,11 +272,11 @@ await redisStore.writeSnapshot("ESH6", snapshotData);
 
 The `clearTodayData()` function:
 - Deletes `bar:latest` hash
-- Deletes all `bar:today:*` lists
 - Deletes `market_data` stream
 - Deletes all `session:*` hashes
 - Resets `meta:bar_count` to 0
 - Updates `meta:trading_date`
+- Does NOT delete TimeSeries data (retention handles history)
 
 ---
 
@@ -282,11 +292,11 @@ The `clearTodayData()` function:
 
 ```yaml
 redis:
-  image: redis:8.2-alpine
+  image: redis/redis-stack-server:latest
   container_name: mk3-redis
   ports:
     - "6379:6379"
   volumes:
     - redis-data:/data
-  command: redis-server --appendonly yes
+  command: redis-stack-server --appendonly yes
 ```

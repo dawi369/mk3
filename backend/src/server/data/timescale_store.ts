@@ -82,6 +82,48 @@ class TimescaleStore {
         CREATE INDEX IF NOT EXISTS idx_bars_symbol_time ON bars (symbol, timestamp DESC);
       `;
 
+      // 30-minute continuous aggregate for analytics/backtesting
+      await this.sql`
+        CREATE MATERIALIZED VIEW IF NOT EXISTS bars_30m
+        WITH (timescaledb.continuous) AS
+        SELECT
+          symbol,
+          time_bucket('30 minutes', timestamp) AS bucket,
+          first(open, timestamp) AS open,
+          max(high) AS high,
+          min(low) AS low,
+          last(close, timestamp) AS close,
+          sum(volume) AS volume,
+          sum(volume * vwap) / NULLIF(sum(volume), 0) AS vwap
+        FROM bars
+        GROUP BY symbol, bucket;
+      `;
+
+      await this.sql`
+        CREATE INDEX IF NOT EXISTS idx_bars_30m_symbol_time
+        ON bars_30m (symbol, bucket DESC);
+      `;
+
+      await this.sql`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM timescaledb_information.jobs
+            WHERE proc_name = 'policy_refresh_continuous_aggregate'
+              AND hypertable_name = 'bars_30m'
+          ) THEN
+            PERFORM add_continuous_aggregate_policy(
+              'bars_30m',
+              start_offset => INTERVAL '1 year',
+              end_offset => INTERVAL '5 minutes',
+              schedule_interval => INTERVAL '30 minutes'
+            );
+          END IF;
+        END
+        $$;
+      `;
+
       this.connected = true;
       console.log("TimescaleDB schema initialized");
     } catch (err: any) {

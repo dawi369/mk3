@@ -1,60 +1,101 @@
-# Data Architecture & Symbol Strategy Report
+# RedisTimeSeries Implementation Plan
 
-## 1. Symbol Corrections (Immediate Action)
-Your current configuration includes expired or delivery-status contracts. Update the following to ensure liquidity:
+## Summary
+We will replace list-based history storage with RedisTimeSeries (RTS) for all 1-second bars, keep 7 days of retention, and auto-downsample into the UI timeframes (5s, 30s, 1m, 5m, 15m, 1h, 4h, 1d). The Redis stream remains for real-time WebSocket fanout. TimescaleDB continues to store long-term history.
 
-| Ticker | Old (Expired/Delivery) | New (Active Front Month) | Notes |
-| :--- | :--- | :--- | :--- |
-| **Crude Oil** | `CLG6` (Feb '26) | **`CLH6` (Mar '26)** | Old contract expired Jan 20. |
-| **Brent** | `BZG6` (Feb '26) | **`BZJ6` (Apr '26)** | Expired Dec '25. |
-| **Gold** | `GCG6` (Feb '26) | **`GCJ6` (Apr '26)** | Currently in delivery (dangerous). |
-| **Hogs** | `HEG6` (Feb '26) | **`HEJ6` (Apr '26)** | Expires ~Feb 13; low liquidity. |
+## Architecture
+- Ingest: WebSocket -> normalize bar -> RedisTimeSeries (1s) + RTS downsample rules
+- Stream: Redis `market_data` stream remains for real-time broadcast
+- Query: REST endpoints use `TS.MRANGE` to return candles in the requested timeframe
+- Retention: RTS retains 7 days; no daily deletes of RTS keys
 
----
+## Key Schema
+Key format:
+`ts:bar:{tf}:{symbol}:{field}`
 
-## 2. The "7-Day History" Feasibility Study
+Examples:
+- `ts:bar:1s:ESH6:open`
+- `ts:bar:1m:ESH6:close`
 
-### The Problem: Raw JSON at 1-Second Resolution
-Attempting to store and serve 7 days of 1-second data as raw JSON objects is **not viable**.
+Labels:
+- `symbol=ESH6`
+- `product=ES`
+- `field=open|high|low|close|volume|trades`
+- `tf=1s|5s|30s|1m|5m|15m|1h|4h|1d`
 
-* **Data Count:** ~605,000 points per ticker per week.
-* **Payload Size:** ~115 MB per ticker (Network/Browser crash risk).
-* **Redis RAM:** ~10-12 GB required for 80 tickers (High risk of eviction/OOM).
+Retention:
+- All RTS series use 7 days retention (`RETENTION 604800000`)
 
-### The Solution: RedisTimeSeries (Hybrid Architecture)
-You are using `redis:8.2-alpine`, which supports the necessary features.
+## Downsampling Rules
+Rules are created per symbol per field:
+- 1s -> 5s
+- 1s -> 30s
+- 1s -> 1m
+- 1m -> 5m
+- 1m -> 15m
+- 1m -> 1h
+- 1h -> 4h
+- 1h -> 1d
 
-**Architecture Strategy:**
-1.  **Real-Time Layer (Hot):** Keep using **Redis Streams** (`market_data`) for the live firehose. Trim this stream aggressively (e.g., keep only last 1 hour).
-2.  **History Layer (Cold):** Offload data from the Stream into **RedisTimeSeries** keys.
+Aggregations per field:
+- open: FIRST
+- high: MAX
+- low: MIN
+- close: LAST
+- volume: SUM
+- trades: SUM
 
-**Benefits:**
-* **Compression:** Uses "Double Delta" encoding. Reduces 200-byte JSON to ~15 bytes.
-* **RAM Usage:** Drops from ~12GB to **~1.5GB** for 7 days of history.
-* **Performance:** Enables server-side aggregations (Downsampling).
+## Ingest Flow
+On first bar for a symbol:
+1. Create RTS series for all fields/timeframes (idempotent)
+2. Create downsample rules (idempotent)
 
----
+On every bar:
+1. `TS.MADD` for open/high/low/close/volume/trades at timestamp
+2. `HSET bar:latest` for latest lookup
+3. `XADD market_data` for WS broadcast
+4. Update session hash (VWAP, CVOL, etc)
 
-## 3. Implementation Plan
+## Query Endpoints
+- `GET /bars/range/:symbol?start=ms&end=ms&tf=1m`
+- `GET /bars/week/:symbol?tf=1m`
+- `GET /bars/today/:symbol?tf=1s`
 
-### A. Data Structure
-Since TimeSeries stores single values, split your OHLCV data into 5 keys per symbol:
-* `ts:{symbol}:open`
-* `ts:{symbol}:high`
-* `ts:{symbol}:low`
-* `ts:{symbol}:close`
-* `ts:{symbol}:vol`
+All range endpoints use `TS.MRANGE` with `symbol` + `tf` label filters and merge field series into OHLCV candles.
 
-### B. Downsampling Rules (Crucial)
-To prevent browser freezing when users zoom out to 7 days, create automatic compaction rules in Redis.
+## Frontend Changes
+When the chart modal opens or the timeframe changes:
+1. Fetch `/bars/week/:symbol?tf=${timeframe}` for primary + comparisons
+2. Hydrate the store with historical bars
+3. Live WS updates continue to append
 
-```bash
-# 1. Create Raw Key (7 Day Retention)
-TS.CREATE ts:ESH6:close RETENTION 604800000
+## Docker Compose Change
+Redis must be Redis Stack to enable RedisTimeSeries:
 
-# 2. Create Downsampled Key (1 Minute Resolution, 30 Day Retention)
-TS.CREATE ts:ESH6:close:1m RETENTION 2592000000
+```yaml
+redis:
+  image: redis/redis-stack-server:latest
+  container_name: mk3-redis
+  ports:
+    - "6379:6379"
+  volumes:
+    - redis-data:/data
+  command: redis-stack-server --appendonly yes
+```
 
-# 3. Create Rule (Auto-aggregate)
-# When data hits raw key, auto-update the 1m key using the 'last' value
-TS.CREATERULE ts:ESH6:close ts:ESH6:close:1m AGGREGATION last 60000
+Verify RTS module:
+`redis-cli MODULE LIST`
+
+## Curve Mode Readiness
+Because RTS uses labels, curve queries become trivial:
+- Latest curve: `TS.MGET FILTER product=ES tf=1s field=close`
+- Historical curve: `TS.MRANGE start end FILTER product=ES tf=1m field=close`
+
+This supports term structure without additional indexing.
+
+## Rollout Checklist
+1. Switch Redis image to Redis Stack
+2. Add RTS series + rules on ingest
+3. Add range/week endpoints
+4. Update frontend to hydrate history
+5. Validate charts across timeframes

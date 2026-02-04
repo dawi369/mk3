@@ -1,0 +1,234 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
+import type { Bar } from "@/types/common.types";
+import type { Timeframe, TickerMode } from "@/types/ticker.types";
+import { useTickerStore } from "@/store/use-ticker-store";
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+const TIMEFRAME_MS: Record<Timeframe, number> = {
+  "5s": 5000,
+  "30s": 30000,
+  "1m": 60000,
+  "5m": 300000,
+  "15m": 900000,
+  "1h": 3600000,
+  "4h": 14400000,
+  "1d": 86400000,
+};
+
+const HISTORY_WINDOWS_MS: Record<Timeframe, number> = {
+  "5s": 24 * 60 * 60 * 1000,
+  "30s": 3 * 24 * 60 * 60 * 1000,
+  "1m": ONE_WEEK_MS,
+  "5m": ONE_WEEK_MS,
+  "15m": ONE_WEEK_MS,
+  "1h": ONE_WEEK_MS,
+  "4h": ONE_WEEK_MS,
+  "1d": ONE_WEEK_MS,
+};
+
+const MAX_SERIES_POINTS = 200_000;
+
+function normalizeTimestampMs(value: number): number {
+  if (!Number.isFinite(value)) return value;
+  return value < 1e12 ? value * 1000 : value;
+}
+
+function buildRange(timeframe: Timeframe): { start: number; end: number } {
+  const end = Date.now();
+  const windowMs = HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
+  const start = end - windowMs;
+  return { start, end };
+}
+
+function mergeBars(current: Bar[], incoming: Bar[], maxPoints: number): Bar[] {
+  if (current.length === 0) return incoming.slice(-maxPoints);
+  if (incoming.length === 0) return current.slice(-maxPoints);
+  const map = new Map<number, Bar>();
+  for (const bar of incoming) {
+    map.set(bar.startTime, bar);
+  }
+  for (const bar of current) {
+    map.set(bar.startTime, bar);
+  }
+  const merged = Array.from(map.values()).sort((a, b) => a.startTime - b.startTime);
+  if (merged.length > maxPoints) {
+    return merged.slice(merged.length - maxPoints);
+  }
+  return merged;
+}
+
+interface UseChartHistoryOptions {
+  symbols: string[];
+  timeframe: Timeframe;
+  enabled: boolean;
+  mode: TickerMode;
+}
+
+export function useChartHistory({
+  symbols,
+  timeframe,
+  enabled,
+  mode,
+}: UseChartHistoryOptions) {
+  const uniqueSymbols = useMemo(() => {
+    const list = Array.from(new Set(symbols.filter(Boolean)));
+    return list.sort();
+  }, [symbols]);
+  const symbolKey = uniqueSymbols.join("|");
+  const bucketMs = TIMEFRAME_MS[timeframe];
+  const windowMs = HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
+  const maxPoints = useMemo(
+    () => Math.min(MAX_SERIES_POINTS, Math.ceil(windowMs / bucketMs) + 2),
+    [windowMs, bucketMs],
+  );
+
+  const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, Bar[]>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const lastSeenRef = useRef<Map<string, string>>(new Map());
+
+  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
+
+  const latestBars = useMemo(() => {
+    const result: Record<string, Bar | undefined> = {};
+    for (const symbol of uniqueSymbols) {
+      result[symbol] = entities[symbol]?.latestBar;
+    }
+    return result;
+  }, [entities, symbolKey, uniqueSymbols]);
+
+  useEffect(() => {
+    lastSeenRef.current.clear();
+  }, [timeframe, symbolKey]);
+
+  useEffect(() => {
+    if (!enabled || uniqueSymbols.length === 0) {
+      setSeriesBySymbol({});
+      return;
+    }
+
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const { start, end } = buildRange(timeframe);
+
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const results = await Promise.all(
+          uniqueSymbols.map(async (symbol) => {
+            const response = await fetch(
+              `${NEXT_PUBLIC_HUB_URL}/bars/range/${symbol}?tf=${timeframe}&start=${start}&end=${end}`,
+              { signal: controller.signal },
+            );
+            if (!response.ok) return [symbol, []] as const;
+            const payload = await response.json();
+            const bars = Array.isArray(payload?.bars) ? payload.bars : [];
+            return [symbol, bars] as const;
+          }),
+        );
+
+        const next: Record<string, Bar[]> = {};
+        for (const [symbol, bars] of results) {
+          next[symbol] = bars;
+        }
+        setSeriesBySymbol((prev) => {
+          const merged: Record<string, Bar[]> = {};
+          for (const symbol of uniqueSymbols) {
+            merged[symbol] = mergeBars(prev[symbol] ?? [], next[symbol] ?? [], maxPoints);
+          }
+          return merged;
+        });
+      } catch (error) {
+        if ((error as { name?: string }).name !== "AbortError") {
+          console.warn("[useChartHistory] Failed to load history", error);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      controller.abort();
+    };
+  }, [enabled, timeframe, symbolKey, maxPoints]);
+
+  useEffect(() => {
+    if (!enabled || uniqueSymbols.length === 0) return;
+
+    setSeriesBySymbol((prev) => {
+      let updated = false;
+      const next = { ...prev };
+
+      for (const symbol of uniqueSymbols) {
+        const bar = latestBars[symbol];
+        if (!bar) continue;
+
+        const signature = `${bar.startTime}:${bar.close}:${bar.volume}:${bar.trades}`;
+        if (lastSeenRef.current.get(symbol) === signature) continue;
+        lastSeenRef.current.set(symbol, signature);
+
+        const normalizedStart = normalizeTimestampMs(bar.startTime);
+        const bucketStart = Math.floor(normalizedStart / bucketMs) * bucketMs;
+        const bucketEnd = bucketStart + bucketMs;
+
+        const existing = next[symbol] ? [...next[symbol]] : [];
+        const last = existing[existing.length - 1];
+
+        if (last && last.startTime === bucketStart) {
+          existing[existing.length - 1] = {
+            ...last,
+            high: Math.max(last.high, bar.high),
+            low: Math.min(last.low, bar.low),
+            close: bar.close,
+            volume: (last.volume || 0) + (bar.volume || 0),
+            trades: (last.trades || 0) + (bar.trades || 0),
+            endTime: bucketEnd,
+          };
+          next[symbol] = existing;
+          updated = true;
+          continue;
+        }
+
+        if (last && bucketStart < last.startTime) {
+          continue;
+        }
+
+        const nextBar: Bar = {
+          symbol,
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+          volume: bar.volume || 0,
+          trades: bar.trades || 0,
+          startTime: bucketStart,
+          endTime: bucketEnd,
+        };
+
+        const appended = [...existing, nextBar];
+        if (appended.length > maxPoints) {
+          next[symbol] = appended.slice(appended.length - maxPoints);
+        } else {
+          next[symbol] = appended;
+        }
+        updated = true;
+      }
+
+      return updated ? next : prev;
+    });
+  }, [latestBars, enabled, timeframe, symbolKey, bucketMs, maxPoints]);
+
+  return {
+    seriesBySymbol,
+    isLoading,
+  };
+}

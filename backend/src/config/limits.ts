@@ -1,6 +1,6 @@
 export const LIMITS = {
-  // Bar storage
-  maxHubBars: 86_400, // Max bars per symbol in Redis LIST (1 day at 1-second bars)
+  // RedisTimeSeries retention
+  redisTsRetentionMs: 7 * 24 * 60 * 60 * 1000, // 7 days
 
   // Redis operation batching
   redisScanBatchSize: 100,

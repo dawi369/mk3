@@ -6,7 +6,6 @@ import { Redis } from "ioredis";
 // Redis Key Constants
 const KEYS = {
   LATEST_HASH: "bar:latest", // HASH: symbol -> bar JSON
-  TODAY_PREFIX: "bar:today:", // LIST per symbol: bar:today:{symbol}
   STREAM: "market_data", // STREAM: real-time event bus
   PUBSUB_CHANNEL: "bars", // PUB/SUB: legacy support
   META_DATE: "meta:trading_date",
@@ -15,8 +14,65 @@ const KEYS = {
   SNAPSHOT_PREFIX: "snapshot:", // HASH per symbol: snapshot:{symbol}
 } as const;
 
+const TS_FIELDS = ["open", "high", "low", "close", "volume", "trades"] as const;
+type TimeSeriesField = (typeof TS_FIELDS)[number];
+
+const TIMEFRAMES = ["1s", "5s", "30s", "1m", "5m", "15m", "1h", "4h", "1d"] as const;
+type Timeframe = (typeof TIMEFRAMES)[number];
+
+const TIMEFRAME_MS: Record<Timeframe, number> = {
+  "1s": 1000,
+  "5s": 5000,
+  "30s": 30000,
+  "1m": 60000,
+  "5m": 300000,
+  "15m": 900000,
+  "1h": 3600000,
+  "4h": 14400000,
+  "1d": 86400000,
+};
+
+const DOWNSAMPLE_RULES: Array<{ source: Timeframe; dest: Timeframe; bucketMs: number }> = [
+  { source: "1s", dest: "5s", bucketMs: TIMEFRAME_MS["5s"] },
+  { source: "1s", dest: "30s", bucketMs: TIMEFRAME_MS["30s"] },
+  { source: "1s", dest: "1m", bucketMs: TIMEFRAME_MS["1m"] },
+  { source: "1m", dest: "5m", bucketMs: TIMEFRAME_MS["5m"] },
+  { source: "1m", dest: "15m", bucketMs: TIMEFRAME_MS["15m"] },
+  { source: "1m", dest: "1h", bucketMs: TIMEFRAME_MS["1h"] },
+  { source: "1h", dest: "4h", bucketMs: TIMEFRAME_MS["4h"] },
+  { source: "1h", dest: "1d", bucketMs: TIMEFRAME_MS["1d"] },
+];
+
+const TS_PREFIX = "ts:bar";
+
+function buildTsKey(tf: Timeframe, symbol: string, field: TimeSeriesField): string {
+  return `${TS_PREFIX}:${tf}:${symbol}:${field}`;
+}
+
+function extractRootSymbol(symbol: string): string {
+  const match = symbol.match(/^([A-Z]+)[FGHJKMNQUVXZ]\d{1,2}$/);
+  return match ? match[1] : symbol;
+}
+
+function normalizeTimestampMs(value: number): number {
+  if (!Number.isFinite(value)) return value;
+  return value < 1e12 ? value * 1000 : value;
+}
+
+function isIgnorableRedisError(error: unknown): boolean {
+  const message = String(error).toLowerCase();
+  return (
+    message.includes("already exists") ||
+    message.includes("busykey") ||
+    message.includes("already has a src rule") ||
+    message.includes("already has a source rule")
+  );
+}
+
 class RedisStore {
   public redis: Redis;
+  private tsInitialized = new Set<string>();
+  private tsInitPromises = new Map<string, Promise<void>>();
 
   constructor() {
     this.redis = new Redis({
@@ -30,7 +86,12 @@ class RedisStore {
       },
     });
 
-    this.redis.on("connect", () => console.log("Redis connected"));
+    this.redis.on("connect", () => {
+      console.log("Redis connected");
+      const today = new Date().toISOString().split("T")[0]!;
+      this.redis.setnx(KEYS.META_DATE, today).catch(() => undefined);
+      this.redis.setnx(KEYS.META_COUNT, "0").catch(() => undefined);
+    });
     this.redis.on("error", (err: any) => {
       console.error("Redis error:", err);
       if (err.code === "ECONNREFUSED") {
@@ -50,20 +111,19 @@ class RedisStore {
   /**
    * Write a bar to all storage locations:
    * - HSET bar:latest {symbol} (latest bar per symbol in single hash)
-   * - RPUSH bar:today:{symbol} (today's history per symbol)
+   * - TS.MADD ts:bar:1s:{symbol}:{field} (TimeSeries storage + downsample rules)
    * - XADD market_data (real-time stream)
    * - PUBLISH bars (legacy pub/sub)
    */
   async writeBar(bar: Bar): Promise<void> {
     const barJson = JSON.stringify(bar);
+    await this.ensureTimeSeriesForSymbol(bar.symbol);
+    await this.writeTimeSeries(bar);
+
     const multi = this.redis.multi();
 
     // Latest bar: single hash with symbol as field
     multi.hset(KEYS.LATEST_HASH, bar.symbol, barJson);
-
-    // Today's bars: list per symbol (for historical queries within the day)
-    multi.rpush(`${KEYS.TODAY_PREFIX}${bar.symbol}`, barJson);
-    multi.ltrim(`${KEYS.TODAY_PREFIX}${bar.symbol}`, -LIMITS.maxHubBars, -1);
 
     // Metadata
     multi.incr(KEYS.META_COUNT);
@@ -136,6 +196,135 @@ class RedisStore {
     }
   }
 
+  private async ensureTimeSeriesForSymbol(symbol: string): Promise<void> {
+    if (this.tsInitialized.has(symbol)) return;
+
+    const existingPromise = this.tsInitPromises.get(symbol);
+    if (existingPromise) {
+      await existingPromise;
+      return;
+    }
+
+    const initPromise = this.createTimeSeriesForSymbol(symbol);
+    this.tsInitPromises.set(symbol, initPromise);
+
+    try {
+      await initPromise;
+      this.tsInitialized.add(symbol);
+    } finally {
+      this.tsInitPromises.delete(symbol);
+    }
+  }
+
+  private async createTimeSeriesForSymbol(symbol: string): Promise<void> {
+    const product = extractRootSymbol(symbol);
+    const retentionMs = LIMITS.redisTsRetentionMs;
+
+    for (const tf of TIMEFRAMES) {
+      for (const field of TS_FIELDS) {
+        const key = buildTsKey(tf, symbol, field);
+        const labels = [
+          "symbol",
+          symbol,
+          "product",
+          product,
+          "field",
+          field,
+          "tf",
+          tf,
+        ];
+        await this.createSeries(key, retentionMs, labels);
+      }
+    }
+
+    for (const field of TS_FIELDS) {
+      for (const rule of DOWNSAMPLE_RULES) {
+        const sourceKey = buildTsKey(rule.source, symbol, field);
+        const destKey = buildTsKey(rule.dest, symbol, field);
+        await this.createDownsampleRule(sourceKey, destKey, field, rule.bucketMs);
+      }
+    }
+  }
+
+  private async createSeries(
+    key: string,
+    retentionMs: number,
+    labels: string[],
+  ): Promise<void> {
+    try {
+      await this.redis.call(
+        "TS.CREATE",
+        key,
+        "RETENTION",
+        retentionMs.toString(),
+        "DUPLICATE_POLICY",
+        "LAST",
+        "LABELS",
+        ...labels,
+      );
+    } catch (error) {
+      if (!isIgnorableRedisError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  private async createDownsampleRule(
+    sourceKey: string,
+    destKey: string,
+    field: TimeSeriesField,
+    bucketMs: number,
+  ): Promise<void> {
+    const aggregation = this.getAggregationForField(field);
+    try {
+      await this.redis.call(
+        "TS.CREATERULE",
+        sourceKey,
+        destKey,
+        "AGGREGATION",
+        aggregation,
+        bucketMs.toString(),
+      );
+    } catch (error) {
+      if (!isIgnorableRedisError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  private getAggregationForField(field: TimeSeriesField): string {
+    switch (field) {
+      case "open":
+        return "FIRST";
+      case "high":
+        return "MAX";
+      case "low":
+        return "MIN";
+      case "close":
+        return "LAST";
+      case "volume":
+      case "trades":
+        return "SUM";
+      default:
+        return "LAST";
+    }
+  }
+
+  private async writeTimeSeries(bar: Bar): Promise<void> {
+    const timestamp = normalizeTimestampMs(bar.startTime);
+    const args: Array<string> = [];
+
+    for (const field of TS_FIELDS) {
+      const key = buildTsKey("1s", bar.symbol, field);
+      const value = (bar as Record<TimeSeriesField, number>)[field] ?? 0;
+      args.push(key, timestamp.toString(), value.toString());
+    }
+
+    if (args.length > 0) {
+      await this.redis.call("TS.MADD", ...args);
+    }
+  }
+
   /**
    * Get latest bar for a specific symbol
    * O(1) operation using HGET
@@ -174,15 +363,99 @@ class RedisStore {
   }
 
   /**
+   * Get bars for a symbol within a time range for a given timeframe
+   */
+  async getBarsRange(
+    symbol: string,
+    startMs: number,
+    endMs: number,
+    timeframe: Timeframe,
+  ): Promise<Bar[]> {
+    const range = await this.redis.call(
+      "TS.MRANGE",
+      startMs.toString(),
+      endMs.toString(),
+      "WITHLABELS",
+      "FILTER",
+      `symbol=${symbol}`,
+      `tf=${timeframe}`,
+    );
+
+    if (!Array.isArray(range)) return [];
+
+    const bucketMs = TIMEFRAME_MS[timeframe];
+    const byTimestamp = new Map<number, Partial<Bar>>();
+
+    for (const series of range as any[]) {
+      const key = series?.[0] as string | undefined;
+      const labels = series?.[1] as Array<[string, string]> | undefined;
+      const data = series?.[2] as Array<[number, string]> | undefined;
+
+      if (!Array.isArray(data)) continue;
+
+      const fieldLabel = labels?.find(([label]) => label === "field")?.[1];
+      const fieldFromKey = key?.split(":").pop();
+      const field = (fieldLabel || fieldFromKey) as TimeSeriesField | undefined;
+
+      if (!field || !TS_FIELDS.includes(field)) continue;
+
+      for (const point of data) {
+        const ts = Number(point[0]);
+        const value = Number(point[1]);
+        const existing = byTimestamp.get(ts) || {
+          symbol,
+          startTime: ts,
+          endTime: ts + bucketMs,
+        };
+        (existing as any)[field] = value;
+        byTimestamp.set(ts, existing);
+      }
+    }
+
+    const bars: Bar[] = [];
+    const sorted = Array.from(byTimestamp.entries()).sort((a, b) => a[0] - b[0]);
+
+    for (const [, partial] of sorted) {
+      if (
+        partial.open === undefined ||
+        partial.high === undefined ||
+        partial.low === undefined ||
+        partial.close === undefined
+      ) {
+        continue;
+      }
+
+      bars.push({
+        symbol,
+        open: Number(partial.open),
+        high: Number(partial.high),
+        low: Number(partial.low),
+        close: Number(partial.close),
+        volume: Number(partial.volume ?? 0),
+        trades: Number(partial.trades ?? 0),
+        startTime: Number(partial.startTime),
+        endTime: Number(partial.endTime),
+      });
+    }
+
+    return bars;
+  }
+
+  /**
    * Get today's bars for a specific symbol
    */
-  async getTodayBars(symbol: string): Promise<Bar[]> {
-    const data = await this.redis.lrange(
-      `${KEYS.TODAY_PREFIX}${symbol}`,
+  async getTodayBars(symbol: string, timeframe: Timeframe = "1s"): Promise<Bar[]> {
+    const now = new Date();
+    const startOfDay = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
       0,
-      -1,
+      0,
+      0,
+      0,
     );
-    return data.map((d) => JSON.parse(d));
+    return await this.getBarsRange(symbol, startOfDay, Date.now(), timeframe);
   }
 
   /**
@@ -318,8 +591,8 @@ class RedisStore {
   /**
    * Clear today's data (run at 2 AM ET daily)
    * - Deletes bar:latest hash (single key now!)
-   * - Deletes all bar:today:* lists
    * - Deletes market_data stream
+   * - Does NOT delete TimeSeries data (retention handles history)
    * @param force - If true, bypasses the "already cleared today" check
    */
   async clearTodayData(force = false): Promise<{ cleared: number; newDate: string }> {
@@ -344,12 +617,6 @@ class RedisStore {
     // Clear market_data stream
     const streamDeleted = await this.redis.del(KEYS.STREAM);
     clearedCount += streamDeleted;
-
-    // Clear today's bars (still need scan for bar:today:* pattern)
-    const todayKeys = await this.scanKeys(`${KEYS.TODAY_PREFIX}*`);
-    if (todayKeys.length > 0) {
-      clearedCount += await this.deleteInBatches(todayKeys);
-    }
 
     // Clear session data
     const sessionKeys = await this.scanKeys(`${KEYS.SESSION_PREFIX}*`);

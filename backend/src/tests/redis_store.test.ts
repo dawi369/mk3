@@ -22,7 +22,6 @@ describe("RedisStore", () => {
   afterAll(async () => {
     // Clean up test data
     await redisStore.redis.hdel("bar:latest", testSymbol);
-    await redisStore.redis.del(`bar:today:${testSymbol}`);
     await redisStore.redis.del(`session:${testSymbol}`);
     await redisStore.redis.del(`snapshot:${testSymbol}`);
   });
@@ -60,7 +59,8 @@ describe("RedisStore", () => {
       expect(parsed.close).toBe(5005);
     });
 
-    test("writes bar to today list", async () => {
+    test("writes bar to timeseries", async () => {
+      const now = Date.now();
       const bar: Bar = {
         symbol: testSymbol,
         open: 5010,
@@ -69,16 +69,16 @@ describe("RedisStore", () => {
         close: 5015,
         volume: 150,
         trades: 75,
-        startTime: Date.now(),
-        endTime: Date.now() + 60000,
+        startTime: now,
+        endTime: now + 60000,
         dollarVolume: 752250,
       };
 
       await redisStore.writeBar(bar);
 
-      const todayBars = await redisStore.getTodayBars(testSymbol);
-      expect(todayBars.length).toBeGreaterThan(0);
-      expect(todayBars[todayBars.length - 1]!.close).toBe(5015);
+      const bars = await redisStore.getBarsRange(testSymbol, now - 1000, now + 1000, "1s");
+      expect(bars.length).toBeGreaterThan(0);
+      expect(bars[bars.length - 1]!.close).toBe(5015);
     });
   });
 

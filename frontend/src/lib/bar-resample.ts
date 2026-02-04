@@ -12,11 +12,22 @@ const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
   "1d": 86400,
 };
 
+function normalizeTimestamp(value: number): number {
+  if (!Number.isFinite(value)) return value;
+  return value < 1e12 ? value * 1000 : value;
+}
+
 export function resampleBars(bars: Bar[], timeframe: Timeframe): Bar[] {
   if (!bars || bars.length === 0) return [];
 
   const intervalMs = TIMEFRAME_SECONDS[timeframe] * 1000;
-  const sorted = [...bars].sort((a, b) => a.startTime - b.startTime);
+  const sorted = [...bars]
+    .map((bar) => ({
+      ...bar,
+      startTime: normalizeTimestamp(bar.startTime),
+      endTime: normalizeTimestamp(bar.endTime),
+    }))
+    .sort((a, b) => a.startTime - b.startTime);
   const result: Bar[] = [];
 
   let bucketStart = Math.floor(sorted[0].startTime / intervalMs) * intervalMs;

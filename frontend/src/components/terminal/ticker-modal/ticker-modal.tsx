@@ -27,6 +27,7 @@ import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
 import { resampleBars } from "@/lib/bar-resample";
 import { getGlobexSessionStartMs } from "@/lib/session-time";
 import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-provider";
+import { useChartHistory } from "@/hooks/use-chart-history";
 import {
   MAX_SPREAD_LEGS,
   TIMEFRAMES,
@@ -61,6 +62,22 @@ const formatNumber = (num: number, decimals = 2) =>
     maximumFractionDigits: decimals,
   }).format(num);
 
+function normalizeTimestamp(value: number): number {
+  if (!Number.isFinite(value)) return value;
+  return value < 1e12 ? value * 1000 : value;
+}
+
+function formatDepth(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${Math.max(1, minutes)}m`;
+}
+
 function toCandleData(bars: Bar[]): CandlestickData<Time>[] {
   return bars.map((bar) => ({
     time: Math.floor(bar.startTime / 1000) as Time,
@@ -80,17 +97,15 @@ function toLineData(bars: Bar[]): LineData<Time>[] {
 
 function buildSpreadSeries(
   legs: SpreadLeg[],
-  seriesBySymbol: Record<string, Bar[]>,
-  timeframe: Timeframe
+  seriesBySymbol: Record<string, Bar[]>
 ): LineData<Time>[] {
   if (!legs || legs.length === 0) return [];
 
   const legMaps = legs.map((leg) => {
     const bars = seriesBySymbol[leg.symbol];
     if (!bars || bars.length === 0) return { leg, map: new Map<number, number>() };
-    const resampled = resampleBars(bars, timeframe);
     const map = new Map<number, number>();
-    for (const bar of resampled) {
+    for (const bar of bars) {
       map.set(bar.startTime, bar.close);
     }
     return { leg, map };
@@ -144,35 +159,10 @@ export function TickerModal() {
   } = useTickerModal();
   const { openWithMode } = useSpotlight();
   const mode = useTickerStore((state) => state.mode);
-  const seriesBySymbol = useTickerStore((state) => state.seriesByMode[mode]);
+  const liveSeriesBySymbol = useTickerStore((state) => state.seriesByMode[mode]);
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
   const setTrackedSymbols = useTickerStore((state) => state.setTrackedSymbols);
-  const bars = useTickerStore((state) =>
-    primarySymbol ? state.seriesByMode[mode][primarySymbol] : undefined
-  );
   const [showLegs, setShowLegs] = useState(true);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        close();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, close]);
-
-  const resampledPrimary = useMemo(
-    () => (bars && bars.length > 0 ? resampleBars(bars, timeframe) : []),
-    [bars, timeframe]
-  );
-
-  const chartData: CandlestickData<Time>[] | undefined = useMemo(() => {
-    if (resampledPrimary.length === 0) return undefined;
-    return toCandleData(resampledPrimary);
-  }, [resampledPrimary]);
-
   const orderedSymbols = useMemo(() => {
     if (!primarySymbol) return comparisons;
     return [primarySymbol, ...comparisons];
@@ -185,9 +175,80 @@ export function TickerModal() {
     return orderedSymbols;
   }, [orderedSymbols, spreadEnabled, spreadLegs]);
 
+  const chartSymbols = useMemo(() => {
+    const symbols = new Set<string>();
+    if (primarySymbol) symbols.add(primarySymbol);
+    for (const symbol of comparisons) symbols.add(symbol);
+    if (spreadEnabled) {
+      for (const leg of spreadLegs) symbols.add(leg.symbol);
+    }
+    return Array.from(symbols);
+  }, [primarySymbol, comparisons, spreadEnabled, spreadLegs]);
+
+  const { seriesBySymbol: historySeriesBySymbol } = useChartHistory({
+    symbols: chartSymbols,
+    timeframe,
+    enabled: isOpen,
+    mode,
+  });
+
+  const resolvedSeriesBySymbol = useMemo(() => {
+    const map: Record<string, Bar[]> = {};
+    for (const symbol of chartSymbols) {
+      map[symbol] = historySeriesBySymbol[symbol] ?? liveSeriesBySymbol[symbol] ?? [];
+    }
+    return map;
+  }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol]);
+
+  const chartSeriesBySymbol = useMemo(() => {
+    const map: Record<string, Bar[]> = {};
+    for (const symbol of chartSymbols) {
+      const history = historySeriesBySymbol[symbol];
+      if (history && history.length > 0) {
+        map[symbol] = history;
+        continue;
+      }
+      const live = liveSeriesBySymbol[symbol] ?? [];
+      map[symbol] = timeframe === "1s" ? live : resampleBars(live, timeframe);
+    }
+    return map;
+  }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe]);
+
+  const bars = primarySymbol ? chartSeriesBySymbol[primarySymbol] : undefined;
+
+  // Handle escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        close();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, close]);
+
+  const depthInfo = useMemo(() => {
+    if (!bars || bars.length === 0) return null;
+    const first = normalizeTimestamp(bars[0].startTime);
+    const last = normalizeTimestamp(bars[bars.length - 1].startTime);
+    const unit = bars[bars.length - 1].startTime < 1e12 ? "s" : "ms";
+    return {
+      first,
+      last,
+      unit,
+      depth: formatDepth(last - first),
+      count: bars.length,
+    };
+  }, [bars]);
+
+  const chartData: CandlestickData<Time>[] | undefined = useMemo(() => {
+    if (!bars || bars.length === 0) return undefined;
+    return toCandleData(bars);
+  }, [bars]);
+
   const headerItems = useMemo(() => {
     return headerSymbols.map((symbol) => {
-      const symbolBars = seriesBySymbol[symbol];
+      const symbolBars = resolvedSeriesBySymbol[symbol];
       const symbolEntity = entities[symbol];
       const symbolSnapshot = buildTickerSnapshot(symbol, symbolBars, symbolEntity?.latestBar);
       const symbolChange = symbolSnapshot.prev_close
@@ -200,7 +261,7 @@ export function TickerModal() {
         changePercent: symbolChange,
       };
     });
-  }, [headerSymbols, seriesBySymbol, entities]);
+  }, [headerSymbols, resolvedSeriesBySymbol, entities]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -220,26 +281,25 @@ export function TickerModal() {
     const data: Record<string, LineData<Time>[]> = {};
     const symbols = new Set(overlaySymbols);
     for (const symbol of symbols) {
-      const series = seriesBySymbol[symbol];
+      const series = chartSeriesBySymbol[symbol];
       if (!series || series.length === 0) {
         data[symbol] = [];
         continue;
       }
-      const resampled = resampleBars(series, timeframe);
-      data[symbol] = resampled.length > 0 ? toLineData(resampled) : [];
+      data[symbol] = toLineData(series);
     }
     return data;
-  }, [overlaySymbols, seriesBySymbol, timeframe]);
+  }, [overlaySymbols, chartSeriesBySymbol]);
 
   const spreadData = useMemo(() => {
     if (!spreadEnabled) return [];
-    return buildSpreadSeries(spreadLegs, seriesBySymbol, timeframe);
-  }, [spreadEnabled, spreadLegs, seriesBySymbol, timeframe]);
+    return buildSpreadSeries(spreadLegs, chartSeriesBySymbol);
+  }, [spreadEnabled, spreadLegs, chartSeriesBySymbol]);
 
   const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
   const visibleBars = 200;
   const secondsVisible = timeframe.endsWith("s");
-  const sessionStartMs = useMemo(() => getGlobexSessionStartMs(new Date()), []);
+  const sessionStartMs = useMemo(() => getGlobexSessionStartMs(new Date()), [primarySymbol]);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!isOpen) return;
@@ -251,7 +311,7 @@ export function TickerModal() {
   const rightOffsetRatio = 0.2;
   const hasRangeData = spreadEnabled
     ? spreadData.length > 1
-    : resampledPrimary.length > 1;
+    : (bars?.length ?? 0) > 1;
 
   const timeRange = useMemo(() => {
     if (!hasRangeData) return undefined;
@@ -278,10 +338,10 @@ export function TickerModal() {
 
         {/* Header */}
         <div className="px-4 pt-3 pb-2 bg-black/20 border-b border-white/10">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              {headerItems.map((item, index) => (
-                <div key={item.symbol} className="flex items-baseline gap-2">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                {headerItems.map((item, index) => (
+                  <div key={item.symbol} className="flex items-baseline gap-2">
                   <span className="text-lg font-bold tracking-tight">{item.symbol}</span>
                   <span className="text-base font-mono">{formatNumber(item.price)}</span>
                   <span
@@ -309,6 +369,16 @@ export function TickerModal() {
               <X className="w-4 h-4" />
             </Button>
           </div>
+
+          {depthInfo && (
+            <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-2">
+              <span>Depth {depthInfo.depth}</span>
+              <span>·</span>
+              <span>Bars {depthInfo.count.toLocaleString()}</span>
+              <span>·</span>
+              <span>Unit {depthInfo.unit}</span>
+            </div>
+          )}
 
           <div className="mt-3 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">

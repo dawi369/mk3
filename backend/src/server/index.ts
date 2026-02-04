@@ -22,7 +22,7 @@ async function startHubServer() {
     console.log("Starting Hub server...");
 
     // Initialize TimescaleDB
-    await timescaleStore.init();
+    // await timescaleStore.init();
 
     polygonClient = new PolygonWSClient();
     const futuresMarket: PolygonMarketType = "futures";
