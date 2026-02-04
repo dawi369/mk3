@@ -133,7 +133,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
   seriesByMode: { front: {}, curve: {} },
   byAssetClassByMode: { front: emptyAssetIndex(), curve: emptyAssetIndex() },
   selectionByMode: { front: emptySelection(), curve: emptySelection() },
-  timeframe: "1h",
+  timeframe: "1m",
   isSidebarOpen: true,
 
   setMode: (mode) =>

@@ -39,26 +39,22 @@ export default function PricingPage() {
               Simple, Transparent Pricing
             </h1>
             <p className="mt-4 text-xl text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your trading style. No hidden fees, cancel anytime.
+              Everything you need. No hidden fees, cancel anytime.
             </p>
           </motion.div>
 
           {/* Pricing Cards */}
-          <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="grid gap-8 md:grid-cols-2 max-w-4xl mx-auto">
-            <PlanCard
-              tier="free"
-              ctaLabel="Get Started"
-              onUpgrade={handleGetStarted}
-            />
+          <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="flex justify-center max-w-md mx-auto">
             <PlanCard
               tier="pro"
-              ctaLabel="Subscribe to Pro"
+              ctaLabel="Start 7-day free trial"
               onUpgrade={handleSubscribe}
+              className="w-full"
             />
           </motion.div>
 
           {/* FAQ or Trust Section could go here */}
-          <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="mt-20 text-center">
+          <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
               Have questions? <a href="mailto:support@swordfish.com" className="underline underline-offset-4 hover:text-foreground">Contact support</a>
             </p>

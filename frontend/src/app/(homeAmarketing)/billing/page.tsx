@@ -137,18 +137,13 @@ export default function BillingPage() {
               <Settings2 className="h-5 w-5 text-muted-foreground" />
               <h2 className="text-xl font-semibold text-foreground">Plans</h2>
             </div>
-            <div className="grid gap-6 md:grid-cols-2">
-              <PlanCard
-                tier="free"
-                subscription={subscription}
-                onUpgrade={handleUpgrade}
-                onManage={handleManage}
-              />
+            <div className="flex justify-center max-w-md mx-auto">
               <PlanCard
                 tier="pro"
                 subscription={subscription}
                 onUpgrade={handleUpgrade}
                 onManage={handleManage}
+                className="w-full"
               />
             </div>
           </motion.section>

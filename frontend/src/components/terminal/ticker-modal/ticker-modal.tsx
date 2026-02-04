@@ -187,6 +187,19 @@ export function TickerModal() {
     return [primarySymbol, ...comparisons];
   }, [primarySymbol, comparisons]);
 
+  const headerTitle = useMemo(() => {
+    if (spreadEnabled) {
+      if (spreadLegs.length === 0) return primarySymbol;
+      return `Spread (${spreadLegs.length} legs)`;
+    }
+
+    if (orderedSymbols.length <= 1) return primarySymbol;
+    if (orderedSymbols.length === 2) {
+      return `${orderedSymbols[0]} + ${orderedSymbols[1]}`;
+    }
+    return `${orderedSymbols[0]} + ${orderedSymbols[1]} + ${orderedSymbols.length - 2}`;
+  }, [orderedSymbols, primarySymbol, spreadEnabled, spreadLegs]);
+
   const overlaySymbols = spreadEnabled
     ? showLegs
       ? spreadLegs.map((leg) => leg.symbol)
@@ -228,7 +241,7 @@ export function TickerModal() {
         <div className="px-4 pt-3 pb-2 bg-black/20 border-b border-white/10">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-baseline gap-3">
-              <h2 className="text-lg font-bold tracking-tight">{primarySymbol}</h2>
+              <h2 className="text-lg font-bold tracking-tight">{headerTitle}</h2>
               <div className="flex items-center gap-2">
                 <span className="text-base font-mono">{formatNumber(snapshot.last_price)}</span>
                 <span
@@ -307,7 +320,9 @@ export function TickerModal() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
 
+              <div className="flex items-center gap-2 flex-1 min-w-0">
                 <ToggleGroup
                   type="single"
                   value={spreadEnabled ? "spread" : "compare"}
@@ -325,48 +340,48 @@ export function TickerModal() {
                   </ToggleGroupItem>
                 </ToggleGroup>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={toggleSidebar}
-                  aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
-                >
-                  {isSidebarOpen ? (
-                    <PanelRightClose className="w-3.5 h-3.5" />
-                  ) : (
-                    <PanelRightOpen className="w-3.5 h-3.5" />
-                  )}
-                </Button>
+                {!spreadEnabled && (
+                  <div className="flex items-center gap-2 overflow-x-auto">
+                    {orderedSymbols.map((symbol, index) => (
+                      <div
+                        key={symbol}
+                        className={cn(
+                          "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
+                          "bg-white/5 hover:bg-white/10 transition-colors"
+                        )}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: SYMBOL_COLORS[index % SYMBOL_COLORS.length] }}
+                        />
+                        <span className="font-mono">{symbol}</span>
+                        {orderedSymbols.length > 1 && (
+                          <button
+                            onClick={() => removeComparison(symbol)}
+                            className="ml-1 p-0.5 rounded hover:bg-white/10 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {!spreadEnabled && (
-                <div className="flex items-center gap-2 max-w-[45%] overflow-x-auto">
-                  {orderedSymbols.map((symbol, index) => (
-                    <div
-                      key={symbol}
-                      className={cn(
-                        "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-                        "bg-white/5 hover:bg-white/10 transition-colors"
-                      )}
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: SYMBOL_COLORS[index % SYMBOL_COLORS.length] }}
-                      />
-                      <span className="font-mono">{symbol}</span>
-                      {index > 0 && (
-                        <button
-                          onClick={() => removeComparison(symbol)}
-                          className="ml-1 p-0.5 rounded hover:bg-white/10 transition-colors"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={toggleSidebar}
+                aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+              >
+                {isSidebarOpen ? (
+                  <PanelRightClose className="w-3.5 h-3.5" />
+                ) : (
+                  <PanelRightOpen className="w-3.5 h-3.5" />
+                )}
+              </Button>
             </div>
 
             {spreadEnabled && (

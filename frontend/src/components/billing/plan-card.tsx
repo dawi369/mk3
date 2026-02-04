@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, X, Sparkles, Zap } from "lucide-react";
+import { Check, X, Sparkles, Zap, Fish } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +51,7 @@ export function PlanCard({
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
         {isPro ? (
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Fish className="h-5 w-5 text-primary" />
         ) : (
           <Zap className="h-5 w-5 text-muted-foreground" />
         )}

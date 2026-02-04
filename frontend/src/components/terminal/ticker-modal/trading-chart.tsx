@@ -40,7 +40,7 @@ export function TradingChart({
   const primaryCandleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const primaryLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
-  const seriesTypeRef = useRef<"candlestick" | "line">("candlestick");
+  const lastFitKeyRef = useRef<string | null>(null);
 
   const useLinePrimary = lineData !== undefined;
 
@@ -83,31 +83,27 @@ export function TradingChart({
 
     chartRef.current = chart;
 
-    if (useLinePrimary) {
-      const lineSeries = chart.addSeries(LineSeries, {
-        color: SYMBOL_COLORS[0],
-        lineWidth: 2,
-      });
-      primaryLineRef.current = lineSeries;
-      seriesTypeRef.current = "line";
-      lineSeries.setData(lineData ?? emptyLines);
-    } else {
-      const candlestickSeries = chart.addSeries(CandlestickSeries, {
-        upColor: SYMBOL_COLORS[0],
-        downColor: "#f43f5e",
-        borderUpColor: SYMBOL_COLORS[0],
-        borderDownColor: "#f43f5e",
-        wickUpColor: SYMBOL_COLORS[0],
-        wickDownColor: "#f43f5e",
-      });
-      primaryCandleRef.current = candlestickSeries;
-      seriesTypeRef.current = "candlestick";
-      const chartData = data ?? emptyCandles;
-      candlestickSeries.setData(chartData);
-    }
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+      upColor: SYMBOL_COLORS[0],
+      downColor: "#f43f5e",
+      borderUpColor: SYMBOL_COLORS[0],
+      borderDownColor: "#f43f5e",
+      wickUpColor: SYMBOL_COLORS[0],
+      wickDownColor: "#f43f5e",
+    });
+    primaryCandleRef.current = candlestickSeries;
+
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: SYMBOL_COLORS[0],
+      lineWidth: 2,
+    });
+    primaryLineRef.current = lineSeries;
+
+    candlestickSeries.setData(emptyCandles);
+    lineSeries.setData(emptyLines);
 
     chart.timeScale().fitContent();
-  }, [data, lineData, useLinePrimary]);
+  }, []);
 
   // Handle resize
   useEffect(() => {
@@ -143,28 +139,19 @@ export function TradingChart({
     if (!chartRef.current) return;
 
     if (useLinePrimary) {
-      if (seriesTypeRef.current !== "line") {
-        initChart();
-        return;
-      }
-      if (primaryLineRef.current) {
-        primaryLineRef.current.setData(lineData ?? emptyLines);
-        chartRef.current.timeScale().fitContent();
-      }
-      return;
+      primaryCandleRef.current?.setData(emptyCandles);
+      primaryLineRef.current?.setData(lineData ?? emptyLines);
+    } else {
+      primaryLineRef.current?.setData(emptyLines);
+      primaryCandleRef.current?.setData(data ?? emptyCandles);
     }
 
-    if (seriesTypeRef.current !== "candlestick") {
-      initChart();
-      return;
-    }
-
-    if (primaryCandleRef.current) {
-      const chartData = data ?? emptyCandles;
-      primaryCandleRef.current.setData(chartData);
+    const fitKey = `${ticker}:${useLinePrimary ? "line" : "candle"}`;
+    if (lastFitKeyRef.current !== fitKey) {
       chartRef.current.timeScale().fitContent();
+      lastFitKeyRef.current = fitKey;
     }
-  }, [ticker, data, lineData, useLinePrimary, initChart]);
+  }, [ticker, data, lineData, useLinePrimary]);
 
   // Handle comparison symbols
   useEffect(() => {

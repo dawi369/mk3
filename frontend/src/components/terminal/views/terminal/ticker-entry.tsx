@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
+import type { TickerSnapshot } from "@/types/ticker.types";
 
 // ============================================================================
 // Types

@@ -136,7 +136,7 @@ function useDefaultCommands(): SpotlightCommand[] {
 }
 
 export function Spotlight() {
-  const { isOpen, mode: spotlightMode, open, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
+  const { isOpen, mode: spotlightMode, open, openWithMode, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
   const mode = useTickerStore((state) => state.mode);
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
   const series = useTickerStore((state) => state.seriesByMode[mode]);
@@ -175,7 +175,11 @@ export function Spotlight() {
       // Toggle spotlight
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        toggle();
+        if (isModalOpen) {
+          openWithMode("ticker-compare");
+        } else {
+          toggle();
+        }
         return;
       }
       
@@ -199,7 +203,7 @@ export function Spotlight() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, toggle, open]);
+  }, [isOpen, toggle, open, openWithMode, isModalOpen]);
 
   // Group commands by their group property
   const groupedCommands = useMemo(() => {
@@ -243,6 +247,7 @@ export function Spotlight() {
       title="Command Palette"
       description="Search for commands, navigate, or perform actions."
       showCloseButton={false}
+      showOverlay={!isModalOpen}
       className="border-white/20 bg-card/95 backdrop-blur-lg max-w-m!"
     >
       <CommandInput 

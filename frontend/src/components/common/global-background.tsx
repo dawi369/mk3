@@ -39,7 +39,7 @@ export function GlobalBackground() {
   const isHomePage = pathname === "/";
 
   const speed = isHomePage ? 1.0 : 0.5;
-  const darknessMultiplier = isHomePage ? 1.0 : 4.0;
+  const darknessMultiplier = isHomePage ? 1.0 : 2.0;
   // Apply a subtle blur on non-home pages to improve text readability
   // const blur = isHomePage ? 0 : 4;
   const blur = 2;

@@ -2,6 +2,9 @@ import type { Bar } from "@/types/common.types";
 import type { Timeframe } from "@/types/ticker.types";
 
 const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
+  "1s": 1,
+  "5s": 5,
+  "30s": 30,
   "1m": 60,
   "5m": 300,
   "15m": 900,
