@@ -15,7 +15,8 @@ import {
 } from "@/lib/ticker-mapping";
 import { extractRoot } from "@/lib/month-utils";
 
-const MAX_BARS = 300;
+const MAX_BARS_DEFAULT = 7200;
+const MAX_BARS_TRACKED = 36000;
 
 const emptySelection = (): TickerSelectionState => ({
   primary: null,
@@ -49,7 +50,7 @@ function buildEntity(mode: TickerMode, symbol: string): TickerEntity {
   };
 }
 
-function upsertSeries(current: Bar[] | undefined, nextBar: Bar): Bar[] {
+function upsertSeries(current: Bar[] | undefined, nextBar: Bar, limit: number): Bar[] {
   const existing = current ? [...current] : [];
   const lastBar = existing[existing.length - 1];
 
@@ -59,8 +60,8 @@ function upsertSeries(current: Bar[] | undefined, nextBar: Bar): Bar[] {
   }
 
   const updated = [...existing, nextBar];
-  if (updated.length > MAX_BARS) {
-    return updated.slice(updated.length - MAX_BARS);
+  if (updated.length > limit) {
+    return updated.slice(updated.length - limit);
   }
   return updated;
 }
@@ -102,6 +103,7 @@ interface TickerStoreState {
   entitiesByMode: Record<TickerMode, Record<string, TickerEntity>>;
   seriesByMode: Record<TickerMode, Record<string, Bar[]>>;
   byAssetClassByMode: Record<TickerMode, Record<string, string[]>>;
+  trackedSymbolsByMode: Record<TickerMode, Record<string, true>>;
   selectionByMode: Record<TickerMode, TickerSelectionState>;
   timeframe: Timeframe;
   isSidebarOpen: boolean;
@@ -109,6 +111,7 @@ interface TickerStoreState {
   setMode: (mode: TickerMode) => void;
   registerSymbols: (mode: TickerMode, symbols: string[]) => void;
   upsertBar: (mode: TickerMode, bar: Bar) => void;
+  setTrackedSymbols: (symbols: string[]) => void;
 
   openPrimary: (symbol: string) => void;
   toggleSelectShift: (symbol: string) => void;
@@ -132,6 +135,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
   entitiesByMode: { front: {}, curve: {} },
   seriesByMode: { front: {}, curve: {} },
   byAssetClassByMode: { front: emptyAssetIndex(), curve: emptyAssetIndex() },
+  trackedSymbolsByMode: { front: {}, curve: {} },
   selectionByMode: { front: emptySelection(), curve: emptySelection() },
   timeframe: "1m",
   isSidebarOpen: true,
@@ -176,6 +180,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       const entities = { ...state.entitiesByMode[mode] };
       const series = { ...state.seriesByMode[mode] };
       const index = { ...state.byAssetClassByMode[mode] };
+      const tracked = state.trackedSymbolsByMode[mode];
 
       if (!entities[bar.symbol]) {
         const entity = buildEntity(mode, bar.symbol);
@@ -196,12 +201,28 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       } as TickerEntity;
 
       entities[bar.symbol] = nextEntity;
-      series[bar.symbol] = upsertSeries(series[bar.symbol], bar);
+      const limit = tracked[bar.symbol] ? MAX_BARS_TRACKED : MAX_BARS_DEFAULT;
+      series[bar.symbol] = upsertSeries(series[bar.symbol], bar, limit);
 
       return {
         entitiesByMode: { ...state.entitiesByMode, [mode]: entities },
         seriesByMode: { ...state.seriesByMode, [mode]: series },
         byAssetClassByMode: { ...state.byAssetClassByMode, [mode]: index },
+      };
+    }),
+
+  setTrackedSymbols: (symbols) =>
+    set((state) => {
+      const mode = state.mode;
+      const nextTracked = symbols.reduce((acc, symbol) => {
+        acc[symbol] = true;
+        return acc;
+      }, {} as Record<string, true>);
+      return {
+        trackedSymbolsByMode: {
+          ...state.trackedSymbolsByMode,
+          [mode]: nextTracked,
+        },
       };
     }),
 

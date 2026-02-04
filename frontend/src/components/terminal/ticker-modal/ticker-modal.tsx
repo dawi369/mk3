@@ -144,6 +144,8 @@ export function TickerModal() {
   const { openWithMode } = useSpotlight();
   const mode = useTickerStore((state) => state.mode);
   const seriesBySymbol = useTickerStore((state) => state.seriesByMode[mode]);
+  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
+  const setTrackedSymbols = useTickerStore((state) => state.setTrackedSymbols);
   const bars = useTickerStore((state) =>
     primarySymbol ? state.seriesByMode[mode][primarySymbol] : undefined
   );
@@ -160,8 +162,6 @@ export function TickerModal() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, close]);
 
-  if (!primarySymbol) return null;
-
   const resampledPrimary = useMemo(
     () => (bars && bars.length > 0 ? resampleBars(bars, timeframe) : []),
     [bars, timeframe]
@@ -171,8 +171,6 @@ export function TickerModal() {
     if (resampledPrimary.length === 0) return undefined;
     return toCandleData(resampledPrimary);
   }, [resampledPrimary]);
-
-  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
 
   const orderedSymbols = useMemo(() => {
     if (!primarySymbol) return comparisons;
@@ -203,6 +201,14 @@ export function TickerModal() {
     });
   }, [headerSymbols, seriesBySymbol, entities]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setTrackedSymbols([]);
+      return;
+    }
+    setTrackedSymbols(headerSymbols);
+  }, [isOpen, headerSymbols, setTrackedSymbols]);
+
   const overlaySymbols = spreadEnabled
     ? showLegs
       ? spreadLegs.map((leg) => leg.symbol)
@@ -229,7 +235,11 @@ export function TickerModal() {
     return buildSpreadSeries(spreadLegs, seriesBySymbol, timeframe);
   }, [spreadEnabled, spreadLegs, seriesBySymbol, timeframe]);
 
-  const fitKey = `${primarySymbol}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
+  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
+  const visibleBars = timeframe.endsWith("s") ? 300 : 200;
+  const secondsVisible = timeframe.endsWith("s");
+
+  if (!primarySymbol) return null;
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && close()} handleOnly>
@@ -530,6 +540,8 @@ export function TickerModal() {
                 comparisonData={comparisonData}
                 showComparisons={!spreadEnabled || showLegs}
                 fitKey={fitKey}
+                visibleBars={visibleBars}
+                secondsVisible={secondsVisible}
               />
             </div>
           </div>

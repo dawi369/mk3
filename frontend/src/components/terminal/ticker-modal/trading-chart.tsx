@@ -21,6 +21,8 @@ interface TradingChartProps {
   comparisonData?: Record<string, LineData<Time>[]>;
   showComparisons?: boolean;
   fitKey?: string;
+  visibleBars?: number;
+  secondsVisible?: boolean;
   className?: string;
 }
 
@@ -35,6 +37,8 @@ export function TradingChart({
   comparisonData,
   showComparisons = true,
   fitKey,
+  visibleBars = 200,
+  secondsVisible = false,
   className,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,7 +108,12 @@ export function TradingChart({
     candlestickSeries.setData(emptyCandles);
     lineSeries.setData(emptyLines);
 
-    chart.timeScale().fitContent();
+    chart.applyOptions({
+      timeScale: {
+        timeVisible: true,
+        secondsVisible,
+      },
+    });
   }, []);
 
   // Handle resize
@@ -140,6 +149,13 @@ export function TradingChart({
   useEffect(() => {
     if (!chartRef.current) return;
 
+    chartRef.current.applyOptions({
+      timeScale: {
+        timeVisible: true,
+        secondsVisible,
+      },
+    });
+
     if (useLinePrimary) {
       primaryCandleRef.current?.setData(emptyCandles);
       primaryLineRef.current?.setData(lineData ?? emptyLines);
@@ -149,11 +165,16 @@ export function TradingChart({
     }
 
     const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
-    if (lastFitKeyRef.current !== nextFitKey) {
-      chartRef.current.timeScale().fitContent();
+    const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
+
+    if (lastFitKeyRef.current !== nextFitKey && length > 0) {
+      const clampedVisible = Math.max(10, visibleBars);
+      const to = length - 1;
+      const from = Math.max(0, length - clampedVisible);
+      chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
       lastFitKeyRef.current = nextFitKey;
     }
-  }, [ticker, data, lineData, useLinePrimary, fitKey]);
+  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
 
   // Handle comparison symbols
   useEffect(() => {
