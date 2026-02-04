@@ -162,7 +162,7 @@ export default function LoginPage() {
                   ) : (
                     <AppleIcon />
                   )}
-                  Continue with Apple (fuc u apple, not paying 100 ayear)
+                  Continue with Apple
                 </Button>
 
                 <Button

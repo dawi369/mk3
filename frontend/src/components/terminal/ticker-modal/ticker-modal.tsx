@@ -144,9 +144,6 @@ export function TickerModal() {
   const { openWithMode } = useSpotlight();
   const mode = useTickerStore((state) => state.mode);
   const seriesBySymbol = useTickerStore((state) => state.seriesByMode[mode]);
-  const entity = useTickerStore((state) =>
-    primarySymbol ? state.entitiesByMode[mode][primarySymbol] : undefined
-  );
   const bars = useTickerStore((state) =>
     primarySymbol ? state.seriesByMode[mode][primarySymbol] : undefined
   );
@@ -165,13 +162,6 @@ export function TickerModal() {
 
   if (!primarySymbol) return null;
 
-  const snapshot = useMemo(
-    () => buildTickerSnapshot(primarySymbol, bars, entity?.latestBar),
-    [primarySymbol, bars, entity?.latestBar]
-  );
-  const changePercent = snapshot.prev_close
-    ? ((snapshot.last_price - snapshot.prev_close) / snapshot.prev_close) * 100
-    : 0;
   const resampledPrimary = useMemo(
     () => (bars && bars.length > 0 ? resampleBars(bars, timeframe) : []),
     [bars, timeframe]
@@ -182,23 +172,36 @@ export function TickerModal() {
     return toCandleData(resampledPrimary);
   }, [resampledPrimary]);
 
+  const entities = useTickerStore((state) => state.entitiesByMode[mode]);
+
   const orderedSymbols = useMemo(() => {
     if (!primarySymbol) return comparisons;
     return [primarySymbol, ...comparisons];
   }, [primarySymbol, comparisons]);
 
-  const headerTitle = useMemo(() => {
-    if (spreadEnabled) {
-      if (spreadLegs.length === 0) return primarySymbol;
-      return `Spread (${spreadLegs.length} legs)`;
+  const headerSymbols = useMemo(() => {
+    if (spreadEnabled && spreadLegs.length > 0) {
+      return spreadLegs.map((leg) => leg.symbol);
     }
+    return orderedSymbols;
+  }, [orderedSymbols, spreadEnabled, spreadLegs]);
 
-    if (orderedSymbols.length <= 1) return primarySymbol;
-    if (orderedSymbols.length === 2) {
-      return `${orderedSymbols[0]} + ${orderedSymbols[1]}`;
-    }
-    return `${orderedSymbols[0]} + ${orderedSymbols[1]} + ${orderedSymbols.length - 2}`;
-  }, [orderedSymbols, primarySymbol, spreadEnabled, spreadLegs]);
+  const headerItems = useMemo(() => {
+    return headerSymbols.map((symbol) => {
+      const symbolBars = seriesBySymbol[symbol];
+      const symbolEntity = entities[symbol];
+      const symbolSnapshot = buildTickerSnapshot(symbol, symbolBars, symbolEntity?.latestBar);
+      const symbolChange = symbolSnapshot.prev_close
+        ? ((symbolSnapshot.last_price - symbolSnapshot.prev_close) / symbolSnapshot.prev_close) * 100
+        : 0;
+
+      return {
+        symbol,
+        price: symbolSnapshot.last_price,
+        changePercent: symbolChange,
+      };
+    });
+  }, [headerSymbols, seriesBySymbol, entities]);
 
   const overlaySymbols = spreadEnabled
     ? showLegs
@@ -242,20 +245,25 @@ export function TickerModal() {
         {/* Header */}
         <div className="px-4 pt-3 pb-2 bg-black/20 border-b border-white/10">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex items-baseline gap-3">
-              <h2 className="text-lg font-bold tracking-tight">{headerTitle}</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-mono">{formatNumber(snapshot.last_price)}</span>
-                <span
-                  className={cn(
-                    "text-sm font-medium",
-                    changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              {headerItems.map((item, index) => (
+                <div key={item.symbol} className="flex items-baseline gap-2">
+                  <span className="text-lg font-bold tracking-tight">{item.symbol}</span>
+                  <span className="text-base font-mono">{formatNumber(item.price)}</span>
+                  <span
+                    className={cn(
+                      "text-sm font-medium",
+                      item.changePercent >= 0 ? "text-emerald-500" : "text-rose-500"
+                    )}
+                  >
+                    {item.changePercent >= 0 ? "+" : ""}
+                    {item.changePercent.toFixed(2)}%
+                  </span>
+                  {index < headerItems.length - 1 && (
+                    <span className="text-muted-foreground/60">,</span>
                   )}
-                >
-                  {changePercent >= 0 ? "+" : ""}
-                  {changePercent.toFixed(2)}%
-                </span>
-              </div>
+                </div>
+              ))}
             </div>
 
             <Button
