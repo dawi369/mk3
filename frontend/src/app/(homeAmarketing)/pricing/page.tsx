@@ -26,11 +26,6 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen relative">
-      {/* Background Grid Effect - matching style potential */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
-      </div>
-
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-24">
         <motion.div initial="initial" animate="animate" variants={ANIMATION_CONFIG.stagger}>
           {/* Header */}
