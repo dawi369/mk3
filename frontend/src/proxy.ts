@@ -3,19 +3,79 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_SITE_URL,
 } from "@/config/env";
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const STATIC_PATHS = new Set(["/manifest.json", "/robots.txt", "/sitemap.xml"]);
+const WAITLIST_PATH = "/waitlist";
+
+function parseHost(hostHeader: string | null): string {
+  if (!hostHeader) return "";
+  const rawHost = hostHeader.split(",")[0]?.trim() ?? "";
+  return rawHost.split(":")[0]?.toLowerCase() ?? "";
+}
+
+function getCanonicalHost(): string {
+  try {
+    return new URL(NEXT_PUBLIC_SITE_URL).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function parseHosts(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
-  const hostname = request.headers.get("host") || "";
+  const hostname = parseHost(
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host")
+  );
 
-  // Extract subdomain (e.g., "waitlist" from "waitlist.swordfish.com")
-  const subdomain = hostname.split(".")[0];
+  const canonicalHost = getCanonicalHost();
+  const extraAllowedHosts = parseHosts(process.env.WAITLIST_ALLOWED_HOSTS);
+  const extraWaitlistHosts = parseHosts(process.env.WAITLIST_HOSTS);
+  const isLocalHost = LOCAL_HOSTS.has(hostname);
+  const isWaitlistHost =
+    hostname.startsWith("waitlist.") ||
+    hostname.startsWith("waitlist-") ||
+    extraWaitlistHosts.includes(hostname) ||
+    (canonicalHost && hostname === canonicalHost);
+  const waitlistOnly = process.env.WAITLIST_ONLY === "true";
+  const allowedHosts = new Set([
+    ...LOCAL_HOSTS,
+    ...extraAllowedHosts,
+    ...extraWaitlistHosts,
+  ]);
+  if (canonicalHost) {
+    allowedHosts.add(canonicalHost);
+  }
 
-  // Handle waitlist subdomain routing
-  if (subdomain === "waitlist" && !url.pathname.startsWith("/waitlist")) {
-    url.pathname = `/waitlist${url.pathname === "/" ? "" : url.pathname}`;
-    return NextResponse.rewrite(url);
+  if (
+    process.env.NODE_ENV === "production" &&
+    canonicalHost &&
+    hostname &&
+    !allowedHosts.has(hostname)
+  ) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.hostname = canonicalHost;
+    redirectUrl.protocol = "https:";
+    redirectUrl.port = "";
+    return NextResponse.redirect(redirectUrl, 308);
+  }
+
+  if (!STATIC_PATHS.has(url.pathname)) {
+    const shouldForceWaitlist = isWaitlistHost || (waitlistOnly && !isLocalHost);
+    if (shouldForceWaitlist && url.pathname !== WAITLIST_PATH) {
+      url.pathname = WAITLIST_PATH;
+      return NextResponse.rewrite(url);
+    }
   }
 
   let supabaseResponse = NextResponse.next({
@@ -50,17 +110,3 @@ export async function proxy(request: NextRequest) {
 
   return supabaseResponse;
 }
-
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
-};
-

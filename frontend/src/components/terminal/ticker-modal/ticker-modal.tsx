@@ -209,7 +209,7 @@ export function TickerModal() {
         continue;
       }
       const live = liveSeriesBySymbol[symbol] ?? [];
-      map[symbol] = timeframe === "1s" ? live : resampleBars(live, timeframe);
+      map[symbol] = resampleBars(live, timeframe);
     }
     return map;
   }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe]);
