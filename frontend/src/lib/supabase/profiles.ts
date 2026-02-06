@@ -2,7 +2,11 @@ import { createClient } from "@/utils/supabase/client";
 
 export interface UserProfile {
   id: string;
+  email?: string;
+  first_name: string | null;
+  last_name: string | null;
   display_name: string | null;
+  auth_provider: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -17,7 +21,7 @@ export async function getUserProfile(
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, created_at, updated_at")
+    .select("id, email, first_name, last_name, display_name, auth_provider, created_at, updated_at")
     .eq("id", userId)
     .single();
 
@@ -36,21 +40,30 @@ export async function getUserProfile(
 }
 
 /**
- * Update user's display name in profiles table
+ * Update user profile fields
  */
-export async function updateDisplayName(
+export interface ProfileUpdate {
+  first_name?: string | null;
+  last_name?: string | null;
+  display_name?: string | null;
+}
+
+export async function updateProfile(
   userId: string,
-  displayName: string,
+  updates: ProfileUpdate,
 ): Promise<boolean> {
   const supabase = createClient();
 
   const { error } = await supabase
     .from("profiles")
-    .update({ display_name: displayName })
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", userId);
 
   if (error) {
-    console.warn("Error updating display name:", error.message || error);
+    console.warn("Error updating profile:", error.message || error);
     return false;
   }
 

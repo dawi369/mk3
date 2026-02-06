@@ -1,7 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, Bell, Shield, Monitor } from "lucide-react";
+import { User, Bell, Monitor, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,9 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/providers/auth-provider";
+import { updateProfile } from "@/lib/supabase/profiles";
+import { toast } from "sonner";
 
 const ANIMATION_CONFIG = {
   fadeInUp: {
@@ -28,6 +32,60 @@ const ANIMATION_CONFIG = {
 };
 
 export default function SettingsPage() {
+  const { user, profile, loading, refreshProfile } = useAuth();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Populate form when profile loads
+  useEffect(() => {
+    if (profile) {
+      setFirstName(profile.first_name || "");
+      setLastName(profile.last_name || "");
+    }
+  }, [profile]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      const success = await updateProfile(user.id, {
+        first_name: firstName.trim() || null,
+        last_name: lastName.trim() || null,
+        display_name: firstName.trim() || "Trader",
+      });
+
+      if (success) {
+        await refreshProfile();
+        toast.success("Profile updated successfully");
+      } else {
+        toast.error("Failed to update profile");
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Please log in to access settings.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen relative">
       {/* Background Grid Effect */}
@@ -74,27 +132,57 @@ export default function SettingsPage() {
                   <CardHeader>
                     <CardTitle>Profile Information</CardTitle>
                     <CardDescription>
-                      Update your account profile details and email.
+                      Update your account profile details.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="first-name">First name</Label>
-                        <Input id="first-name" placeholder="Enter your first name" />
+                        <Input
+                          id="first-name"
+                          placeholder="Enter your first name"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          disabled={isSaving}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="last-name">Last name</Label>
-                        <Input id="last-name" placeholder="Enter your last name" />
+                        <Input
+                          id="last-name"
+                          placeholder="Enter your last name"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          disabled={isSaving}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" type="email" placeholder="Enter your email" />
+                      <Input
+                        id="email"
+                        type="email"
+                        value={user.email || ""}
+                        disabled
+                        className="bg-muted/50"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Email cannot be changed here.
+                      </p>
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-end border-t p-6">
-                    <Button>Save Changes</Button>
+                    <Button onClick={handleSaveProfile} disabled={isSaving}>
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
                   </CardFooter>
                 </Card>
               </TabsContent>
