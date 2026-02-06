@@ -50,11 +50,11 @@ export function PlanCard({
 
       {/* Header */}
       <div className="mb-4 flex items-center gap-2">
-        {isPro ? (
+        {/* {isPro ? (
           <Fish className="h-5 w-5 text-primary" />
         ) : (
           <Zap className="h-5 w-5 text-muted-foreground" />
-        )}
+        )} */}
         <h3 className="text-xl font-semibold text-foreground">{config.name}</h3>
         {isCurrentPlan && (
           <Badge variant="secondary" className="ml-auto">

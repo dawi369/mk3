@@ -1,6 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { SubscriptionGuard } from "@/components/auth/subscription-guard";
 import { SpotlightProvider } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import { Spotlight } from "@/components/terminal/layout/spotlight/spotlight";
 import { TickerModal } from "@/components/terminal/ticker-modal/ticker-modal";
@@ -33,7 +35,11 @@ export default function TerminalLayout({ children }: { children: React.ReactNode
         <TerminalViewProvider>
           <HeaderProvider>
             <SpotlightProvider>
-              <TerminalLayoutContent>{children}</TerminalLayoutContent>
+              <ProtectedRoute redirectTo="/login">
+                <SubscriptionGuard>
+                  <TerminalLayoutContent>{children}</TerminalLayoutContent>
+                </SubscriptionGuard>
+              </ProtectedRoute>
             </SpotlightProvider>
           </HeaderProvider>
         </TerminalViewProvider>
