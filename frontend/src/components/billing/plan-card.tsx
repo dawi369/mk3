@@ -197,7 +197,7 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
           <div>
             <p className="text-sm text-muted-foreground">
               {isTrialing 
-                ? "Trial ends on" 
+                ? "Trial ends and renews on" 
                 : (subscription.cancelAtPeriodEnd || isCanceled)
                   ? "Access until" 
                   : "Renews on"}
@@ -215,7 +215,7 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
         {/* Status Banners - utilizing free space */}
         {isPastDue && (
            <div className="sm:text-right">
-            <p className="text-sm font-medium text-destructive">Payment failed</p>
+            <p className="text-sm font-medium text-red-500 dark:text-red-400">Payment failed</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Update payment info to keep Pro access.
             </p>
@@ -224,7 +224,7 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
 
         {isUnpaid && (
            <div className="sm:text-right">
-            <p className="text-sm font-medium text-destructive">Payment failed</p>
+            <p className="text-sm font-medium text-red-500 dark:text-red-400">Payment failed</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Update payment info to renew Pro access.
             </p>
@@ -252,9 +252,9 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
         
         {isTrialing && tier !== "free" && (
            <div className="sm:text-right">
-            <p className="text-sm text-muted-foreground">First billing amount</p>
-            <p className="mt-1 font-medium text-foreground">
-              {config.priceDisplay} 
+            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Test drive active</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Experience the full power of Pro.
             </p>
           </div>
         )}
