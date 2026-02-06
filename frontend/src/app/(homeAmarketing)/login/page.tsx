@@ -98,7 +98,8 @@ export default function LoginPage() {
   const isAnyLoading = loading || oauthLoading !== null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
