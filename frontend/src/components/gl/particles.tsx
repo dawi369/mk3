@@ -44,6 +44,13 @@ export function Particles({
   const revealStartTime = useRef<number | null>(null);
   const [isRevealing, setIsRevealing] = useState(true);
   const revealDuration = 3.5; // seconds
+  
+  // Smooth opacity transition ref
+  const opacityRef = useRef({ value: opacity });
+  
+  // Simulated time ref to prevent jumps when speed changes
+  const simulatedTimeRef = useRef(0);
+  
   // Create simulation material with scale parameter
   const simulationMaterial = useMemo(() => {
     return new SimulationMaterial(planeScale);
@@ -92,7 +99,14 @@ export function Particles({
     state.gl.render(scene, camera);
     state.gl.setRenderTarget(null);
 
-    // Use manual time if enabled, otherwise use elapsed time
+    // Calculate simulated time
+    if (!useManualTime) {
+      // Integrate speed over time to ensure smooth continuous movement
+      simulatedTimeRef.current += delta * (timeScale * speed);
+    } else {
+      simulatedTimeRef.current = manualTime;
+    }
+
     const currentTime = useManualTime ? manualTime : state.clock.elapsedTime;
 
     // Initialize reveal start time on first frame
@@ -109,13 +123,14 @@ export function Particles({
 
     // Map progress to reveal factor (0 = fully hidden, higher values = more revealed)
     // We want to start from center (0) and expand outward (higher values)
-    const revealFactor = easedProgress * 4.0; // Doubled the radius for larger coverage
+    const revealFactor = easedProgress * 4.0; 
 
     if (revealProgress >= 1.0 && isRevealing) {
       setIsRevealing(false);
     }
 
-    dofPointsMaterial.uniforms.uTime.value = currentTime;
+    // Use simulated time for uniforms that depend on speed
+    dofPointsMaterial.uniforms.uTime.value = simulatedTimeRef.current;
 
     dofPointsMaterial.uniforms.uFocus.value = focus;
     dofPointsMaterial.uniforms.uBlur.value = aperture;
@@ -128,14 +143,19 @@ export function Particles({
       delta
     );
 
-    simulationMaterial.uniforms.uTime.value = currentTime;
+    simulationMaterial.uniforms.uTime.value = simulatedTimeRef.current;
     simulationMaterial.uniforms.uNoiseScale.value = noiseScale;
     simulationMaterial.uniforms.uNoiseIntensity.value = noiseIntensity;
-    simulationMaterial.uniforms.uTimeScale.value = timeScale * speed;
+    
+    // Set timeScale to 1.0 since we handled the multiplier in simulatedTimeRef
+    simulationMaterial.uniforms.uTimeScale.value = 1.0;
+
+    // Smooth opacity transition (0.5s duration)
+    easing.damp(opacityRef.current, "value", opacity, 0.5, delta);
 
     // Update point material uniforms
     dofPointsMaterial.uniforms.uPointSize.value = pointSize;
-    dofPointsMaterial.uniforms.uOpacity.value = opacity;
+    dofPointsMaterial.uniforms.uOpacity.value = opacityRef.current.value;
     dofPointsMaterial.uniforms.uRevealFactor.value = revealFactor;
     dofPointsMaterial.uniforms.uRevealProgress.value = easedProgress;
   });
