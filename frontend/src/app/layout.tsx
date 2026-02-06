@@ -80,14 +80,14 @@ export const metadata: Metadata = {
     icon: [
       // Light mode
       {
-        url: "/mk3LogoTransparentnBackground.png",
+        url: "/mk3LogoTransparent.png",
         type: "image/png",
         sizes: "any",
         media: "(prefers-color-scheme: light)",
       },
       // Dark mode
       {
-        url: "/mk3LogoTransparentnBackground.png",
+        url: "/mk3LogoTransparent.png",
         type: "image/png",
         sizes: "any",
         media: "(prefers-color-scheme: dark)",

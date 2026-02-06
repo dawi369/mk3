@@ -70,6 +70,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, 308);
   }
 
+  if (url.pathname.startsWith("/_next/")) {
+    return NextResponse.next();
+  }
+
   if (!STATIC_PATHS.has(url.pathname)) {
     const shouldForceWaitlist = isWaitlistHost || (waitlistOnly && !isLocalHost);
     if (shouldForceWaitlist && url.pathname !== WAITLIST_PATH) {
