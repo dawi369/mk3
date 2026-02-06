@@ -155,7 +155,7 @@ export default function LoginPage() {
                   variant="outline"
                   className="w-full"
                   onClick={() => handleOAuthLogin("apple")}
-                  disabled={true}
+                  disabled={isAnyLoading}
                 >
                   {oauthLoading === "apple" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
