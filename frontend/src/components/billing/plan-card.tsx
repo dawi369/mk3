@@ -57,14 +57,8 @@ export function PlanCard({
         )} */}
         <h3 className="text-xl font-semibold text-foreground">{config.name}</h3>
         {isCurrentPlan && (
-          <Badge 
-            variant="secondary" 
-            className={cn(
-              "ml-auto",
-              subscription?.status === "trialing" && "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
-            )}
-          >
-            {subscription?.status === "trialing" ? "Trial Active" : "Current Plan"}
+          <Badge variant="secondary" className="ml-auto">
+            Current Plan
           </Badge>
         )}
       </div>
@@ -139,6 +133,7 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
   const isCanceled = status === "canceled";
   const isPastDue = status === "past_due";
   const isUnpaid = status === "unpaid";
+  const isIncomplete = status === "incomplete";
   const isActive = isSubscriptionActive(subscription);
 
   let badgeVariant = "outline";
@@ -157,6 +152,9 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
   } else if (isPastDue || isUnpaid) {
     badgeStyles += " bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
     badgeLabel = isPastDue ? "Past Due" : "Unpaid";
+  } else if (isIncomplete) {
+    badgeStyles += " bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    badgeLabel = "Incomplete";
   } else {
     // Default Active
     badgeStyles += " bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
@@ -199,8 +197,12 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
               {isTrialing 
                 ? "Trial ends and renews on" 
                 : (subscription.cancelAtPeriodEnd || isCanceled)
-                  ? "Access until" 
-                  : "Renews on"}
+                  ? "Access until"
+                  : (isPastDue || isUnpaid)
+                    ? "Payment due"
+                    : isIncomplete
+                      ? "Setup expires"
+                      : "Renews on"}
             </p>
             <p className="mt-1 font-medium text-foreground">
               {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", {
@@ -227,6 +229,24 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
             <p className="text-sm font-medium text-red-500 dark:text-red-400">Payment failed</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Update payment info to renew Pro access.
+            </p>
+          </div>
+        )}
+        
+        {isPaused && (
+           <div className="sm:text-right">
+            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">On hold</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your subscription is currently paused.
+            </p>
+          </div>
+        )}
+
+        {isIncomplete && (
+           <div className="sm:text-right">
+            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Setup incomplete</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Please finish setting up your payment.
             </p>
           </div>
         )}
