@@ -57,8 +57,14 @@ export function PlanCard({
         )} */}
         <h3 className="text-xl font-semibold text-foreground">{config.name}</h3>
         {isCurrentPlan && (
-          <Badge variant="secondary" className="ml-auto">
-            Current Plan
+          <Badge 
+            variant="secondary" 
+            className={cn(
+              "ml-auto",
+              subscription?.status === "trialing" && "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400"
+            )}
+          >
+            {subscription?.status === "trialing" ? "Trial Active" : "Current Plan"}
           </Badge>
         )}
       </div>
@@ -126,41 +132,133 @@ interface CurrentPlanSummaryProps {
 export function CurrentPlanSummary({ subscription, className }: CurrentPlanSummaryProps) {
   const tier = subscription?.tier || "free";
   const config = TIER_CONFIG[tier];
+  
+  const status = subscription?.status;
+  const isTrialing = status === "trialing";
+  const isPaused = status === "paused";
+  const isCanceled = status === "canceled";
+  const isPastDue = status === "past_due";
+  const isUnpaid = status === "unpaid";
   const isActive = isSubscriptionActive(subscription);
 
+  let badgeVariant = "outline";
+  let badgeStyles = "border-transparent px-2.5 py-0.5 text-xs font-semibold shadow-none transition-colors";
+  let badgeLabel = "Active";
+
+  if (isTrialing) {
+    badgeStyles += " bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    badgeLabel = "Trial Active";
+  } else if (isPaused) {
+    badgeStyles += " bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
+    badgeLabel = "Paused";
+  } else if (isCanceled) {
+    badgeStyles += " bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400";
+    badgeLabel = "Canceled";
+  } else if (isPastDue || isUnpaid) {
+    badgeStyles += " bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+    badgeLabel = isPastDue ? "Past Due" : "Unpaid";
+  } else {
+    // Default Active
+    badgeStyles += " bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+  }
+
   return (
-    <div className={cn("rounded-xl border bg-card p-6", className)}>
-      <div className="flex items-center justify-between">
+    <div className={cn("rounded-xl border bg-card p-6 shadow-sm", className)}>
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground">Current Plan</p>
-          <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-muted-foreground">Current Plan</p>
+          <div className="mt-1 flex items-center gap-3">
             <h2 className="text-2xl font-bold text-foreground">{config.name}</h2>
-            {isActive && (
-              <Badge variant="outline" className="border-green text-green">
-                Active
+            {tier !== "free" && (
+              <Badge variant="outline" className={badgeStyles}>
+                {badgeLabel}
               </Badge>
+            )}
+            {/* Show canceled badge separately if active but scheduled to cancel */}
+            {subscription?.cancelAtPeriodEnd && !isCanceled && (
+              <Badge variant="secondary">Cancels soon</Badge>
             )}
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Billing</p>
-          <p className="text-lg font-semibold text-foreground">
-            {config.priceDisplay}
-            <span className="text-sm font-normal text-muted-foreground">/{config.interval}</span>
-          </p>
-        </div>
+        
+        {tier !== "free" && (
+          <div className="text-left sm:text-right">
+            <p className="text-sm font-medium text-muted-foreground">Price</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">
+              {config.priceDisplay}
+              <span className="text-sm font-normal text-muted-foreground">/{config.interval}</span>
+            </p>
+          </div>
+        )}
       </div>
 
-      {subscription?.currentPeriodEnd && tier !== "free" && (
-        <p className="mt-4 text-sm text-muted-foreground">
-          {subscription.cancelAtPeriodEnd ? "Access until" : "Renews on"}{" "}
-          {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", {
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </p>
-      )}
+      <div className="mt-8 grid gap-4 border-t pt-6 sm:grid-cols-2">
+        {subscription?.currentPeriodEnd && tier !== "free" && (
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {isTrialing 
+                ? "Trial ends on" 
+                : (subscription.cancelAtPeriodEnd || isCanceled)
+                  ? "Access until" 
+                  : "Renews on"}
+            </p>
+            <p className="mt-1 font-medium text-foreground">
+              {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+        )}
+
+        {/* Status Banners - utilizing free space */}
+        {isPastDue && (
+           <div className="sm:text-right">
+            <p className="text-sm font-medium text-destructive">Payment failed</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Update payment info to keep Pro access.
+            </p>
+          </div>
+        )}
+
+        {isUnpaid && (
+           <div className="sm:text-right">
+            <p className="text-sm font-medium text-destructive">Payment failed</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Update payment info to renew Pro access.
+            </p>
+          </div>
+        )}
+
+        {isCanceled && (
+           <div className="sm:text-right">
+            <p className="text-sm font-medium text-muted-foreground">Set to expire</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enjoy your time left. We'll be here when you're ready.
+            </p>
+          </div>
+        )}
+
+        {status === "active" && !subscription?.cancelAtPeriodEnd && tier !== "free" && !isPaused && (
+           <div className="sm:text-right">
+            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">All systems go</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your subscription is active and automated.
+            </p>
+          </div>
+        )}
+
+        
+        {isTrialing && tier !== "free" && (
+           <div className="sm:text-right">
+            <p className="text-sm text-muted-foreground">First billing amount</p>
+            <p className="mt-1 font-medium text-foreground">
+              {config.priceDisplay} 
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

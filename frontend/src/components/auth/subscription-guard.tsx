@@ -27,9 +27,12 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
       try {
         const subscription = await getUserSubscription(user.id);
         
-        // Access Logic: Pro Tier AND (Active OR Trialing)
+        // Access Logic: Pro Tier AND (Active OR Trialing OR Past Due)
         const isPro = subscription?.tier === "pro";
-        const isActive = subscription?.status === "active" || subscription?.status === "trialing";
+        const isActive = 
+          subscription?.status === "active" || 
+          subscription?.status === "trialing" ||
+          subscription?.status === "past_due";
         
         setHasAccess(isPro && isActive);
       } catch (error) {
