@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
 import type { TickerSnapshot } from "@/types/ticker.types";
+import type { IndicatorBucket } from "@/types/redis.types";
 
 // ============================================================================
 // Types
@@ -66,6 +67,32 @@ function formatPercent(percent: number): string {
   return `${sign}${percent.toFixed(2)}%`;
 }
 
+const INDICATOR_LABELS: Record<IndicatorBucket, string> = {
+  low: "L",
+  mid: "M",
+  high: "H",
+};
+
+const INDICATOR_STYLES: Record<IndicatorBucket, string> = {
+  low: "text-blue-400 border-blue-400/30",
+  mid: "text-muted-foreground border-white/15",
+  high: "text-emerald-400 border-emerald-400/30",
+};
+
+function IndicatorBadge({ bucket }: { bucket?: IndicatorBucket }) {
+  if (!bucket) return null;
+  return (
+    <span
+      className={cn(
+        "ml-1 inline-flex items-center justify-center rounded border px-1 text-[9px] font-bold leading-3",
+        INDICATOR_STYLES[bucket]
+      )}
+    >
+      {INDICATOR_LABELS[bucket]}
+    </span>
+  );
+}
+
 
 // ============================================================================
 // Sub-Components
@@ -73,6 +100,10 @@ function formatPercent(percent: number): string {
 
 interface DataZoneProps {
   data: TickerSnapshot;
+  volumeValue: number;
+  volumeBucket?: IndicatorBucket;
+  vwapValue?: number;
+  vwapBucket?: IndicatorBucket;
 }
 
 /**
@@ -80,11 +111,12 @@ interface DataZoneProps {
  * Contains symbol, price, change, and volume in a 3-row layout
  * Typography: Numbers use font-mono (JetBrains Mono), tabular-nums
  */
-const DataZone = React.memo(({ data }: DataZoneProps) => {
+const DataZone = React.memo(({ data, volumeValue, volumeBucket, vwapValue, vwapBucket }: DataZoneProps) => {
   const { root, expiry } = parseSymbol(data.symbol);
   const netChange = data.change;
   const percentChange = data.changePercent;
   const isPositive = netChange >= 0;
+  const hasVwap = typeof vwapValue === "number" && Number.isFinite(vwapValue) && vwapValue > 0;
 
   return (
     <div className="flex flex-col justify-between h-full py-2 pl-2.5 pr-2.5 overflow-hidden min-w-0">
@@ -126,11 +158,13 @@ const DataZone = React.memo(({ data }: DataZoneProps) => {
       {/* Row 3: Liquidity Context */}
       <div className="flex items-center justify-between gap-2 overflow-hidden">
         <span className="text-[11px] font-mono text-muted-foreground/40 tabular-nums tracking-wider uppercase shrink-0">
-          Vol {formatVolume(data.cum_volume)}
+          Vol {formatVolume(volumeValue)}
+          <IndicatorBadge bucket={volumeBucket} />
         </span>
-        {data.vwap && (
+        {hasVwap && (
           <span className="text-[11px] font-mono text-amber-500/60 tabular-nums shrink-0">
-            VWAP {formatPrice(data.vwap)}
+            VWAP {formatPrice(vwapValue!)}
+            <IndicatorBadge bucket={vwapBucket} />
           </span>
         )}
       </div>
@@ -239,6 +273,17 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
     [symbol, bars, entity?.latestBar, snapshot, session]
   );
 
+  const volumeValue = useMemo(() => {
+    if (session && Number.isFinite(session.volNow) && session.volNow > 0) return session.volNow;
+    if (entity?.latestBar && Number.isFinite(entity.latestBar.volume)) return entity.latestBar.volume;
+    return snapshotData.cum_volume;
+  }, [session, entity?.latestBar, snapshotData.cum_volume]);
+
+  const vwapValue = useMemo(() => {
+    if (session && Number.isFinite(session.vwap) && session.vwap > 0) return session.vwap;
+    return snapshotData.vwap;
+  }, [session, snapshotData.vwap]);
+
   const isSelected = selection.selected.includes(symbol) && !isModalOpen;
   const isPrimary = selection.primary === symbol && !isModalOpen;
 
@@ -273,7 +318,13 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
       onClick={handleClick}
     >
       {/* Zone 1: Data Cluster */}
-      <DataZone data={snapshotData} />
+      <DataZone
+        data={snapshotData}
+        volumeValue={volumeValue}
+        volumeBucket={session && session.volNow > 0 ? session.volBucket : undefined}
+        vwapValue={vwapValue}
+        vwapBucket={session && session.vwap > 0 ? session.vwapBucket : undefined}
+      />
 
       {/* Separator - 1px vertical line */}
       <div className="my-2 bg-white/6" />

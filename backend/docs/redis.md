@@ -110,6 +110,15 @@ Rolling intraday calculations computed from incoming bars.
 | `dayHigh` | number | Session high (rolling) |
 | `dayLow` | number | Session low (rolling) |
 | `dayOpen` | number | First bar open of session |
+| `volNow` | number | Latest bar volume (current) |
+| `volMin` | number | Minimum bar volume seen this session |
+| `volMax` | number | Maximum bar volume seen this session |
+| `volPos` | number | Current volume position (0-1) |
+| `volBucket` | string | `low` / `mid` / `high` |
+| `vwapMin` | number | Minimum VWAP seen this session |
+| `vwapMax` | number | Maximum VWAP seen this session |
+| `vwapPos` | number | Current VWAP position (0-1) |
+| `vwapBucket` | string | `low` / `mid` / `high` |
 | `cumPriceVolume` | number | Running total for VWAP calc |
 | `cumVolume` | number | Running total for VWAP calc |
 | `timestamp` | number | Last update (epoch ms) |
@@ -127,6 +136,18 @@ cumPriceVolume += bar.close * bar.volume;
 cumVolume += bar.volume;
 vwap = cumPriceVolume / cumVolume;
 ```
+
+**Indicator Position (session scope):**
+```
+pos = (value - min) / (max - min)
+bucket = low   if pos <= 0.33
+bucket = mid   if pos <= 0.66
+bucket = high  otherwise
+```
+
+- `volNow` uses the latest bar volume.
+- `volMin/volMax` track the min/max bar volume seen this session.
+- `vwapMin/vwapMax` track the min/max VWAP seen this session.
 
 ---
 

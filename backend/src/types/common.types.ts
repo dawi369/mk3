@@ -35,6 +35,8 @@ export interface RefreshJobStatus {
  * Rolling intraday session calculations
  * Stored in Redis at session:{symbol}
  */
+export type IndicatorBucket = "low" | "mid" | "high";
+
 export interface SessionData {
   dayOpen: number;
   dayHigh: number;
@@ -42,6 +44,15 @@ export interface SessionData {
   vwap: number;
   cvol: number;
   tradeCount: number;
+  volNow: number;
+  volMin: number;
+  volMax: number;
+  volPos: number;
+  volBucket: IndicatorBucket;
+  vwapMin: number;
+  vwapMax: number;
+  vwapPos: number;
+  vwapBucket: IndicatorBucket;
   // Internal running totals for VWAP calculation
   cumPriceVolume: number;
   cumVolume: number;
@@ -66,4 +77,3 @@ export interface SnapshotData {
   openInterest: number | null;
   timestamp: number;
 }
-

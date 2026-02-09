@@ -1,6 +1,6 @@
 import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
-import type { Bar, SessionData, SnapshotData } from "@/types/common.types.js";
+import type { Bar, SessionData, SnapshotData, IndicatorBucket } from "@/types/common.types.js";
 import { Redis } from "ioredis";
 
 // Redis Key Constants
@@ -57,6 +57,31 @@ function extractRootSymbol(symbol: string): string {
 function normalizeTimestampMs(value: number): number {
   if (!Number.isFinite(value)) return value;
   return value < 1e12 ? value * 1000 : value;
+}
+
+function parseNumber(value: string | number | undefined, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value: number, min = 0, max = 1): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function calcIndicatorPos(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max)) {
+    return 0.5;
+  }
+  const range = max - min;
+  if (range <= 0) return 0.5;
+  return clamp((value - min) / range, 0, 1);
+}
+
+function bucketForPos(pos: number): IndicatorBucket {
+  if (pos <= 0.33) return "low";
+  if (pos <= 0.66) return "mid";
+  return "high";
 }
 
 function isIgnorableRedisError(error: unknown): boolean {
@@ -161,8 +186,17 @@ class RedisStore {
     const now = Date.now();
     const priceVolume = bar.close * bar.volume;
 
+    const volNow = bar.volume;
+
     if (Object.keys(existing).length === 0) {
       // First bar of session - initialize
+      const vwapMin = bar.close;
+      const vwapMax = bar.close;
+      const volMin = volNow;
+      const volMax = volNow;
+      const vwapPos = calcIndicatorPos(bar.close, vwapMin, vwapMax);
+      const volPos = calcIndicatorPos(volNow, volMin, volMax);
+
       const session: SessionData = {
         dayOpen: bar.open,
         dayHigh: bar.high,
@@ -170,6 +204,15 @@ class RedisStore {
         vwap: bar.close, // First bar: VWAP = close
         cvol: bar.volume,
         tradeCount: bar.trades,
+        volNow,
+        volMin,
+        volMax,
+        volPos,
+        volBucket: bucketForPos(volPos),
+        vwapMin,
+        vwapMax,
+        vwapPos,
+        vwapBucket: bucketForPos(vwapPos),
         cumPriceVolume: priceVolume,
         cumVolume: bar.volume,
         timestamp: now,
@@ -181,12 +224,28 @@ class RedisStore {
       const cumVolume = parseFloat(existing.cumVolume || "0") + bar.volume;
       const vwap = cumVolume > 0 ? cumPriceVolume / cumVolume : 0;
 
+      const vwapMin = Math.min(parseNumber(existing.vwapMin, vwap), vwap);
+      const vwapMax = Math.max(parseNumber(existing.vwapMax, vwap), vwap);
+      const volMin = Math.min(parseNumber(existing.volMin, volNow), volNow);
+      const volMax = Math.max(parseNumber(existing.volMax, volNow), volNow);
+      const vwapPos = calcIndicatorPos(vwap, vwapMin, vwapMax);
+      const volPos = calcIndicatorPos(volNow, volMin, volMax);
+
       const updates: Record<string, string | number> = {
         dayHigh: Math.max(parseFloat(existing.dayHigh || "0"), bar.high),
         dayLow: Math.min(parseFloat(existing.dayLow || String(bar.low)), bar.low),
         vwap,
         cvol: parseFloat(existing.cvol || "0") + bar.volume,
         tradeCount: parseInt(existing.tradeCount || "0") + bar.trades,
+        volNow,
+        volMin,
+        volMax,
+        volPos,
+        volBucket: bucketForPos(volPos),
+        vwapMin,
+        vwapMax,
+        vwapPos,
+        vwapBucket: bucketForPos(vwapPos),
         cumPriceVolume,
         cumVolume,
         timestamp: now,
@@ -472,6 +531,15 @@ class RedisStore {
       vwap: parseFloat(data.vwap || "0"),
       cvol: parseFloat(data.cvol || "0"),
       tradeCount: parseInt(data.tradeCount || "0"),
+      volNow: parseFloat(data.volNow || "0"),
+      volMin: parseFloat(data.volMin || "0"),
+      volMax: parseFloat(data.volMax || "0"),
+      volPos: parseFloat(data.volPos || "0"),
+      volBucket: (data.volBucket as IndicatorBucket) || "mid",
+      vwapMin: parseFloat(data.vwapMin || "0"),
+      vwapMax: parseFloat(data.vwapMax || "0"),
+      vwapPos: parseFloat(data.vwapPos || "0"),
+      vwapBucket: (data.vwapBucket as IndicatorBucket) || "mid",
       cumPriceVolume: parseFloat(data.cumPriceVolume || "0"),
       cumVolume: parseFloat(data.cumVolume || "0"),
       timestamp: parseInt(data.timestamp || "0"),
