@@ -25,6 +25,8 @@ export interface TickerSnapshot {
   prev_close: number;
   cum_volume: number;
   vwap?: number;
+  change: number;
+  changePercent: number;
 }
 
 export interface TickerSelectionState {

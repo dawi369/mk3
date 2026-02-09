@@ -7,6 +7,7 @@ import type {
   TickerMode,
   TickerSelectionState,
 } from "@/types/ticker.types";
+import type { SnapshotData, SessionData } from "@/types/redis.types";
 import { MAX_SPREAD_LEGS } from "@/types/ticker.types";
 import {
   ASSET_CLASSES,
@@ -106,6 +107,8 @@ interface TickerStoreState {
   byAssetClassByMode: Record<TickerMode, Record<string, string[]>>;
   trackedSymbolsByMode: Record<TickerMode, Record<string, true>>;
   selectionByMode: Record<TickerMode, TickerSelectionState>;
+  snapshotsBySymbol: Record<string, SnapshotData>;
+  sessionsBySymbol: Record<string, SessionData>;
   timeframe: Timeframe;
   isSidebarOpen: boolean;
 
@@ -113,6 +116,8 @@ interface TickerStoreState {
   registerSymbols: (mode: TickerMode, symbols: string[]) => void;
   upsertBar: (mode: TickerMode, bar: Bar) => void;
   setTrackedSymbols: (symbols: string[]) => void;
+  setSnapshots: (snapshots: Record<string, SnapshotData>) => void;
+  setSessions: (sessions: Record<string, SessionData>) => void;
 
   openPrimary: (symbol: string) => void;
   toggleSelectShift: (symbol: string) => void;
@@ -138,6 +143,8 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
   byAssetClassByMode: { front: emptyAssetIndex(), curve: emptyAssetIndex() },
   trackedSymbolsByMode: { front: {}, curve: {} },
   selectionByMode: { front: emptySelection(), curve: emptySelection() },
+  snapshotsBySymbol: {},
+  sessionsBySymbol: {},
   timeframe: "1m",
   isSidebarOpen: true,
 
@@ -226,6 +233,16 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
         },
       };
     }),
+
+  setSnapshots: (snapshots) =>
+    set(() => ({
+      snapshotsBySymbol: snapshots,
+    })),
+
+  setSessions: (sessions) =>
+    set(() => ({
+      sessionsBySymbol: sessions,
+    })),
 
   openPrimary: (symbol) =>
     set((state) => {

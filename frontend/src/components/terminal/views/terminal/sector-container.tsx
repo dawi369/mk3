@@ -13,6 +13,7 @@ import {
 interface SectorContainerProps {
   title: string;
   openInterest?: number;
+  openInterestPercent?: number;
   avgChange?: number;
   isUpdating?: boolean; 
   children?: React.ReactNode;
@@ -24,9 +25,17 @@ interface SectorContainerProps {
 // Gap between items in px
 const GRID_GAP = 4; // gap-1 = 4px
 
+function formatOpenInterest(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 export function SectorContainer({
   title,
   openInterest,
+  openInterestPercent,
   avgChange,
   isUpdating,
   children,
@@ -46,26 +55,35 @@ export function SectorContainer({
         </CardTitle>
         
         {/* Right: Controls & Metrics - Floating in header */}
-        <div className="flex items-center gap-3">
-
-
-          {avgChange !== undefined && (
-             <span className={cn(
-                "font-mono text-xs font-bold tracking-wider transition-colors duration-300 mr-2",
-                 avgChange >= 0 ? "text-emerald-500" : "text-rose-500"
-            )}>
-              {avgChange >= 0 ? "+" : ""}{avgChange.toFixed(2)}%
-            </span>
-          )}
-
+        <div className="flex flex-col items-end gap-1">
           {openInterest !== undefined && (
             <span className={cn(
-                "font-mono text-xs uppercase font-bold tracking-wider transition-colors duration-300",
+                "font-mono text-[11px] uppercase font-bold tracking-wider transition-colors duration-300",
                  isUpdating ? "text-white" : "text-muted-foreground/70"
             )}>
-              OPEN INT: {(openInterest * 100).toFixed(0)}%
+              OI: {formatOpenInterest(openInterest)}
             </span>
           )}
+
+          <div className="flex items-center gap-3">
+            {avgChange !== undefined && (
+              <span className={cn(
+                  "font-mono text-xs font-bold tracking-wider transition-colors duration-300",
+                   avgChange >= 0 ? "text-emerald-500" : "text-rose-500"
+              )}>
+                {avgChange >= 0 ? "+" : ""}{avgChange.toFixed(2)}%
+              </span>
+            )}
+
+            {openInterestPercent !== undefined && (
+              <span className={cn(
+                  "font-mono text-xs uppercase font-bold tracking-wider transition-colors duration-300",
+                   isUpdating ? "text-white" : "text-muted-foreground/70"
+              )}>
+                OI {openInterestPercent.toFixed(1)}%
+              </span>
+            )}
+          </div>
         </div>
       </CardHeader>
       

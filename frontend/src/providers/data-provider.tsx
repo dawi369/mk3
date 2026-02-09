@@ -6,6 +6,7 @@ import { Bar } from "@/types/common.types";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
 import { getAllProductCodes } from "@/lib/ticker-mapping";
+import type { SnapshotData, SessionData } from "@/types/redis.types";
 
 interface MarketData {
   [symbol: string]: Bar[];
@@ -23,6 +24,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const { subscribe, status } = useConnection();
   const registerSymbols = useTickerStore((state) => state.registerSymbols);
   const upsertBar = useTickerStore((state) => state.upsertBar);
+  const setSnapshots = useTickerStore((state) => state.setSnapshots);
+  const setSessions = useTickerStore((state) => state.setSessions);
   const [isLoading, setIsLoading] = useState(true);
   const pendingBarsRef = useRef<Bar[]>([]);
   const flushHandleRef = useRef<number | null>(null);
@@ -51,6 +54,49 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
     };
   }, [registerSymbols]);
+
+  useEffect(() => {
+    let mounted = true;
+    let sessionsInterval: number | null = null;
+
+    const loadSnapshots = async () => {
+      try {
+        const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/snapshots`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        const snapshots = payload?.snapshots as Record<string, SnapshotData> | undefined;
+        if (!mounted || !snapshots) return;
+        setSnapshots(snapshots);
+      } catch (err) {
+        console.warn("[DataProvider] Failed to load snapshots", err);
+      }
+    };
+
+    const loadSessions = async () => {
+      try {
+        const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/sessions`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        const sessions = payload?.sessions as Record<string, SessionData> | undefined;
+        if (!mounted || !sessions) return;
+        setSessions(sessions);
+      } catch (err) {
+        console.warn("[DataProvider] Failed to load sessions", err);
+      }
+    };
+
+    loadSnapshots();
+    loadSessions();
+
+    sessionsInterval = window.setInterval(loadSessions, 30_000);
+
+    return () => {
+      mounted = false;
+      if (sessionsInterval !== null) {
+        window.clearInterval(sessionsInterval);
+      }
+    };
+  }, [setSnapshots, setSessions]);
 
   useEffect(() => {
     const flush = () => {

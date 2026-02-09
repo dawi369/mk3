@@ -27,13 +27,14 @@ export function TerminalView() {
       {terminalData.map((data) => (
         <div key={data.id} style={{ minHeight: 0, minWidth: 0, overflow: "hidden", position: "relative" }}>
           <ErrorBoundary name={data.title}>
-            <SectorContainer
-              title={data.title}
-              openInterest={data.openInterest}
-              avgChange={data.avgChange}
-              isUpdating={false}
-              className="h-full w-full"
-              visibleRows={visibleRows}
+              <SectorContainer
+                title={data.title}
+                openInterest={data.openInterest}
+                openInterestPercent={data.openInterestPercent}
+                avgChange={data.avgChange}
+                isUpdating={false}
+                className="h-full w-full"
+                visibleRows={visibleRows}
               // Removed specific showPagination filter to show arrows for all as requested
             >
               {data.symbols.map((symbol) => (

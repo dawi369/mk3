@@ -1,4 +1,5 @@
 import type { Bar } from "@/types/common.types";
+import type { SnapshotData, SessionData } from "@/types/redis.types";
 import type { TickerSnapshot } from "@/types/ticker.types";
 
 const MOCK_SYMBOLS = [
@@ -8,6 +9,14 @@ const MOCK_SYMBOLS = [
 ];
 
 let mockIndex = 0;
+
+function isValidPrice(value?: number | null): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isValidNumber(value?: number | null): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
 
 function hashSymbol(value: string): number {
   let hash = 0;
@@ -59,35 +68,116 @@ function summarizeBars(bars: Bar[]): {
   };
 }
 
-export function buildTickerSnapshot(symbol: string, bars?: Bar[], latest?: Bar): TickerSnapshot {
-  if (bars && bars.length > 0) {
-    const summary = summarizeBars(bars);
-    return {
-      symbol,
-      last_price: summary.close,
-      session_open: summary.open,
-      session_high: summary.high,
-      session_low: summary.low,
-      prev_close: summary.open,
-      cum_volume: summary.volume,
-      vwap: summary.vwap,
-    };
+export function resolveLastPrice(options: {
+  bars?: Bar[];
+  latest?: Bar;
+  snapshot?: SnapshotData | null;
+}): number | null {
+  const { bars, latest, snapshot } = options;
+  if (isValidPrice(latest?.close)) return latest!.close;
+  if (bars && bars.length > 0 && isValidPrice(bars[bars.length - 1]?.close)) {
+    return bars[bars.length - 1].close;
+  }
+  if (isValidPrice(snapshot?.sessionClose)) return snapshot!.sessionClose;
+  if (isValidPrice(snapshot?.settlementPrice)) return snapshot!.settlementPrice;
+  return null;
+}
+
+export function resolveReferencePrice(options: {
+  bars?: Bar[];
+  latest?: Bar;
+  snapshot?: SnapshotData | null;
+}): number | null {
+  const { bars, latest, snapshot } = options;
+  if (isValidPrice(snapshot?.prevSettlement)) return snapshot!.prevSettlement;
+  if (isValidPrice(snapshot?.settlementPrice)) return snapshot!.settlementPrice;
+  if (isValidPrice(snapshot?.sessionClose)) return snapshot!.sessionClose;
+  if (bars && bars.length > 0 && isValidPrice(bars[0]?.open)) return bars[0].open;
+  if (isValidPrice(latest?.open)) return latest!.open;
+  return null;
+}
+
+export function getChangeMetrics(options: {
+  bars?: Bar[];
+  latest?: Bar;
+  snapshot?: SnapshotData | null;
+}): { change: number; changePercent: number; hasReference: boolean } {
+  const lastPrice = resolveLastPrice(options);
+  const reference = resolveReferencePrice(options);
+  if (!isValidPrice(lastPrice) || !isValidPrice(reference)) {
+    return { change: 0, changePercent: 0, hasReference: false };
+  }
+  const change = lastPrice - reference;
+  const changePercent = reference === 0 ? 0 : (change / reference) * 100;
+  return { change, changePercent, hasReference: true };
+}
+
+export function buildTickerSnapshot(
+  symbol: string,
+  bars?: Bar[],
+  latest?: Bar,
+  snapshot?: SnapshotData | null,
+  session?: SessionData | null,
+): TickerSnapshot {
+  const summary = bars && bars.length > 0 ? summarizeBars(bars) : null;
+  const lastPrice = resolveLastPrice({ bars, latest, snapshot }) ?? 0;
+  const reference = resolveReferencePrice({ bars, latest, snapshot }) ?? lastPrice;
+
+  const sessionOpen =
+    (isValidPrice(session?.dayOpen) && session!.dayOpen) ||
+    (isValidPrice(snapshot?.sessionOpen) && snapshot!.sessionOpen) ||
+    (isValidPrice(summary?.open) && summary!.open) ||
+    (isValidPrice(latest?.open) && latest!.open) ||
+    lastPrice;
+
+  const sessionHigh =
+    (isValidPrice(session?.dayHigh) && session!.dayHigh) ||
+    (isValidPrice(snapshot?.sessionHigh) && snapshot!.sessionHigh) ||
+    (isValidPrice(summary?.high) && summary!.high) ||
+    (isValidPrice(latest?.high) && latest!.high) ||
+    lastPrice;
+
+  const sessionLow =
+    (isValidPrice(session?.dayLow) && session!.dayLow) ||
+    (isValidPrice(snapshot?.sessionLow) && snapshot!.sessionLow) ||
+    (isValidPrice(summary?.low) && summary!.low) ||
+    (isValidPrice(latest?.low) && latest!.low) ||
+    lastPrice;
+
+  let cumVolume = 0;
+  if (isValidNumber(session?.cvol)) {
+    cumVolume = session!.cvol;
+  } else if (isValidNumber(summary?.volume)) {
+    cumVolume = summary!.volume;
+  } else if (isValidNumber(latest?.volume)) {
+    cumVolume = latest!.volume;
   }
 
-  if (latest) {
-    return {
-      symbol,
-      last_price: latest.close,
-      session_open: latest.open,
-      session_high: latest.high,
-      session_low: latest.low,
-      prev_close: latest.open,
-      cum_volume: latest.volume,
-      vwap: undefined,
-    };
+  const vwap = isValidPrice(session?.vwap)
+    ? session!.vwap
+    : isValidPrice(summary?.vwap)
+      ? summary!.vwap
+      : undefined;
+
+  const change = lastPrice - reference;
+  const changePercent = reference ? (change / reference) * 100 : 0;
+
+  if (lastPrice === 0 && !summary && !snapshot && !session) {
+    return generateMockSnapshot(symbol);
   }
 
-  return generateMockSnapshot(symbol);
+  return {
+    symbol,
+    last_price: lastPrice,
+    session_open: sessionOpen,
+    session_high: sessionHigh,
+    session_low: sessionLow,
+    prev_close: reference,
+    cum_volume: cumVolume,
+    vwap,
+    change,
+    changePercent,
+  };
 }
 
 export function generateMockSnapshot(symbol?: string): TickerSnapshot {
@@ -128,5 +218,7 @@ export function generateMockSnapshot(symbol?: string): TickerSnapshot {
     prev_close: prevClose,
     cum_volume: Math.floor(rand() * 1_500_000) + 50_000,
     vwap: (sessionHigh + sessionLow + lastPrice) / 3,
+    change: lastPrice - prevClose,
+    changePercent: prevClose ? ((lastPrice - prevClose) / prevClose) * 100 : 0,
   };
 }

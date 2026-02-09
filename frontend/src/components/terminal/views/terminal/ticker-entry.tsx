@@ -58,6 +58,14 @@ function formatChange(change: number): string {
   return `${sign}${change.toFixed(2)}`;
 }
 
+/**
+ * Format percent change with sign
+ */
+function formatPercent(percent: number): string {
+  const sign = percent >= 0 ? "+" : "";
+  return `${sign}${percent.toFixed(2)}%`;
+}
+
 
 // ============================================================================
 // Sub-Components
@@ -74,18 +82,29 @@ interface DataZoneProps {
  */
 const DataZone = React.memo(({ data }: DataZoneProps) => {
   const { root, expiry } = parseSymbol(data.symbol);
-  const netChange = data.last_price - data.prev_close;
+  const netChange = data.change;
+  const percentChange = data.changePercent;
   const isPositive = netChange >= 0;
 
   return (
     <div className="flex flex-col justify-between h-full py-2 pl-2.5 pr-2.5 overflow-hidden min-w-0">
       {/* Row 1: Identity */}
-      <div className="flex items-baseline gap-1 overflow-hidden">
-        <span className="text-lg font-bold text-foreground tracking-tight leading-none shrink-0">
-          {root}
-        </span>
-        <span className="text-sm font-mono text-muted-foreground/50 tracking-wide shrink-0">
-          {expiry}
+      <div className="flex items-baseline justify-between gap-2 overflow-hidden">
+        <div className="flex items-baseline gap-1 overflow-hidden">
+          <span className="text-lg font-bold text-foreground tracking-tight leading-none shrink-0">
+            {root}
+          </span>
+          <span className="text-sm font-mono text-muted-foreground/50 tracking-wide shrink-0">
+            {expiry}
+          </span>
+        </div>
+        <span
+          className={cn(
+            "text-[11px] font-mono font-semibold tabular-nums tracking-tight shrink-0",
+            isPositive ? "text-emerald-500/90" : "text-rose-500/90"
+          )}
+        >
+          {formatChange(netChange)}
         </span>
       </div>
 
@@ -96,12 +115,11 @@ const DataZone = React.memo(({ data }: DataZoneProps) => {
         </span>
         <span
           className={cn(
-            // TODO figure out how to make it all fit for 55,555.05 +9.999.99
             "text-[16px] font-mono font-semibold tabular-nums tracking-tight shrink-0",
             isPositive ? "text-emerald-500" : "text-rose-500"
           )}
         >
-          {formatChange(netChange)}
+          {formatPercent(percentChange)}
         </span>
       </div>
 
@@ -184,13 +202,15 @@ const PulseBar = React.memo(({ data }: PulseBarProps) => {
           }}
         />
 
-        {/* Current Price Indicator (small dot at tip) */}
+        {/* Current Price Marker */}
         <div
           className={cn(
-            "absolute w-1 h-1 left-1/2 -translate-x-1/2 rounded-full transition-all duration-150",
-            isUp ? "bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.5)]" : "bg-rose-400 shadow-[0_0_4px_rgba(244,63,94,0.5)]"
+            "absolute left-0 right-0 h-px transition-all duration-150",
+            isUp
+              ? "bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.5)]"
+              : "bg-rose-400 shadow-[0_0_4px_rgba(244,63,94,0.5)]"
           )}
-          style={{ bottom: `${calcPosition(last_price)}%`, transform: "translate(-50%, 50%)" }}
+          style={{ bottom: `${calcPosition(last_price)}%` }}
         />
       </div>
     </div>
@@ -206,14 +226,16 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
   const mode = useTickerStore((state) => state.mode);
   const entity = useTickerStore((state) => state.entitiesByMode[mode][symbol]);
   const bars = useTickerStore((state) => state.seriesByMode[mode][symbol]);
+  const snapshot = useTickerStore((state) => state.snapshotsBySymbol[symbol]);
+  const session = useTickerStore((state) => state.sessionsBySymbol[symbol]);
   const selection = useTickerStore((state) => state.selectionByMode[mode]);
   const isModalOpen = useTickerStore((state) => state.isModalOpen);
   const openPrimary = useTickerStore((state) => state.openPrimary);
   const toggleSelectShift = useTickerStore((state) => state.toggleSelectShift);
 
-  const snapshot = useMemo(
-    () => buildTickerSnapshot(symbol, bars, entity?.latestBar),
-    [symbol, bars, entity?.latestBar]
+  const snapshotData = useMemo(
+    () => buildTickerSnapshot(symbol, bars, entity?.latestBar, snapshot, session),
+    [symbol, bars, entity?.latestBar, snapshot, session]
   );
 
   const isSelected = selection.selected.includes(symbol) && !isModalOpen;
@@ -250,13 +272,13 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
       onClick={handleClick}
     >
       {/* Zone 1: Data Cluster */}
-      <DataZone data={snapshot} />
+      <DataZone data={snapshotData} />
 
       {/* Separator - 1px vertical line */}
       <div className="my-2 bg-white/6" />
 
       {/* Zone 2: Pulse Bar */}
-      <PulseBar data={snapshot} />
+      <PulseBar data={snapshotData} />
     </Card>
   );
 });

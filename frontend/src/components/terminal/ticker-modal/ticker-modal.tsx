@@ -161,6 +161,8 @@ export function TickerModal() {
   const mode = useTickerStore((state) => state.mode);
   const liveSeriesBySymbol = useTickerStore((state) => state.seriesByMode[mode]);
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
+  const snapshots = useTickerStore((state) => state.snapshotsBySymbol);
+  const sessions = useTickerStore((state) => state.sessionsBySymbol);
   const setTrackedSymbols = useTickerStore((state) => state.setTrackedSymbols);
   const [showLegs, setShowLegs] = useState(true);
   const orderedSymbols = useMemo(() => {
@@ -250,18 +252,22 @@ export function TickerModal() {
     return headerSymbols.map((symbol) => {
       const symbolBars = resolvedSeriesBySymbol[symbol];
       const symbolEntity = entities[symbol];
-      const symbolSnapshot = buildTickerSnapshot(symbol, symbolBars, symbolEntity?.latestBar);
-      const symbolChange = symbolSnapshot.prev_close
-        ? ((symbolSnapshot.last_price - symbolSnapshot.prev_close) / symbolSnapshot.prev_close) * 100
-        : 0;
+      const symbolSnapshot = buildTickerSnapshot(
+        symbol,
+        symbolBars,
+        symbolEntity?.latestBar,
+        snapshots[symbol],
+        sessions[symbol]
+      );
+      const symbolChange = symbolSnapshot.changePercent;
 
       return {
         symbol,
         price: symbolSnapshot.last_price,
-        changePercent: symbolChange,
+          changePercent: symbolChange,
       };
     });
-  }, [headerSymbols, resolvedSeriesBySymbol, entities]);
+  }, [headerSymbols, resolvedSeriesBySymbol, entities, snapshots, sessions]);
 
   useEffect(() => {
     if (!isOpen) {

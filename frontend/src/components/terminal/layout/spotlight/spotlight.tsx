@@ -18,6 +18,8 @@ import {
 import { useTickerStore } from "@/store/use-ticker-store";
 import type { TickerSearchResult } from "@/types/ticker.types";
 import type { Bar } from "@/types/common.types";
+import { getChangeMetrics, resolveLastPrice } from "@/lib/ticker-snapshot";
+import type { SnapshotData, SessionData } from "@/types/redis.types";
 
 function summarizeVolume(bars?: Bar[]): number {
   if (!bars || bars.length === 0) return 0;
@@ -28,6 +30,8 @@ function searchTickers(
   query: string,
   entities: Record<string, { symbol: string; name: string; latestBar?: Bar }>,
   series: Record<string, Bar[]>,
+  snapshots: Record<string, SnapshotData>,
+  sessions: Record<string, SessionData>,
 ): TickerSearchResult[] {
   if (!query) return [];
   const q = query.toUpperCase();
@@ -41,11 +45,12 @@ function searchTickers(
 
     const bars = series[entity.symbol];
     const latest = entity.latestBar || bars?.[bars.length - 1];
-    const base = bars?.[0]?.open || latest?.open || latest?.close || 0;
-    const lastPrice = latest?.close || 0;
-    const change = base ? lastPrice - base : 0;
-    const changePercent = base ? change / base : 0;
-    const volume = summarizeVolume(bars) || latest?.volume || 0;
+    const snapshot = snapshots[entity.symbol];
+    const session = sessions[entity.symbol];
+    const lastPrice = resolveLastPrice({ bars, latest, snapshot }) || 0;
+    const changeMetrics = getChangeMetrics({ bars, latest, snapshot });
+    const volume =
+      session?.cvol ?? (summarizeVolume(bars) || latest?.volume || 0);
 
     let rank = 3;
     if (symbol === q) rank = 0;
@@ -56,8 +61,8 @@ function searchTickers(
       symbol: entity.symbol,
       name: entity.name,
       lastPrice,
-      change,
-      changePercent,
+      change: changeMetrics.change,
+      changePercent: changeMetrics.changePercent / 100,
       volume,
       rank,
     });
@@ -140,6 +145,8 @@ export function Spotlight() {
   const mode = useTickerStore((state) => state.mode);
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
   const series = useTickerStore((state) => state.seriesByMode[mode]);
+  const snapshots = useTickerStore((state) => state.snapshotsBySymbol);
+  const sessions = useTickerStore((state) => state.sessionsBySymbol);
   const isModalOpen = useTickerStore((state) => state.isModalOpen);
   const openPrimary = useTickerStore((state) => state.openPrimary);
   const addComparison = useTickerStore((state) => state.addComparison);
@@ -162,12 +169,12 @@ export function Spotlight() {
   // Handle ticker search
   useEffect(() => {
     if (query) {
-      const results = searchTickers(query, entities, series);
+      const results = searchTickers(query, entities, series, snapshots, sessions);
       setTickerResults(results);
     } else {
       setTickerResults([]);
     }
-  }, [query, entities, series]);
+  }, [query, entities, series, snapshots, sessions]);
 
   // Keyboard shortcut handler - Ctrl+K or Cmd+K
   useEffect(() => {
