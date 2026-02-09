@@ -78,21 +78,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      // Light mode
       {
         url: "/mk3LogoTransparent.png",
         type: "image/png",
-        sizes: "any",
-        media: "(prefers-color-scheme: light)",
-      },
-      // Dark mode
-      {
-        url: "/mk3LogoTransparent.png",
-        type: "image/png",
-        sizes: "any",
-        media: "(prefers-color-scheme: dark)",
+        sizes: "32x32",
       },
     ],
+    shortcut: "/mk3LogoTransparent.png",
+    apple: "/mk3LogoTransparent.png",
   },
   manifest: "/manifest.json",
   appleWebApp: {

@@ -8,6 +8,32 @@ import {
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const STATIC_PATHS = new Set(["/manifest.json", "/robots.txt", "/sitemap.xml"]);
+const STATIC_EXTENSIONS = new Set([
+  ".css",
+  ".js",
+  ".mjs",
+  ".cjs",
+  ".map",
+  ".json",
+  ".ico",
+  ".svg",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".mp4",
+  ".webm",
+  ".mp3",
+  ".wav",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".eot",
+  ".txt",
+]);
 const WAITLIST_PATH = "/waitlist";
 
 function parseHost(hostHeader: string | null): string {
@@ -72,6 +98,15 @@ export async function proxy(request: NextRequest) {
 
   if (url.pathname.startsWith("/_next/")) {
     return NextResponse.next();
+  }
+
+  const pathname = url.pathname.toLowerCase();
+  const extensionIndex = pathname.lastIndexOf(".");
+  if (extensionIndex !== -1) {
+    const ext = pathname.slice(extensionIndex);
+    if (STATIC_EXTENSIONS.has(ext)) {
+      return NextResponse.next();
+    }
   }
 
   if (!STATIC_PATHS.has(url.pathname)) {
