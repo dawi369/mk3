@@ -88,7 +88,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     loadSnapshots();
     loadSessions();
 
-    sessionsInterval = window.setInterval(loadSessions, 30_000);
+    sessionsInterval = window.setInterval(loadSessions, 60_000);
 
     return () => {
       mounted = false;

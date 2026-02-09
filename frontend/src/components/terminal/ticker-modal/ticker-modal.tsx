@@ -25,7 +25,6 @@ import { AISidebar } from "@/components/terminal/ticker-modal/ai-sidebar";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
 import { resampleBars } from "@/lib/bar-resample";
-import { getGlobexSessionStartMs } from "@/lib/session-time";
 import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import { useChartHistory } from "@/hooks/use-chart-history";
 import {
@@ -62,9 +61,40 @@ const formatNumber = (num: number, decimals = 2) =>
     maximumFractionDigits: decimals,
   }).format(num);
 
+const TIMEFRAME_MS: Record<Timeframe, number> = {
+  "5s": 5000,
+  "30s": 30000,
+  "1m": 60000,
+  "5m": 300000,
+  "15m": 900000,
+  "1h": 3600000,
+  "4h": 14400000,
+  "1d": 86400000,
+};
+
 function normalizeTimestamp(value: number): number {
   if (!Number.isFinite(value)) return value;
   return value < 1e12 ? value * 1000 : value;
+}
+
+function inferIntervalMs(bars: Bar[]): number | null {
+  if (!bars || bars.length < 2) return null;
+  const slice = bars.length > 60 ? bars.slice(-60) : bars;
+  const times = slice
+    .map((bar) => normalizeTimestamp(bar.startTime))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+
+  if (times.length < 2) return null;
+  const diffs: number[] = [];
+  for (let i = 1; i < times.length; i++) {
+    const diff = times[i] - times[i - 1];
+    if (diff > 0) diffs.push(diff);
+  }
+
+  if (diffs.length === 0) return null;
+  diffs.sort((a, b) => a - b);
+  return diffs[Math.floor(diffs.length / 2)] ?? null;
 }
 
 function formatDepth(ms: number): string {
@@ -80,7 +110,7 @@ function formatDepth(ms: number): string {
 
 function toCandleData(bars: Bar[]): CandlestickData<Time>[] {
   return bars.map((bar) => ({
-    time: Math.floor(bar.startTime / 1000) as Time,
+    time: Math.floor(normalizeTimestamp(bar.startTime) / 1000) as Time,
     open: bar.open,
     high: bar.high,
     low: bar.low,
@@ -90,7 +120,7 @@ function toCandleData(bars: Bar[]): CandlestickData<Time>[] {
 
 function toLineData(bars: Bar[]): LineData<Time>[] {
   return bars.map((bar) => ({
-    time: Math.floor(bar.startTime / 1000) as Time,
+    time: Math.floor(normalizeTimestamp(bar.startTime) / 1000) as Time,
     value: bar.close,
   }));
 }
@@ -106,7 +136,7 @@ function buildSpreadSeries(
     if (!bars || bars.length === 0) return { leg, map: new Map<number, number>() };
     const map = new Map<number, number>();
     for (const bar of bars) {
-      map.set(bar.startTime, bar.close);
+      map.set(normalizeTimestamp(bar.startTime), bar.close);
     }
     return { leg, map };
   });
@@ -197,7 +227,8 @@ export function TickerModal() {
   const resolvedSeriesBySymbol = useMemo(() => {
     const map: Record<string, Bar[]> = {};
     for (const symbol of chartSymbols) {
-      map[symbol] = historySeriesBySymbol[symbol] ?? liveSeriesBySymbol[symbol] ?? [];
+      const history = historySeriesBySymbol[symbol];
+      map[symbol] = history && history.length > 0 ? history : liveSeriesBySymbol[symbol] ?? [];
     }
     return map;
   }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol]);
@@ -206,12 +237,16 @@ export function TickerModal() {
     const map: Record<string, Bar[]> = {};
     for (const symbol of chartSymbols) {
       const history = historySeriesBySymbol[symbol];
-      if (history && history.length > 0) {
-        map[symbol] = history;
+      const source = history && history.length > 0 ? history : liveSeriesBySymbol[symbol] ?? [];
+      if (source.length === 0) {
+        map[symbol] = [];
         continue;
       }
-      const live = liveSeriesBySymbol[symbol] ?? [];
-      map[symbol] = resampleBars(live, timeframe);
+
+      const targetMs = TIMEFRAME_MS[timeframe];
+      const inferredMs = inferIntervalMs(source);
+      const needsResample = inferredMs !== null && Math.abs(inferredMs - targetMs) > targetMs * 0.2;
+      map[symbol] = needsResample ? resampleBars(source, timeframe) : source;
     }
     return map;
   }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe]);
@@ -247,6 +282,28 @@ export function TickerModal() {
     if (!bars || bars.length === 0) return undefined;
     return toCandleData(bars);
   }, [bars]);
+
+  const primarySnapshot = useMemo(() => {
+    if (!primarySymbol) return null;
+    const symbolBars = resolvedSeriesBySymbol[primarySymbol];
+    const symbolEntity = entities[primarySymbol];
+    return buildTickerSnapshot(
+      primarySymbol,
+      symbolBars,
+      symbolEntity?.latestBar,
+      snapshots[primarySymbol],
+      sessions[primarySymbol]
+    );
+  }, [primarySymbol, resolvedSeriesBySymbol, entities, snapshots, sessions]);
+
+  const sessionLevels = useMemo(() => {
+    if (!primarySnapshot || spreadEnabled) return undefined;
+    return {
+      high: primarySnapshot.session_high,
+      low: primarySnapshot.session_low,
+      last: primarySnapshot.last_price,
+    };
+  }, [primarySnapshot, spreadEnabled]);
 
   const headerItems = useMemo(() => {
     return headerSymbols.map((symbol) => {
@@ -305,32 +362,6 @@ export function TickerModal() {
   const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
   const visibleBars = 200;
   const secondsVisible = timeframe.endsWith("s");
-  const sessionStartMs = useMemo(() => getGlobexSessionStartMs(new Date()), [primarySymbol]);
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    if (!isOpen) return;
-    const interval = setInterval(() => {
-      setNowMs(Date.now());
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [isOpen]);
-  const rightOffsetRatio = 0.2;
-  const hasRangeData = spreadEnabled
-    ? spreadData.length > 1
-    : (bars?.length ?? 0) > 1;
-
-  const timeRange = useMemo(() => {
-    if (!hasRangeData) return undefined;
-    const fromMs = sessionStartMs;
-    const toMs = nowMs + (nowMs - sessionStartMs) * rightOffsetRatio;
-    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) {
-      return undefined;
-    }
-    return {
-      from: Math.floor(fromMs / 1000) as Time,
-      to: Math.floor(toMs / 1000) as Time,
-    };
-  }, [sessionStartMs, nowMs, hasRangeData]);
 
   if (!primarySymbol) return null;
 
@@ -645,7 +676,7 @@ export function TickerModal() {
                 fitKey={fitKey}
                 visibleBars={visibleBars}
                 secondsVisible={secondsVisible}
-                timeRange={timeRange}
+                sessionLevels={sessionLevels}
               />
             </div>
           </div>

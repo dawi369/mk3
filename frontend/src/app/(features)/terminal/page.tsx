@@ -1,22 +1,13 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams, useRouter } from "next/navigation";
-import { TerminalDock, TerminalViewType } from "@/components/terminal/layout/terminal-dock";
 import { TerminalView } from "@/components/terminal/views/terminal";
-import { SentimentView } from "@/components/terminal/views/sentiment";
 import { AiLabView } from "@/components/terminal/views/ai-lab";
 import { StreamView } from "@/components/terminal/views/stream";
 import { BacktestingView } from "@/components/terminal/views/backtesting";
 import { useTerminalView } from "@/providers/terminal-view-provider";
 import { ErrorBoundary } from "@/components/common/error-boundary";
-
-const VALID_VIEWS: TerminalViewType[] = ["terminal", "sentiment", "ai-lab", "backtesting", "stream"];
-
-function isValidView(view: string | null): view is TerminalViewType {
-  return view !== null && VALID_VIEWS.includes(view as TerminalViewType);
-}
 
 function TerminalPageContent() {
   const { activeView } = useTerminalView();
@@ -39,11 +30,6 @@ function TerminalPageContent() {
           {activeView === "terminal" && (
             <ErrorBoundary name="Main Terminal">
               <TerminalView />
-            </ErrorBoundary>
-          )}
-          {activeView === "sentiment" && (
-            <ErrorBoundary name="Sentiment">
-              <SentimentView />
             </ErrorBoundary>
           )}
           {activeView === "ai-lab" && (

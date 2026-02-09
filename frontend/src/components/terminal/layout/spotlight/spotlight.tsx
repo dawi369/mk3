@@ -10,7 +10,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Terminal, Activity, Scale, Sparkles, Settings, FlaskConical } from "lucide-react";
+import { Terminal, Activity, Sparkles, Settings, FlaskConical } from "lucide-react";
 import {
   useSpotlight,
   SpotlightCommand,
@@ -92,28 +92,17 @@ function useDefaultCommands(): SpotlightCommand[] {
           close();
         },
       },
-      {
-        id: "nav-backtesting",
-        label: "Go to Backtesting",
-        icon: <FlaskConical className="size-4" />,
-        shortcut: "B",
-        group: "Navigation",
-        action: () => {
-          router.push("/backtesting");
-          close();
-        },
-      },
-      {
-        id: "nav-sentiment",
-        label: "Go to Sentiment",
-        icon: <Scale className="size-4" />,
-        shortcut: "S",
-        group: "Navigation",
-        action: () => {
-          router.push("/terminal?view=sentiment");
-          close();
-        },
-      },
+      // {
+      //   id: "nav-sentiment",
+      //   label: "Go to Sentiment",
+      //   icon: <Scale className="size-4" />,
+      //   shortcut: "S",
+      //   group: "Navigation",
+      //   action: () => {
+      //     router.push("/terminal?view=sentiment");
+      //     close();
+      //   },
+      // },
       {
         id: "nav-ailab",
         label: "Go to AI Lab",
@@ -122,6 +111,17 @@ function useDefaultCommands(): SpotlightCommand[] {
         group: "Navigation",
         action: () => {
           router.push("/terminal?view=ai-lab");
+          close();
+        },
+      },
+      {
+        id: "nav-backtesting",
+        label: "Go to Backtesting",
+        icon: <FlaskConical className="size-4" />,
+        shortcut: "B",
+        group: "Navigation",
+        action: () => {
+          router.push("/backtesting");
           close();
         },
       },

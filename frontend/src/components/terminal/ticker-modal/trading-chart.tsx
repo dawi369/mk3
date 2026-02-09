@@ -7,6 +7,7 @@ import {
   LineSeries,
   IChartApi,
   ISeriesApi,
+  LineStyle,
   CandlestickData,
   LineData,
   Time,
@@ -23,12 +24,13 @@ interface TradingChartProps {
   fitKey?: string;
   visibleBars?: number;
   secondsVisible?: boolean;
-  timeRange?: { from: Time; to: Time };
+  sessionLevels?: { high?: number | null; low?: number | null; last?: number | null };
   className?: string;
 }
 
 const emptyCandles: CandlestickData<Time>[] = [];
 const emptyLines: LineData<Time>[] = [];
+type PriceLineRef = ReturnType<ISeriesApi<"Line">["createPriceLine"]>;
 
 export function TradingChart({
   ticker,
@@ -40,7 +42,7 @@ export function TradingChart({
   fitKey,
   visibleBars = 200,
   secondsVisible = false,
-  timeRange,
+  sessionLevels,
   className,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,8 +51,16 @@ export function TradingChart({
   const primaryLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const lastFitKeyRef = useRef<string | null>(null);
+  const lastTickerRef = useRef<string | null>(null);
+  const priceLinesRef = useRef<{
+    high?: PriceLineRef;
+    low?: PriceLineRef;
+    last?: PriceLineRef;
+    seriesType?: "line" | "candle";
+  }>({});
 
   const useLinePrimary = lineData !== undefined;
+  const rightOffset = Math.max(2, Math.floor(visibleBars * 0.2));
 
   // Initialize chart
   const initChart = useCallback(() => {
@@ -98,25 +108,22 @@ export function TradingChart({
       borderDownColor: "#f43f5e",
       wickUpColor: SYMBOL_COLORS[0],
       wickDownColor: "#f43f5e",
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     primaryCandleRef.current = candlestickSeries;
 
     const lineSeries = chart.addSeries(LineSeries, {
       color: SYMBOL_COLORS[0],
       lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
     });
     primaryLineRef.current = lineSeries;
 
     candlestickSeries.setData(emptyCandles);
     lineSeries.setData(emptyLines);
 
-    chart.applyOptions({
-      timeScale: {
-        timeVisible: true,
-        secondsVisible,
-        rightOffset: Math.floor(visibleBars * 0.2),
-      },
-    });
   }, []);
 
   // Handle resize
@@ -156,6 +163,7 @@ export function TradingChart({
       timeScale: {
         timeVisible: true,
         secondsVisible,
+        rightOffset,
       },
     });
 
@@ -169,25 +177,141 @@ export function TradingChart({
 
     const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
     const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
+    const clampedVisible = Math.max(10, visibleBars);
+    const expectedTo = length > 0 ? length - 1 + rightOffset : 0;
 
     if (lastFitKeyRef.current !== nextFitKey && length > 0) {
-      if (timeRange) {
-        if (timeRange.from <= timeRange.to) {
-          chartRef.current.timeScale().setVisibleRange(timeRange);
-        }
-        lastFitKeyRef.current = nextFitKey;
-        return;
-      }
-
-      const clampedVisible = Math.max(10, visibleBars);
-      const to = length - 1;
-      const from = Math.max(0, length - clampedVisible);
+      const from = Math.max(0, expectedTo - clampedVisible);
+      const to = expectedTo;
       if (from <= to) {
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
       }
       lastFitKeyRef.current = nextFitKey;
+      return;
     }
-  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, timeRange]);
+
+    if (length > 0) {
+      const range = chartRef.current.timeScale().getVisibleLogicalRange();
+      if (!range) return;
+      const distance = expectedTo - range.to;
+      const isNearRight = distance <= rightOffset + 1 && distance >= -1;
+      if (isNearRight) {
+        const from = Math.max(0, expectedTo - clampedVisible);
+        chartRef.current.timeScale().setVisibleLogicalRange({ from, to: expectedTo });
+      }
+    }
+  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, rightOffset]);
+
+  const clearPriceLines = useCallback(() => {
+    const seriesType = priceLinesRef.current.seriesType;
+    const series =
+      seriesType === "line"
+        ? primaryLineRef.current
+        : seriesType === "candle"
+          ? primaryCandleRef.current
+          : null;
+    if (!series) return;
+    const { high, low, last } = priceLinesRef.current;
+    if (high) series.removePriceLine(high);
+    if (low) series.removePriceLine(low);
+    if (last) series.removePriceLine(last);
+    priceLinesRef.current.high = undefined;
+    priceLinesRef.current.low = undefined;
+    priceLinesRef.current.last = undefined;
+  }, []);
+
+  useEffect(() => {
+    const activeSeries = useLinePrimary ? primaryLineRef.current : primaryCandleRef.current;
+    const nextType = useLinePrimary ? "line" : "candle";
+
+    if (lastTickerRef.current !== ticker) {
+      clearPriceLines();
+      priceLinesRef.current.seriesType = nextType;
+      lastTickerRef.current = ticker;
+    }
+
+    if (priceLinesRef.current.seriesType && priceLinesRef.current.seriesType !== nextType) {
+      clearPriceLines();
+      priceLinesRef.current.seriesType = nextType;
+    }
+
+    if (!priceLinesRef.current.seriesType) {
+      priceLinesRef.current.seriesType = nextType;
+    }
+
+    if (!activeSeries || !sessionLevels) {
+      clearPriceLines();
+      return;
+    }
+
+    const toPrice = (value?: number | null) =>
+      typeof value === "number" && Number.isFinite(value) ? value : null;
+    let high = toPrice(sessionLevels.high);
+    let low = toPrice(sessionLevels.low);
+    const last = toPrice(sessionLevels.last);
+
+    if (high !== null && low !== null && high < low) {
+      [high, low] = [low, high];
+    }
+
+    const upsertLine = (
+      key: "high" | "low" | "last",
+      price: number | null,
+      options: {
+        color: string;
+        title: string;
+        lineStyle: LineStyle;
+        lineWidth: number;
+      }
+    ) => {
+      const existing = priceLinesRef.current[key];
+      if (price === null) {
+        if (existing) {
+          activeSeries.removePriceLine(existing);
+          priceLinesRef.current[key] = undefined;
+        }
+        return;
+      }
+      if (!existing) {
+        priceLinesRef.current[key] = activeSeries.createPriceLine({
+          price,
+          axisLabelVisible: true,
+          title: options.title,
+          lineStyle: options.lineStyle,
+          lineWidth: options.lineWidth,
+          color: options.color,
+        });
+        return;
+      }
+      existing.applyOptions({
+        price,
+        axisLabelVisible: true,
+        title: options.title,
+        lineStyle: options.lineStyle,
+        lineWidth: options.lineWidth,
+        color: options.color,
+      });
+    };
+
+    upsertLine("high", high, {
+      color: "#10b981",
+      title: "SESSION HIGH",
+      lineStyle: LineStyle.Dashed,
+      lineWidth: 1,
+    });
+    upsertLine("low", low, {
+      color: "#f43f5e",
+      title: "SESSION LOW",
+      lineStyle: LineStyle.Dashed,
+      lineWidth: 1,
+    });
+    upsertLine("last", last, {
+      color: "#e2e8f0",
+      title: "LAST",
+      lineStyle: LineStyle.Solid,
+      lineWidth: 2,
+    });
+  }, [sessionLevels, useLinePrimary, ticker, clearPriceLines]);
 
   // Handle comparison symbols
   useEffect(() => {

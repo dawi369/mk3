@@ -100,7 +100,7 @@ const DataZone = React.memo(({ data }: DataZoneProps) => {
         </div>
         <span
           className={cn(
-            "text-[11px] font-mono font-semibold tabular-nums tracking-tight shrink-0",
+            "text-sm font-mono font-semibold tabular-nums tracking-wide shrink-0",
             isPositive ? "text-emerald-500/90" : "text-rose-500/90"
           )}
         >
@@ -152,32 +152,33 @@ interface PulseBarProps {
  */
 const PulseBar = React.memo(({ data }: PulseBarProps) => {
   const { session_high, session_low, session_open, last_price, prev_close } = data;
-  const range = session_high - session_low;
+  const rawHigh = Number.isFinite(session_high) ? session_high : last_price;
+  const rawLow = Number.isFinite(session_low) ? session_low : last_price;
+  const high = Math.max(rawHigh, rawLow);
+  const low = Math.min(rawHigh, rawLow);
+  const range = Math.max(high - low, Number.EPSILON);
 
   // Calculate positions as percentages (0 = bottom, 100 = top)
-  const calcPosition = (price: number) => {
-    if (range === 0) return 50;
-    return ((price - session_low) / range) * 100;
-  };
+  const clampPrice = (price: number) => Math.min(high, Math.max(low, price));
+  const calcPosition = (price: number) => ((price - low) / range) * 100;
 
   // Candle body positioning
-  const bodyTop = Math.max(session_open, last_price);
-  const bodyBottom = Math.min(session_open, last_price);
+  const bodyTop = clampPrice(Math.max(session_open, last_price));
+  const bodyBottom = clampPrice(Math.min(session_open, last_price));
   const bodyTopPercent = calcPosition(bodyTop);
   const bodyBottomPercent = calcPosition(bodyBottom);
-  const bodyHeight = Math.max(bodyTopPercent - bodyBottomPercent, 4); // Min 4% height for visibility
+  const bodyHeight = Math.max(bodyTopPercent - bodyBottomPercent, 2); // Min 2% height for visibility
 
   // Previous close reference line
-  const prevClosePercent = calcPosition(prev_close);
-  const isGapOut = prev_close > session_high || prev_close < session_low;
+  const prevClosePercent = calcPosition(clampPrice(prev_close));
   const clampedPrevClose = Math.max(2, Math.min(98, prevClosePercent));
 
   // Color based on direction
   const isUp = last_price >= session_open;
 
   return (
-    <div className="flex items-center justify-center h-full w-full">
-      <div className="relative h-[80%] w-3 flex items-center justify-center">
+    <div className="flex items-center justify-center h-full w-full py-1">
+      <div className="relative h-[90%] w-3 flex items-center justify-center">
         {/* The Track (Full Range Line) */}
         <div className="absolute inset-0 w-px bg-white/8 left-1/2 -translate-x-1/2 rounded-full" />
 
@@ -185,7 +186,7 @@ const PulseBar = React.memo(({ data }: PulseBarProps) => {
         <div
           className={cn(
             "absolute w-full h-px left-0 transition-colors",
-            isGapOut ? "bg-amber-500/70" : "bg-muted-foreground/30"
+            "bg-muted-foreground/30"
           )}
           style={{ bottom: `${clampedPrevClose}%` }}
         />
@@ -207,10 +208,10 @@ const PulseBar = React.memo(({ data }: PulseBarProps) => {
           className={cn(
             "absolute left-0 right-0 h-px transition-all duration-150",
             isUp
-              ? "bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.5)]"
-              : "bg-rose-400 shadow-[0_0_4px_rgba(244,63,94,0.5)]"
+              ? "bg-emerald-400 shadow-[0_0_3px_rgba(16,185,129,0.4)]"
+              : "bg-rose-400 shadow-[0_0_3px_rgba(244,63,94,0.4)]"
           )}
-          style={{ bottom: `${calcPosition(last_price)}%` }}
+          style={{ bottom: `${calcPosition(clampPrice(last_price))}%` }}
         />
       </div>
     </div>

@@ -42,21 +42,20 @@ function buildRange(timeframe: Timeframe): { start: number; end: number } {
   return { start, end };
 }
 
-function mergeBars(current: Bar[], incoming: Bar[], maxPoints: number): Bar[] {
-  if (current.length === 0) return incoming.slice(-maxPoints);
-  if (incoming.length === 0) return current.slice(-maxPoints);
-  const map = new Map<number, Bar>();
-  for (const bar of incoming) {
-    map.set(bar.startTime, bar);
+function normalizeBars(bars: Bar[], maxPoints: number): Bar[] {
+  if (!bars || bars.length === 0) return [];
+  const normalized = bars
+    .map((bar) => ({
+      ...bar,
+      startTime: normalizeTimestampMs(bar.startTime),
+      endTime: normalizeTimestampMs(bar.endTime),
+    }))
+    .sort((a, b) => a.startTime - b.startTime);
+
+  if (normalized.length > maxPoints) {
+    return normalized.slice(normalized.length - maxPoints);
   }
-  for (const bar of current) {
-    map.set(bar.startTime, bar);
-  }
-  const merged = Array.from(map.values()).sort((a, b) => a.startTime - b.startTime);
-  if (merged.length > maxPoints) {
-    return merged.slice(merged.length - maxPoints);
-  }
-  return merged;
+  return normalized;
 }
 
 interface UseChartHistoryOptions {
@@ -88,6 +87,7 @@ export function useChartHistory({
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const lastSeenRef = useRef<Map<string, string>>(new Map());
+  const seriesKeyRef = useRef<string>(`${timeframe}:${symbolKey}`);
 
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
 
@@ -100,7 +100,12 @@ export function useChartHistory({
   }, [entities, symbolKey, uniqueSymbols]);
 
   useEffect(() => {
-    lastSeenRef.current.clear();
+    const nextKey = `${timeframe}:${symbolKey}`;
+    if (seriesKeyRef.current !== nextKey) {
+      seriesKeyRef.current = nextKey;
+      lastSeenRef.current.clear();
+      setSeriesBySymbol({});
+    }
   }, [timeframe, symbolKey]);
 
   useEffect(() => {
@@ -136,15 +141,9 @@ export function useChartHistory({
 
         const next: Record<string, Bar[]> = {};
         for (const [symbol, bars] of results) {
-          next[symbol] = bars;
+          next[symbol] = normalizeBars(bars, maxPoints);
         }
-        setSeriesBySymbol((prev) => {
-          const merged: Record<string, Bar[]> = {};
-          for (const symbol of uniqueSymbols) {
-            merged[symbol] = mergeBars(prev[symbol] ?? [], next[symbol] ?? [], maxPoints);
-          }
-          return merged;
-        });
+        setSeriesBySymbol(next);
       } catch (error) {
         if ((error as { name?: string }).name !== "AbortError") {
           console.warn("[useChartHistory] Failed to load history", error);

@@ -46,6 +46,13 @@ export function SectorContainer({
   // Using CSS calc: grid-auto-rows: calc((100% - (rows-1)*gap) / rows)
   const rowHeight = `calc((100% - ${(visibleRows - 1) * GRID_GAP}px) / ${visibleRows})`;
   const hasChildren = React.Children.count(children) > 0;
+  const openInterestLabel = openInterest !== undefined ? formatOpenInterest(openInterest) : "--";
+  const openInterestPercentLabel =
+    openInterestPercent !== undefined ? `${openInterestPercent.toFixed(1)}%` : "--";
+  const hasOpenInterest = openInterest !== undefined;
+  const hasOpenInterestPercent = openInterestPercent !== undefined;
+  const openInterestTone =
+    hasOpenInterest || hasOpenInterestPercent ? "text-muted-foreground/70" : "text-muted-foreground/40";
 
   return (
     <Card className={cn("flex flex-col h-full overflow-hidden border-none shadow-none bg-terminal-card gap-0 p-0 rounded-sm", className)}>
@@ -55,17 +62,17 @@ export function SectorContainer({
         </CardTitle>
         
         {/* Right: Controls & Metrics - Floating in header */}
-        <div className="flex flex-col items-end gap-1">
-          {openInterest !== undefined && (
-            <span className={cn(
-                "font-mono text-[11px] uppercase font-bold tracking-wider transition-colors duration-300",
-                 isUpdating ? "text-white" : "text-muted-foreground/70"
-            )}>
-              OI: {formatOpenInterest(openInterest)}
+        <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "font-mono text-xs uppercase font-bold tracking-wider transition-colors duration-300",
+                isUpdating ? "text-white" : openInterestTone
+              )}
+            >
+              {/* {openInterestLabel}  */}
+              OI {openInterestPercentLabel} 
             </span>
-          )}
 
-          <div className="flex items-center gap-3">
             {avgChange !== undefined && (
               <span className={cn(
                   "font-mono text-xs font-bold tracking-wider transition-colors duration-300",
@@ -74,16 +81,6 @@ export function SectorContainer({
                 {avgChange >= 0 ? "+" : ""}{avgChange.toFixed(2)}%
               </span>
             )}
-
-            {openInterestPercent !== undefined && (
-              <span className={cn(
-                  "font-mono text-xs uppercase font-bold tracking-wider transition-colors duration-300",
-                   isUpdating ? "text-white" : "text-muted-foreground/70"
-              )}>
-                OI {openInterestPercent.toFixed(1)}%
-              </span>
-            )}
-          </div>
         </div>
       </CardHeader>
       

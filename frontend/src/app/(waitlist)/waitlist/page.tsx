@@ -4,6 +4,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { BackgroundBeams } from "@/components/ui/background-beams";
+import { Footer } from "@/components/common/footer";
 import { addToWaitlist } from "@/app/(waitlist)/actions";
 
 const ANIMATION_CONFIG = {
@@ -40,7 +41,12 @@ export default function WaitlistPage() {
       <BackgroundBeams className="opacity-70" />
 
       <div className="relative z-10">
-        <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 pt-8">
+        <motion.header
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 pt-8"
+        >
           <div className="flex items-center gap-4">
             <Image
               src="/mk3LogoTransparent.png"
@@ -51,7 +57,7 @@ export default function WaitlistPage() {
             />
             <div className="text-sm uppercase tracking-[0.2em] text-white/70">Swordfish</div>
           </div>
-        </header>
+        </motion.header>
 
         <main className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 px-6 pb-24 pt-16 lg:grid-cols-[1.05fr_0.95fr]">
           <motion.section
@@ -104,7 +110,7 @@ export default function WaitlistPage() {
               variants={ANIMATION_CONFIG.fadeInUp}
               className="mt-10 text-xs uppercase tracking-[0.3em] text-white/50"
             >
-              Estimated app release: <span className="text-white/70">Q2 2026</span>
+              Estimated launch: <span className="text-white/70">Q2 2026</span>
             </motion.div>
           </motion.section>
 
@@ -142,16 +148,19 @@ export default function WaitlistPage() {
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </button>
                 {status && (
-                  <p className={`text-sm ${status.success ? "text-emerald-300" : "text-red-400"}`}>
+                  <p className={`text-sm text-center ${status.success ? "text-emerald-300" : "text-red-400"}`}>
                     {status.message}
                   </p>
                 )}
+                <p className="text-center text-s text-white/50 italic">
+                  Don't use your grandpa's tools.
+                </p>
               </form>
             </div>
           </motion.aside>
         </main>
 
-        <section className="mx-auto w-full max-w-5xl px-6 pb-24">
+        <section className="mx-auto w-full max-w-6xl px-6 pb-24">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -170,6 +179,8 @@ export default function WaitlistPage() {
             />
           </motion.div>
         </section>
+
+        <Footer />
       </div>
     </div>
   );
