@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode, useEffect } from "react";
 
 // --- Row density type ---
 export type VisibleRows = 3 | 4;
@@ -40,6 +40,17 @@ export function HeaderProvider({ children }: HeaderProviderProps) {
     setVisibleRowsState(rows);
   }, []);
 
+  useEffect(() => {
+    const stored = localStorage.getItem("terminal-visible-rows");
+    if (stored === "3" || stored === "4") {
+      setVisibleRowsState(Number(stored) as VisibleRows);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("terminal-visible-rows", String(visibleRows));
+  }, [visibleRows]);
+
   const value = useMemo(
     () => ({
       navContent,
@@ -52,4 +63,3 @@ export function HeaderProvider({ children }: HeaderProviderProps) {
 
   return <HeaderContext.Provider value={value}>{children}</HeaderContext.Provider>;
 }
-

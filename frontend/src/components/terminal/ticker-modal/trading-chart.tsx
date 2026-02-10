@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import {
   createChart,
   CandlestickSeries,
@@ -25,6 +25,7 @@ interface TradingChartProps {
   visibleBars?: number;
   secondsVisible?: boolean;
   sessionLevels?: { high?: number | null; low?: number | null; last?: number | null };
+  compareMode?: boolean;
   className?: string;
 }
 
@@ -43,6 +44,7 @@ export function TradingChart({
   visibleBars = 200,
   secondsVisible = false,
   sessionLevels,
+  compareMode = false,
   className,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,7 @@ export function TradingChart({
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const lastFitKeyRef = useRef<string | null>(null);
   const lastTickerRef = useRef<string | null>(null);
+  const lastRangeKeyRef = useRef<string | null>(null);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
@@ -126,6 +129,30 @@ export function TradingChart({
 
   }, []);
 
+  const formatPercentValue = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return "--";
+    const sign = value >= 0 ? "+" : "";
+    return `${sign}${value.toFixed(2)}%`;
+  }, []);
+
+  const lineFormat = useMemo(() => {
+    if (compareMode) {
+      return {
+        priceFormat: {
+          type: "custom" as const,
+          formatter: formatPercentValue,
+        },
+      };
+    }
+    return {
+      priceFormat: {
+        type: "price" as const,
+        precision: 2,
+        minMove: 0.01,
+      },
+    };
+  }, [compareMode, formatPercentValue]);
+
   // Handle resize
   useEffect(() => {
     if (!containerRef.current) return;
@@ -177,6 +204,10 @@ export function TradingChart({
 
     const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
     const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
+    const lastPoint = useLinePrimary
+      ? lineData?.[length - 1]?.time
+      : data?.[length - 1]?.time;
+    const rangeKey = `${length}:${lastPoint ?? "none"}`;
     const clampedVisible = Math.max(10, visibleBars);
     const expectedTo = length > 0 ? length - 1 + rightOffset : 0;
 
@@ -187,10 +218,11 @@ export function TradingChart({
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
       }
       lastFitKeyRef.current = nextFitKey;
+      lastRangeKeyRef.current = rangeKey;
       return;
     }
 
-    if (length > 0) {
+    if (length > 0 && lastRangeKeyRef.current !== rangeKey) {
       const range = chartRef.current.timeScale().getVisibleLogicalRange();
       if (!range) return;
       const distance = expectedTo - range.to;
@@ -199,8 +231,18 @@ export function TradingChart({
         const from = Math.max(0, expectedTo - clampedVisible);
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to: expectedTo });
       }
+      lastRangeKeyRef.current = rangeKey;
     }
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, rightOffset]);
+
+  useEffect(() => {
+    if (primaryLineRef.current) {
+      primaryLineRef.current.applyOptions(lineFormat);
+    }
+    comparisonSeriesRef.current.forEach((series) => {
+      series.applyOptions(lineFormat);
+    });
+  }, [lineFormat]);
 
   const clearPriceLines = useCallback(() => {
     const seriesType = priceLinesRef.current.seriesType;
@@ -333,21 +375,25 @@ export function TradingChart({
 
     for (let i = 0; i < activeSymbols.length; i++) {
       const symbol = activeSymbols[i];
+      const colorIndex = i + 1;
+      const color = SYMBOL_COLORS[colorIndex % SYMBOL_COLORS.length];
       let series = comparisonSeriesRef.current.get(symbol);
 
       if (!series) {
-        const colorIndex = i + 1;
         series = chartRef.current.addSeries(LineSeries, {
-          color: SYMBOL_COLORS[colorIndex % SYMBOL_COLORS.length],
+          color,
           lineWidth: 2,
         });
         comparisonSeriesRef.current.set(symbol, series);
+      } else {
+        series.applyOptions({ color, lineWidth: 2 });
       }
 
+      series.applyOptions(lineFormat);
       const seriesData = comparisonData?.[symbol] ?? emptyLines;
       series.setData(seriesData);
     }
-  }, [comparisons, comparisonData, showComparisons]);
+  }, [comparisons, comparisonData, showComparisons, lineFormat]);
 
   return <div ref={containerRef} className={className} style={{ width: "100%", height: "100%" }} />;
 }

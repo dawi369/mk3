@@ -17,12 +17,12 @@ const KEYS = {
 const TS_FIELDS = ["open", "high", "low", "close", "volume", "trades"] as const;
 type TimeSeriesField = (typeof TS_FIELDS)[number];
 
-const TIMEFRAMES = ["1s", "5s", "30s", "1m", "5m", "15m", "1h", "4h", "1d"] as const;
+const TIMEFRAMES = ["1s", "15s", "30s", "1m", "5m", "15m", "1h", "4h", "1d"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
 
 const TIMEFRAME_MS: Record<Timeframe, number> = {
   "1s": 1000,
-  "5s": 5000,
+  "15s": 15000,
   "30s": 30000,
   "1m": 60000,
   "5m": 300000,
@@ -33,7 +33,7 @@ const TIMEFRAME_MS: Record<Timeframe, number> = {
 };
 
 const DOWNSAMPLE_RULES: Array<{ source: Timeframe; dest: Timeframe; bucketMs: number }> = [
-  { source: "1s", dest: "5s", bucketMs: TIMEFRAME_MS["5s"] },
+  { source: "1s", dest: "15s", bucketMs: TIMEFRAME_MS["15s"] },
   { source: "1s", dest: "30s", bucketMs: TIMEFRAME_MS["30s"] },
   { source: "1s", dest: "1m", bucketMs: TIMEFRAME_MS["1m"] },
   { source: "1m", dest: "5m", bucketMs: TIMEFRAME_MS["5m"] },

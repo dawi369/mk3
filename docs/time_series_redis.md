@@ -1,7 +1,7 @@
 # RedisTimeSeries Implementation Plan
 
 ## Summary
-We will replace list-based history storage with RedisTimeSeries (RTS) for all 1-second bars, keep 7 days of retention, and auto-downsample into the UI timeframes (5s, 30s, 1m, 5m, 15m, 1h, 4h, 1d). The Redis stream remains for real-time WebSocket fanout. TimescaleDB continues to store long-term history.
+We will replace list-based history storage with RedisTimeSeries (RTS) for all 1-second bars, keep 7 days of retention, and auto-downsample into the UI timeframes (15s, 30s, 1m, 5m, 15m, 1h, 4h, 1d). The Redis stream remains for real-time WebSocket fanout. TimescaleDB continues to store long-term history.
 
 ## Architecture
 - Ingest: WebSocket -> normalize bar -> RedisTimeSeries (1s) + RTS downsample rules
@@ -21,14 +21,14 @@ Labels:
 - `symbol=ESH6`
 - `product=ES`
 - `field=open|high|low|close|volume|trades`
-- `tf=1s|5s|30s|1m|5m|15m|1h|4h|1d`
+- `tf=1s|15s|30s|1m|5m|15m|1h|4h|1d`
 
 Retention:
 - All RTS series use 7 days retention (`RETENTION 604800000`)
 
 ## Downsampling Rules
 Rules are created per symbol per field:
-- 1s -> 5s
+- 1s -> 15s
 - 1s -> 30s
 - 1s -> 1m
 - 1m -> 5m

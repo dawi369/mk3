@@ -3,11 +3,12 @@ import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
 import type { Bar } from "@/types/common.types";
 import type { Timeframe, TickerMode } from "@/types/ticker.types";
 import { useTickerStore } from "@/store/use-ticker-store";
+import { resampleBars } from "@/lib/bar-resample";
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const TIMEFRAME_MS: Record<Timeframe, number> = {
-  "5s": 5000,
+  "15s": 15000,
   "30s": 30000,
   "1m": 60000,
   "5m": 300000,
@@ -18,7 +19,7 @@ const TIMEFRAME_MS: Record<Timeframe, number> = {
 };
 
 const HISTORY_WINDOWS_MS: Record<Timeframe, number> = {
-  "5s": 24 * 60 * 60 * 1000,
+  "15s": 3 * 24 * 60 * 60 * 1000,
   "30s": 3 * 24 * 60 * 60 * 1000,
   "1m": ONE_WEEK_MS,
   "5m": ONE_WEEK_MS,
@@ -56,6 +57,40 @@ function normalizeBars(bars: Bar[], maxPoints: number): Bar[] {
     return normalized.slice(normalized.length - maxPoints);
   }
   return normalized;
+}
+
+type HistoryTimeframe = Timeframe | "1s";
+
+const FALLBACK_TIMEFRAME: Partial<Record<Timeframe, HistoryTimeframe>> = {
+  "15s": "1s",
+  "30s": "15s",
+  "5m": "1m",
+  "15m": "1m",
+  "1h": "1m",
+  "4h": "1m",
+  "1d": "1m",
+};
+
+function shouldFallback(count: number, expected: number): boolean {
+  if (expected < 20) return false;
+  const minBars = Math.max(5, Math.floor(expected * 0.2));
+  return count < minBars;
+}
+
+async function fetchBarsRange(
+  symbol: string,
+  timeframe: HistoryTimeframe,
+  start: number,
+  end: number,
+  signal?: AbortSignal,
+): Promise<Bar[]> {
+  const response = await fetch(
+    `${NEXT_PUBLIC_HUB_URL}/bars/range/${symbol}?tf=${timeframe}&start=${start}&end=${end}`,
+    { signal },
+  );
+  if (!response.ok) return [];
+  const payload = await response.json();
+  return Array.isArray(payload?.bars) ? payload.bars : [];
 }
 
 interface UseChartHistoryOptions {
@@ -128,14 +163,40 @@ export function useChartHistory({
       try {
         const results = await Promise.all(
           uniqueSymbols.map(async (symbol) => {
-            const response = await fetch(
-              `${NEXT_PUBLIC_HUB_URL}/bars/range/${symbol}?tf=${timeframe}&start=${start}&end=${end}`,
-              { signal: controller.signal },
+            const primaryBars = await fetchBarsRange(
+              symbol,
+              timeframe,
+              start,
+              end,
+              controller.signal,
             );
-            if (!response.ok) return [symbol, []] as const;
-            const payload = await response.json();
-            const bars = Array.isArray(payload?.bars) ? payload.bars : [];
-            return [symbol, bars] as const;
+
+            let nextBars = primaryBars;
+            const expected = Math.ceil(windowMs / bucketMs);
+            const fallbackTf = FALLBACK_TIMEFRAME[timeframe];
+            if (fallbackTf && shouldFallback(primaryBars.length, expected)) {
+              let fallbackBars = await fetchBarsRange(
+                symbol,
+                fallbackTf,
+                start,
+                end,
+                controller.signal,
+              );
+              if (fallbackBars.length === 0 && fallbackTf !== "1s") {
+                fallbackBars = await fetchBarsRange(
+                  symbol,
+                  "1s",
+                  start,
+                  end,
+                  controller.signal,
+                );
+              }
+              if (fallbackBars.length > 0) {
+                nextBars = resampleBars(fallbackBars, timeframe);
+              }
+            }
+
+            return [symbol, nextBars] as const;
           }),
         );
 

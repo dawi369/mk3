@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   ArrowLeftRight,
@@ -61,16 +61,16 @@ const formatNumber = (num: number, decimals = 2) =>
     maximumFractionDigits: decimals,
   }).format(num);
 
-const TIMEFRAME_MS: Record<Timeframe, number> = {
-  "5s": 5000,
-  "30s": 30000,
-  "1m": 60000,
-  "5m": 300000,
-  "15m": 900000,
-  "1h": 3600000,
-  "4h": 14400000,
-  "1d": 86400000,
-};
+  const TIMEFRAME_MS: Record<Timeframe, number> = {
+    "15s": 15000,
+    "30s": 30000,
+    "1m": 60000,
+    "5m": 300000,
+    "15m": 900000,
+    "1h": 3600000,
+    "4h": 14400000,
+    "1d": 86400000,
+  };
 
 function normalizeTimestamp(value: number): number {
   if (!Number.isFinite(value)) return value;
@@ -95,6 +95,55 @@ function inferIntervalMs(bars: Bar[]): number | null {
   if (diffs.length === 0) return null;
   diffs.sort((a, b) => a - b);
   return diffs[Math.floor(diffs.length / 2)] ?? null;
+}
+
+function mergeLatestIntoSeries(series: Bar[], latest: Bar | undefined, bucketMs: number): Bar[] {
+  if (!latest) return series;
+  const normalizedStart = normalizeTimestamp(latest.startTime);
+  if (!Number.isFinite(normalizedStart)) return series;
+  const bucketStart = Math.floor(normalizedStart / bucketMs) * bucketMs;
+  const bucketEnd = bucketStart + bucketMs;
+  const existing = series.length > 0 ? [...series] : [];
+  const last = existing[existing.length - 1];
+  if (!last) {
+    existing.push({
+      ...latest,
+      startTime: bucketStart,
+      endTime: bucketEnd,
+    });
+    return existing;
+  }
+
+  const lastStart = normalizeTimestamp(last.startTime);
+  if (lastStart === bucketStart) {
+    if (
+      last.close === latest.close &&
+      last.high >= latest.high &&
+      last.low <= latest.low
+    ) {
+      return existing;
+    }
+    existing[existing.length - 1] = {
+      ...last,
+      high: Math.max(last.high, latest.high),
+      low: Math.min(last.low, latest.low),
+      close: latest.close,
+      volume: (last.volume || 0) + (latest.volume || 0),
+      trades: (last.trades || 0) + (latest.trades || 0),
+      endTime: bucketEnd,
+    };
+    return existing;
+  }
+
+  if (bucketStart > lastStart) {
+    existing.push({
+      ...latest,
+      startTime: bucketStart,
+      endTime: bucketEnd,
+    });
+  }
+
+  return existing;
 }
 
 function formatDepth(ms: number): string {
@@ -123,6 +172,76 @@ function toLineData(bars: Bar[]): LineData<Time>[] {
     time: Math.floor(normalizeTimestamp(bar.startTime) / 1000) as Time,
     value: bar.close,
   }));
+}
+
+function toPercentLineData(bars: Bar[], basePrice: number, startIndex: number): LineData<Time>[] {
+  if (!Number.isFinite(basePrice) || basePrice <= 0) return [];
+  const data: LineData<Time>[] = [];
+  for (let i = startIndex; i < bars.length; i++) {
+    const bar = bars[i];
+    const time = Math.floor(normalizeTimestamp(bar.startTime) / 1000) as Time;
+    const value = ((bar.close / basePrice) - 1) * 100;
+    data.push({ time, value });
+  }
+  return data;
+}
+
+function buildComparisonLines(
+  symbols: string[],
+  seriesBySymbol: Record<string, Bar[]>
+): { primary: LineData<Time>[]; comparisons: Record<string, LineData<Time>[]> } {
+  if (!symbols.length) return { primary: [], comparisons: {} };
+
+  const firstTimes: number[] = [];
+  for (const symbol of symbols) {
+    const bars = seriesBySymbol[symbol];
+    if (!bars || bars.length === 0) continue;
+    const first = normalizeTimestamp(bars[0].startTime);
+    if (Number.isFinite(first)) firstTimes.push(first);
+  }
+
+  if (firstTimes.length === 0) {
+    return { primary: [], comparisons: {} };
+  }
+
+  const referenceStart = Math.max(...firstTimes);
+  const series: Record<string, LineData<Time>[]> = {};
+
+  for (const symbol of symbols) {
+    const bars = seriesBySymbol[symbol];
+    if (!bars || bars.length === 0) {
+      series[symbol] = [];
+      continue;
+    }
+
+    let baselineIndex = -1;
+    for (let i = 0; i < bars.length; i++) {
+      const time = normalizeTimestamp(bars[i].startTime);
+      if (time >= referenceStart && bars[i].close > 0) {
+        baselineIndex = i;
+        break;
+      }
+    }
+
+    if (baselineIndex === -1) {
+      series[symbol] = [];
+      continue;
+    }
+
+    const basePrice = bars[baselineIndex].close;
+    series[symbol] = toPercentLineData(bars, basePrice, baselineIndex);
+  }
+
+  const [primarySymbol, ...rest] = symbols;
+  const comparisons: Record<string, LineData<Time>[]> = {};
+  for (const symbol of rest) {
+    comparisons[symbol] = series[symbol] ?? [];
+  }
+
+  return {
+    primary: primarySymbol ? series[primarySymbol] ?? [] : [],
+    comparisons,
+  };
 }
 
 function buildSpreadSeries(
@@ -178,6 +297,8 @@ export function TickerModal() {
     comparisons,
     timeframe,
     setTimeframe,
+    showSessionLevels,
+    toggleShowSessionLevels,
     spreadEnabled,
     setSpreadEnabled,
     spreadLegs,
@@ -195,10 +316,62 @@ export function TickerModal() {
   const sessions = useTickerStore((state) => state.sessionsBySymbol);
   const setTrackedSymbols = useTickerStore((state) => state.setTrackedSymbols);
   const [showLegs, setShowLegs] = useState(true);
+  const setShowSessionLevels = useTickerStore((state) => state.setShowSessionLevels);
   const orderedSymbols = useMemo(() => {
     if (!primarySymbol) return comparisons;
     return [primarySymbol, ...comparisons];
   }, [primarySymbol, comparisons]);
+  const compareMode = !spreadEnabled && comparisons.length > 0;
+  const initialMode: "single" | "compare" | "spread" = spreadEnabled
+    ? "spread"
+    : compareMode
+      ? "compare"
+      : "single";
+  const [displayMode, setDisplayMode] = useState<"single" | "compare" | "spread">(initialMode);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const transitionRef = useRef<number | null>(null);
+  const latestSignatureRef = useRef<Map<string, string>>(new Map());
+  const mergedHistoryRef = useRef<Map<string, { key: string; series: Bar[] }>>(new Map());
+  const targetMode: "single" | "compare" | "spread" = spreadEnabled
+    ? "spread"
+    : compareMode
+      ? "compare"
+      : "single";
+
+  useEffect(() => {
+    if (displayMode === targetMode) return;
+    if (transitionRef.current) {
+      window.clearTimeout(transitionRef.current);
+    }
+    setIsTransitioning(true);
+
+    transitionRef.current = window.setTimeout(() => {
+      setDisplayMode(targetMode);
+      transitionRef.current = window.setTimeout(() => {
+        setIsTransitioning(false);
+      }, 140);
+    }, 120);
+
+    return () => {
+      if (transitionRef.current) {
+        window.clearTimeout(transitionRef.current);
+      }
+    };
+  }, [displayMode, targetMode]);
+
+  const displayCompare = displayMode === "compare";
+  const displaySpread = displayMode === "spread";
+
+  useEffect(() => {
+    const stored = localStorage.getItem("terminal-show-session-levels");
+    if (stored !== null) {
+      setShowSessionLevels(stored === "true");
+    }
+  }, [setShowSessionLevels]);
+
+  useEffect(() => {
+    localStorage.setItem("terminal-show-session-levels", String(showSessionLevels));
+  }, [showSessionLevels]);
 
   const headerSymbols = useMemo(() => {
     if (spreadEnabled && spreadLegs.length > 0) {
@@ -237,21 +410,54 @@ export function TickerModal() {
     const map: Record<string, Bar[]> = {};
     for (const symbol of chartSymbols) {
       const history = historySeriesBySymbol[symbol];
-      const source = history && history.length > 0 ? history : liveSeriesBySymbol[symbol] ?? [];
-      if (source.length === 0) {
+      if (history && history.length > 0) {
+        const targetMs = TIMEFRAME_MS[timeframe];
+        const latest = entities[symbol]?.latestBar;
+        if (!latest) {
+          map[symbol] = history;
+          continue;
+        }
+
+        const signature = `${latest.startTime}:${latest.high}:${latest.low}:${latest.close}:${latest.volume}:${latest.trades}`;
+        const historyTail = history[history.length - 1];
+        const historyKey = `${history.length}:${historyTail?.startTime ?? 0}:${historyTail?.close ?? 0}`;
+        const cacheKey = `${historyKey}:${targetMs}`;
+        const cached = mergedHistoryRef.current.get(symbol);
+        const lastSignature = latestSignatureRef.current.get(symbol);
+
+        if (cached && cached.key === cacheKey && lastSignature === signature) {
+          map[symbol] = cached.series;
+          continue;
+        }
+
+        const baseSeries = cached && cached.key === cacheKey ? cached.series : history;
+        const merged = mergeLatestIntoSeries(baseSeries, latest, targetMs);
+        latestSignatureRef.current.set(symbol, signature);
+        mergedHistoryRef.current.set(symbol, { key: cacheKey, series: merged });
+        map[symbol] = merged;
+        continue;
+      }
+
+      const live = liveSeriesBySymbol[symbol] ?? [];
+      if (live.length === 0) {
         map[symbol] = [];
         continue;
       }
 
       const targetMs = TIMEFRAME_MS[timeframe];
-      const inferredMs = inferIntervalMs(source);
+      const inferredMs = inferIntervalMs(live);
       const needsResample = inferredMs !== null && Math.abs(inferredMs - targetMs) > targetMs * 0.2;
-      map[symbol] = needsResample ? resampleBars(source, timeframe) : source;
+      map[symbol] = needsResample ? resampleBars(live, timeframe) : live;
     }
     return map;
-  }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe]);
+  }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe, entities]);
 
   const bars = primarySymbol ? chartSeriesBySymbol[primarySymbol] : undefined;
+
+  const compareLines = useMemo(() => {
+    if (!compareMode && displayMode !== "compare") return null;
+    return buildComparisonLines(orderedSymbols, chartSeriesBySymbol);
+  }, [compareMode, displayMode, orderedSymbols, chartSeriesBySymbol]);
 
   // Handle escape key
   useEffect(() => {
@@ -279,9 +485,9 @@ export function TickerModal() {
   }, [bars]);
 
   const chartData: CandlestickData<Time>[] | undefined = useMemo(() => {
-    if (!bars || bars.length === 0) return undefined;
+    if (!bars || bars.length === 0 || displayCompare || displaySpread) return undefined;
     return toCandleData(bars);
-  }, [bars]);
+  }, [bars, displayCompare, displaySpread]);
 
   const primarySnapshot = useMemo(() => {
     if (!primarySymbol) return null;
@@ -297,13 +503,13 @@ export function TickerModal() {
   }, [primarySymbol, resolvedSeriesBySymbol, entities, snapshots, sessions]);
 
   const sessionLevels = useMemo(() => {
-    if (!primarySnapshot || spreadEnabled) return undefined;
+    if (!showSessionLevels || !primarySnapshot || displaySpread || displayCompare) return undefined;
     return {
       high: primarySnapshot.session_high,
       low: primarySnapshot.session_low,
       last: primarySnapshot.last_price,
     };
-  }, [primarySnapshot, spreadEnabled]);
+  }, [showSessionLevels, primarySnapshot, displaySpread, displayCompare]);
 
   const headerItems = useMemo(() => {
     return headerSymbols.map((symbol) => {
@@ -334,13 +540,18 @@ export function TickerModal() {
     setTrackedSymbols(headerSymbols);
   }, [isOpen, headerSymbols, setTrackedSymbols]);
 
-  const overlaySymbols = spreadEnabled
+  const overlaySymbols = displaySpread
     ? showLegs
       ? spreadLegs.map((leg) => leg.symbol)
       : []
-    : comparisons;
+    : displayCompare
+      ? comparisons
+      : [];
 
   const comparisonData = useMemo(() => {
+    if (displayCompare) {
+      return compareLines?.comparisons ?? {};
+    }
     const data: Record<string, LineData<Time>[]> = {};
     const symbols = new Set(overlaySymbols);
     for (const symbol of symbols) {
@@ -352,14 +563,14 @@ export function TickerModal() {
       data[symbol] = toLineData(series);
     }
     return data;
-  }, [overlaySymbols, chartSeriesBySymbol]);
+  }, [displayCompare, compareLines, overlaySymbols, chartSeriesBySymbol]);
 
   const spreadData = useMemo(() => {
     if (!spreadEnabled) return [];
     return buildSpreadSeries(spreadLegs, chartSeriesBySymbol);
   }, [spreadEnabled, spreadLegs, chartSeriesBySymbol]);
 
-  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${spreadEnabled ? "spread" : "compare"}`;
+  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${displaySpread ? "spread" : displayCompare ? "compare" : "single"}`;
   const visibleBars = 200;
   const secondsVisible = timeframe.endsWith("s");
 
@@ -467,13 +678,23 @@ export function TickerModal() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="min-w-[140px]">
-                    <DropdownMenuLabel className="text-xs">Indicators</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem disabled className="text-xs text-muted-foreground">
                       Coming soon...
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2 text-xs gap-1",
+                    showSessionLevels && "bg-white/10 text-foreground"
+                  )}
+                  onClick={toggleShowSessionLevels}
+                >
+                  Levels
+                </Button>
               </div>
 
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -665,18 +886,30 @@ export function TickerModal() {
         <div className="flex-1 flex overflow-hidden">
           {/* Chart area */}
           <div className="flex-1 p-3 overflow-hidden">
-            <div className="h-full rounded-xl border border-white/10 bg-black/20 overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-xl border border-white/10 bg-black/20 overflow-hidden transition-opacity duration-200",
+                isTransitioning && "opacity-70"
+              )}
+            >
               <TradingChart
                 ticker={primarySymbol}
-                data={spreadEnabled ? undefined : chartData}
-                lineData={spreadEnabled ? spreadData : undefined}
+                data={displaySpread || displayCompare ? undefined : chartData}
+                lineData={
+                  displaySpread
+                    ? spreadData
+                    : displayCompare
+                      ? compareLines?.primary ?? []
+                      : undefined
+                }
                 comparisons={overlaySymbols}
-                comparisonData={comparisonData}
-                showComparisons={!spreadEnabled || showLegs}
+                comparisonData={displayCompare ? compareLines?.comparisons ?? {} : comparisonData}
+                showComparisons={displaySpread ? showLegs : displayCompare}
                 fitKey={fitKey}
                 visibleBars={visibleBars}
                 secondsVisible={secondsVisible}
                 sessionLevels={sessionLevels}
+                compareMode={displayCompare}
               />
             </div>
           </div>

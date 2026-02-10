@@ -24,6 +24,8 @@ interface TickerModalState {
   setTimeframe: (tf: Timeframe) => void;
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
+  showSessionLevels: boolean;
+  toggleShowSessionLevels: () => void;
 
   addComparison: (symbol: string) => void;
   removeComparison: (symbol: string) => void;
@@ -46,6 +48,8 @@ export function useTickerModal(): TickerModalState {
   const setTimeframe = useTickerStore((state) => state.setTimeframe);
   const isSidebarOpen = useTickerStore((state) => state.isSidebarOpen);
   const toggleSidebar = useTickerStore((state) => state.toggleSidebar);
+  const showSessionLevels = useTickerStore((state) => state.showSessionLevels);
+  const toggleShowSessionLevels = useTickerStore((state) => state.toggleShowSessionLevels);
   const addComparison = useTickerStore((state) => state.addComparison);
   const removeComparison = useTickerStore((state) => state.removeComparison);
   const setSpreadEnabled = useTickerStore((state) => state.setSpreadEnabled);
@@ -74,6 +78,8 @@ export function useTickerModal(): TickerModalState {
     setTimeframe,
     isSidebarOpen,
     toggleSidebar,
+    showSessionLevels,
+    toggleShowSessionLevels,
     addComparison,
     removeComparison,
     spreadEnabled: selection.spreadEnabled,

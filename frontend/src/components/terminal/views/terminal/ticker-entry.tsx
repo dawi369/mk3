@@ -157,14 +157,14 @@ const DataZone = React.memo(({ data, volumeValue, volumeBucket, vwapValue, vwapB
 
       {/* Row 3: Liquidity Context */}
       <div className="flex items-center justify-between gap-2 overflow-hidden">
-        <span className="text-[11px] font-mono text-muted-foreground/40 tabular-nums tracking-wider uppercase shrink-0">
+        <span className="text-[12px] font-mono text-muted-foreground/40 tabular-nums tracking-wider uppercase shrink-0">
           Vol {formatVolume(volumeValue)}
-          <IndicatorBadge bucket={volumeBucket} />
+          {/* <IndicatorBadge bucket={volumeBucket} /> */}
         </span>
         {hasVwap && (
-          <span className="text-[11px] font-mono text-amber-500/60 tabular-nums shrink-0">
+          <span className="text-[12px] font-mono text-amber-500/60 tabular-nums shrink-0">
             VWAP {formatPrice(vwapValue!)}
-            <IndicatorBadge bucket={vwapBucket} />
+            {/* <IndicatorBadge bucket={vwapBucket} /> */}
           </span>
         )}
       </div>

@@ -22,7 +22,7 @@ export async function addToWaitlist(email: string): Promise<WaitlistResult> {
   if (error) {
     // Unique constraint violation (duplicate email)
     if (error.code === "23505") {
-      return { success: false, message: "You're already on the waitlist!" };
+      return { success: true, message: "You're already on the waitlist!" };
     }
     console.error("Waitlist insert error:", error);
     return { success: false, message: "Something went wrong. Please try again." };

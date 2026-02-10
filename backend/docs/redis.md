@@ -15,7 +15,7 @@ Redis serves as the **hot data layer** for real-time market data distribution an
 | `market_data` | **STREAM** | Real-time event bus (~10M max) | Cleared daily |
 | `bars` | **PUB/SUB** | Legacy channel (maintained for compatibility) | N/A |
 
-**Timeframes:** `1s`, `5s`, `30s`, `1m`, `5m`, `15m`, `1h`, `4h`, `1d`
+**Timeframes:** `1s`, `15s`, `30s`, `1m`, `5m`, `15m`, `1h`, `4h`, `1d`
 
 **Fields:** `open`, `high`, `low`, `close`, `volume`, `trades`
 
@@ -158,7 +158,7 @@ bucket = high  otherwise
 Polygon WS → ws_client.ts → Redis
                               ├── HSET bar:latest
                               ├── TS.MADD ts:bar:1s:{symbol}:{field}
-                              ├── TS.CREATERULE (downsample to 5s/30s/1m/5m/15m/1h/4h/1d)
+                              ├── TS.CREATERULE (downsample to 15s/30s/1m/5m/15m/1h/4h/1d)
                               ├── XADD market_data
                               └── PUBLISH bars
 ```

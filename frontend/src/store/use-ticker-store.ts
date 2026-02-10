@@ -99,6 +99,12 @@ function buildDefaultLegs(selected: string[], primary: string | null): SpreadLeg
   return legs;
 }
 
+function orderSelection(primary: string | null, selected: string[]): string[] {
+  if (!primary) return selected;
+  const rest = selected.filter((symbol) => symbol !== primary);
+  return [primary, ...rest];
+}
+
 interface TickerStoreState {
   mode: TickerMode;
   isModalOpen: boolean;
@@ -111,6 +117,7 @@ interface TickerStoreState {
   sessionsBySymbol: Record<string, SessionData>;
   timeframe: Timeframe;
   isSidebarOpen: boolean;
+  showSessionLevels: boolean;
 
   setMode: (mode: TickerMode) => void;
   registerSymbols: (mode: TickerMode, symbols: string[]) => void;
@@ -132,6 +139,8 @@ interface TickerStoreState {
 
   setTimeframe: (tf: Timeframe) => void;
   toggleSidebar: () => void;
+  setShowSessionLevels: (enabled: boolean) => void;
+  toggleShowSessionLevels: () => void;
   setSpreadEnabled: (enabled: boolean) => void;
 }
 
@@ -147,6 +156,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
   sessionsBySymbol: {},
   timeframe: "1m",
   isSidebarOpen: true,
+  showSessionLevels: true,
 
   setMode: (mode) =>
     set((state) => ({
@@ -368,8 +378,9 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
     set((state) => {
       const mode = state.mode;
       const selection = state.selectionByMode[mode];
-      const nextSelected = selection.selected.filter((s) => s !== symbol);
-      const nextPrimary = selection.primary === symbol ? nextSelected[0] ?? null : selection.primary;
+      const nextSelectedRaw = selection.selected.filter((s) => s !== symbol);
+      const nextPrimary = selection.primary === symbol ? nextSelectedRaw[0] ?? null : selection.primary;
+      const nextSelected = orderSelection(nextPrimary, nextSelectedRaw);
       const nextLegs = selection.spreadEnabled
         ? normalizeLegs(
             selection.spreadLegs.filter((leg) => leg.symbol !== symbol),
@@ -527,6 +538,9 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
 
   setTimeframe: (tf) => set({ timeframe: tf }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  setShowSessionLevels: (enabled) => set({ showSessionLevels: enabled }),
+  toggleShowSessionLevels: () =>
+    set((state) => ({ showSessionLevels: !state.showSessionLevels })),
   setSpreadEnabled: (enabled) =>
     set((state) => {
       const mode = state.mode;
