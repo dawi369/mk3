@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Sparkles, TrendingUp, BarChart3, Brain } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface AISidebarProps {
   isOpen: boolean;
@@ -66,7 +65,6 @@ export function AISidebar({ isOpen }: AISidebarProps) {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
