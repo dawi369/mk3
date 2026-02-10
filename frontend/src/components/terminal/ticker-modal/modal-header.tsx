@@ -14,7 +14,7 @@ interface ModalHeaderProps {
 export function ModalHeader({ headerItems, onClose }: ModalHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
         {headerItems.map((item, index) => (
           <div key={item.symbol} className="flex items-baseline gap-2">
             <span className="text-lg font-bold tracking-tight">{item.symbol}</span>
