@@ -13,7 +13,9 @@ const TIMEFRAME_MS: Record<Timeframe, number> = {
   "1m": 60000,
   "5m": 300000,
   "15m": 900000,
+  "30m": 1800000,
   "1h": 3600000,
+  "2h": 7200000,
   "4h": 14400000,
   "1d": 86400000,
 };
@@ -24,7 +26,9 @@ const HISTORY_WINDOWS_MS: Record<Timeframe, number> = {
   "1m": ONE_WEEK_MS,
   "5m": ONE_WEEK_MS,
   "15m": ONE_WEEK_MS,
+  "30m": ONE_WEEK_MS,
   "1h": ONE_WEEK_MS,
+  "2h": ONE_WEEK_MS,
   "4h": ONE_WEEK_MS,
   "1d": ONE_WEEK_MS,
 };
@@ -36,7 +40,13 @@ function normalizeTimestampMs(value: number): number {
   return value < 1e12 ? value * 1000 : value;
 }
 
-function buildRange(timeframe: Timeframe): { start: number; end: number } {
+function buildRange(
+  timeframe: Timeframe,
+  override?: { start: number; end: number } | null,
+): { start: number; end: number } {
+  if (override) {
+    return { start: override.start, end: override.end };
+  }
   const end = Date.now();
   const windowMs = HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
   const start = end - windowMs;
@@ -66,7 +76,9 @@ const FALLBACK_TIMEFRAME: Partial<Record<Timeframe, HistoryTimeframe>> = {
   "30s": "15s",
   "5m": "1m",
   "15m": "1m",
+  "30m": "1m",
   "1h": "1m",
+  "2h": "1h",
   "4h": "1m",
   "1d": "1m",
 };
@@ -98,6 +110,7 @@ interface UseChartHistoryOptions {
   timeframe: Timeframe;
   enabled: boolean;
   mode: TickerMode;
+  rangeOverride?: { start: number; end: number } | null;
 }
 
 export function useChartHistory({
@@ -105,6 +118,7 @@ export function useChartHistory({
   timeframe,
   enabled,
   mode,
+  rangeOverride = null,
 }: UseChartHistoryOptions) {
   const uniqueSymbols = useMemo(() => {
     const list = Array.from(new Set(symbols.filter(Boolean)));
@@ -112,7 +126,7 @@ export function useChartHistory({
   }, [symbols]);
   const symbolKey = uniqueSymbols.join("|");
   const bucketMs = TIMEFRAME_MS[timeframe];
-  const windowMs = HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
+  const windowMs = rangeOverride ? rangeOverride.end - rangeOverride.start : HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
   const maxPoints = useMemo(
     () => Math.min(MAX_SERIES_POINTS, Math.ceil(windowMs / bucketMs) + 2),
     [windowMs, bucketMs],
@@ -122,7 +136,8 @@ export function useChartHistory({
   const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const lastSeenRef = useRef<Map<string, string>>(new Map());
-  const seriesKeyRef = useRef<string>(`${timeframe}:${symbolKey}`);
+  const rangeKey = rangeOverride ? `${rangeOverride.start}:${rangeOverride.end}` : "default";
+  const seriesKeyRef = useRef<string>(`${timeframe}:${symbolKey}:${rangeKey}`);
 
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
 
@@ -135,13 +150,13 @@ export function useChartHistory({
   }, [entities, symbolKey, uniqueSymbols]);
 
   useEffect(() => {
-    const nextKey = `${timeframe}:${symbolKey}`;
+    const nextKey = `${timeframe}:${symbolKey}:${rangeKey}`;
     if (seriesKeyRef.current !== nextKey) {
       seriesKeyRef.current = nextKey;
       lastSeenRef.current.clear();
       setSeriesBySymbol({});
     }
-  }, [timeframe, symbolKey]);
+  }, [timeframe, symbolKey, rangeKey]);
 
   useEffect(() => {
     if (!enabled || uniqueSymbols.length === 0) {
@@ -156,7 +171,7 @@ export function useChartHistory({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const { start, end } = buildRange(timeframe);
+    const { start, end } = buildRange(timeframe, rangeOverride);
 
     const load = async () => {
       setIsLoading(true);
@@ -219,7 +234,7 @@ export function useChartHistory({
     return () => {
       controller.abort();
     };
-  }, [enabled, timeframe, symbolKey, maxPoints]);
+  }, [enabled, timeframe, symbolKey, maxPoints, rangeKey, rangeOverride]);
 
   useEffect(() => {
     if (!enabled || uniqueSymbols.length === 0) return;

@@ -67,10 +67,28 @@ const formatNumber = (num: number, decimals = 2) =>
     "1m": 60000,
     "5m": 300000,
     "15m": 900000,
+    "30m": 1800000,
     "1h": 3600000,
+    "2h": 7200000,
     "4h": 14400000,
     "1d": 86400000,
   };
+
+type RangePresetId = "1D" | "5D" | "1M" | "3M" | "6M" | "YTD";
+
+const RANGE_PRESETS: Array<{
+  id: RangePresetId;
+  label: string;
+  timeframe: Timeframe;
+  rangeMs?: number;
+}> = [
+  { id: "1D", label: "1D", timeframe: "1m", rangeMs: 24 * 60 * 60 * 1000 },
+  { id: "5D", label: "5D", timeframe: "5m", rangeMs: 5 * 24 * 60 * 60 * 1000 },
+  { id: "1M", label: "1M", timeframe: "30m", rangeMs: 30 * 24 * 60 * 60 * 1000 },
+  { id: "3M", label: "3M", timeframe: "1h", rangeMs: 90 * 24 * 60 * 60 * 1000 },
+  { id: "6M", label: "6M", timeframe: "2h", rangeMs: 180 * 24 * 60 * 60 * 1000 },
+  { id: "YTD", label: "YTD", timeframe: "1d" },
+];
 
 function normalizeTimestamp(value: number): number {
   if (!Number.isFinite(value)) return value;
@@ -266,6 +284,7 @@ export function TickerModal() {
   const [dragSymbol, setDragSymbol] = useState<string | null>(null);
   const [dragOverSymbol, setDragOverSymbol] = useState<string | null>(null);
   const dragSymbolRef = useRef<string | null>(null);
+  const [rangePreset, setRangePreset] = useState<RangePresetId | "custom">("custom");
   const orderedSymbols = useMemo(() => {
     if (!primarySymbol) return comparisons;
     return [primarySymbol, ...comparisons];
@@ -331,10 +350,58 @@ export function TickerModal() {
   const displayCompare = displayMode === "compare";
   const displaySpread = displayMode === "spread";
 
+  const rangeOverride = useMemo(() => {
+    if (rangePreset === "custom") return null;
+    const preset = RANGE_PRESETS.find((entry) => entry.id === rangePreset);
+    if (!preset) return null;
+    const end = Date.now();
+    if (preset.id === "YTD") {
+      const start = new Date(new Date().getFullYear(), 0, 1).getTime();
+      return { start, end };
+    }
+    if (!preset.rangeMs) return null;
+    return { start: end - preset.rangeMs, end };
+  }, [rangePreset]);
+
+  const handleTimeframeChange = useCallback(
+    (tf: Timeframe) => {
+      setTimeframe(tf);
+      setRangePreset("custom");
+    },
+    [setTimeframe],
+  );
+
+  const handleRangePresetChange = useCallback(
+    (presetId: RangePresetId | "custom") => {
+      if (presetId === "custom") {
+        setRangePreset("custom");
+        return;
+      }
+      const preset = RANGE_PRESETS.find((entry) => entry.id === presetId);
+      if (!preset) return;
+      setRangePreset(presetId);
+      setTimeframe(preset.timeframe);
+    },
+    [setTimeframe],
+  );
+
   useEffect(() => {
     const storedTimeframe = localStorage.getItem("terminal-chart-timeframe");
     if (storedTimeframe && TIMEFRAMES.includes(storedTimeframe as Timeframe)) {
       setTimeframe(storedTimeframe as Timeframe);
+    }
+
+    const storedPreset = localStorage.getItem("terminal-chart-range-preset");
+    if (storedPreset) {
+      if (storedPreset === "custom") {
+        setRangePreset("custom");
+      } else {
+        const preset = RANGE_PRESETS.find((entry) => entry.id === storedPreset);
+        if (preset) {
+          setRangePreset(preset.id);
+          setTimeframe(preset.timeframe);
+        }
+      }
     }
 
     const storedSpread = localStorage.getItem("terminal-chart-spread-enabled");
@@ -377,6 +444,11 @@ export function TickerModal() {
 
   useEffect(() => {
     if (!settingsLoaded) return;
+    localStorage.setItem("terminal-chart-range-preset", rangePreset);
+  }, [rangePreset, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
     localStorage.setItem("terminal-chart-sidebar-open", String(isSidebarOpen));
   }, [isSidebarOpen, settingsLoaded]);
 
@@ -403,6 +475,7 @@ export function TickerModal() {
     timeframe,
     enabled: isOpen,
     mode,
+    rangeOverride,
   });
 
   const resolvedSeriesBySymbol = useMemo(() => {
@@ -627,7 +700,7 @@ export function TickerModal() {
             </Button>
           </div>
 
-          {depthInfo && (
+          {/* {depthInfo && (
             <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-2">
               <span>Depth {depthInfo.depth}</span>
               <span>·</span>
@@ -635,7 +708,7 @@ export function TickerModal() {
               <span>·</span>
               <span>Unit {depthInfo.unit}</span>
             </div>
-          )}
+          )} */}
 
           <div className="mt-3 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -666,7 +739,7 @@ export function TickerModal() {
                     {TIMEFRAMES.map((tf, index) => (
                       <DropdownMenuItem
                         key={tf}
-                        onClick={() => setTimeframe(tf)}
+                        onClick={() => handleTimeframeChange(tf)}
                         className={cn("text-xs", timeframe === tf && "bg-accent")}
                       >
                         <span className="flex-1">{tf}</span>
@@ -675,6 +748,29 @@ export function TickerModal() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase font-semibold tracking-wider text-muted-foreground/70">Range</span>
+                  <ToggleGroup
+                    type="single"
+                    value={rangePreset === "custom" ? "" : rangePreset}
+                    onValueChange={(val) =>
+                      handleRangePresetChange(val ? (val as RangePresetId) : "custom")
+                    }
+                    className="bg-muted/50 p-0.5 rounded-md border border-white/5"
+                  >
+                    {RANGE_PRESETS.map((preset) => (
+                      <ToggleGroupItem
+                        key={preset.id}
+                        value={preset.id}
+                        size="sm"
+                        className="h-7 px-2 text-xs data-[state=on]:bg-background"
+                      >
+                        {preset.label}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                </div>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -690,20 +786,30 @@ export function TickerModal() {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <div
                   className={cn(
-                    "h-7 px-2 text-xs gap-1",
-                    showSessionLevels && "bg-white/10 text-foreground"
+                    "transition-all duration-200 overflow-hidden",
+                    displayCompare
+                      ? "opacity-0 max-w-0 pointer-events-none"
+                      : "opacity-100 max-w-[120px]"
                   )}
-                  onClick={toggleShowSessionLevels}
                 >
-                  Levels
-                </Button>
-
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-7 px-2 text-xs gap-1",
+                      showSessionLevels && "bg-white/10 text-foreground"
+                    )}
+                    onClick={toggleShowSessionLevels}
+                  >
+                    Levels
+                  </Button>
+                </div>
               </div>
+            </div>
 
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <ToggleGroup
                   type="single"

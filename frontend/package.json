@@ -59,6 +59,7 @@
     "next": "^16.1.1",
     "next-themes": "^0.4.6",
     "r3f-perf": "^7.2.3",
+    "radix-ui": "^1.4.3",
     "react": "^19.2.3",
     "react-day-picker": "^9.11.3",
     "react-dom": "^19.2.3",
