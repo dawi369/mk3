@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import { useHeader } from "@/components/terminal/layout/header-provider";
 import { AuthIndicator } from "@/components/common/auth-indicator";
 import { useTerminalView } from "@/providers/terminal-view-provider";
@@ -25,6 +26,17 @@ export function TerminalHeader() {
   const { activeView } = useTerminalView();
   const viewMode = useTickerStore((state) => state.mode);
   const setMode = useTickerStore((state) => state.setMode);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("terminal-view-mode");
+    if (stored === "front" || stored === "curve") {
+      setMode(stored);
+    }
+  }, [setMode]);
+
+  useEffect(() => {
+    localStorage.setItem("terminal-view-mode", viewMode);
+  }, [viewMode]);
 
   // Declarative navigation mapping
   const renderNavContent = () => {

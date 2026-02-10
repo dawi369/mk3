@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import {
   createChart,
   CandlestickSeries,
@@ -11,6 +11,7 @@ import {
   CandlestickData,
   LineData,
   Time,
+  PriceScaleMode,
 } from "lightweight-charts";
 import { SYMBOL_COLORS } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 
@@ -55,6 +56,9 @@ export function TradingChart({
   const lastFitKeyRef = useRef<string | null>(null);
   const lastTickerRef = useRef<string | null>(null);
   const lastRangeKeyRef = useRef<string | null>(null);
+  const autoFollowRef = useRef(true);
+  const programmaticRangeRef = useRef(false);
+  const expectedToRef = useRef(0);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
@@ -129,29 +133,7 @@ export function TradingChart({
 
   }, []);
 
-  const formatPercentValue = useCallback((value: number) => {
-    if (!Number.isFinite(value)) return "--";
-    const sign = value >= 0 ? "+" : "";
-    return `${sign}${value.toFixed(2)}%`;
-  }, []);
-
-  const lineFormat = useMemo(() => {
-    if (compareMode) {
-      return {
-        priceFormat: {
-          type: "custom" as const,
-          formatter: formatPercentValue,
-        },
-      };
-    }
-    return {
-      priceFormat: {
-        type: "price" as const,
-        precision: 2,
-        minMove: 0.01,
-      },
-    };
-  }, [compareMode, formatPercentValue]);
+  const compareScale = compareMode;
 
   // Handle resize
   useEffect(() => {
@@ -210,12 +192,18 @@ export function TradingChart({
     const rangeKey = `${length}:${lastPoint ?? "none"}`;
     const clampedVisible = Math.max(10, visibleBars);
     const expectedTo = length > 0 ? length - 1 + rightOffset : 0;
+    expectedToRef.current = expectedTo;
 
     if (lastFitKeyRef.current !== nextFitKey && length > 0) {
       const from = Math.max(0, expectedTo - clampedVisible);
       const to = expectedTo;
       if (from <= to) {
+        autoFollowRef.current = true;
+        programmaticRangeRef.current = true;
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+        queueMicrotask(() => {
+          programmaticRangeRef.current = false;
+        });
       }
       lastFitKeyRef.current = nextFitKey;
       lastRangeKeyRef.current = rangeKey;
@@ -223,26 +211,65 @@ export function TradingChart({
     }
 
     if (length > 0 && lastRangeKeyRef.current !== rangeKey) {
-      const range = chartRef.current.timeScale().getVisibleLogicalRange();
-      if (!range) return;
-      const distance = expectedTo - range.to;
-      const isNearRight = distance <= rightOffset + 1 && distance >= -1;
-      if (isNearRight) {
+      if (autoFollowRef.current) {
         const from = Math.max(0, expectedTo - clampedVisible);
+        programmaticRangeRef.current = true;
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to: expectedTo });
+        queueMicrotask(() => {
+          programmaticRangeRef.current = false;
+        });
       }
       lastRangeKeyRef.current = rangeKey;
     }
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, rightOffset]);
 
   useEffect(() => {
-    if (primaryLineRef.current) {
-      primaryLineRef.current.applyOptions(lineFormat);
+    if (!chartRef.current) return;
+    if (compareScale) {
+      chartRef.current.applyOptions({
+        rightPriceScale: {
+          mode: PriceScaleMode.Percentage,
+          visible: true,
+        },
+        leftPriceScale: {
+          visible: false,
+          mode: PriceScaleMode.Normal,
+        },
+      });
+    } else {
+      chartRef.current.applyOptions({
+        rightPriceScale: {
+          mode: PriceScaleMode.Normal,
+          visible: true,
+        },
+        leftPriceScale: {
+          visible: false,
+          mode: PriceScaleMode.Normal,
+        },
+      });
     }
-    comparisonSeriesRef.current.forEach((series) => {
-      series.applyOptions(lineFormat);
-    });
-  }, [lineFormat]);
+
+    const primaryScaleId = "right";
+    primaryLineRef.current?.applyOptions({ priceScaleId: primaryScaleId });
+    primaryCandleRef.current?.applyOptions({ priceScaleId: primaryScaleId });
+  }, [compareScale]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const timeScale = chartRef.current.timeScale();
+    const handleRangeChange = (range: { from: number; to: number } | null) => {
+      if (!range || programmaticRangeRef.current) return;
+      const expectedTo = expectedToRef.current;
+      const distance = expectedTo - range.to;
+      const isNearRight = distance <= rightOffset + 1 && distance >= -1;
+      autoFollowRef.current = isNearRight;
+    };
+
+    timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
+    return () => {
+      timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
+    };
+  }, [rightOffset]);
 
   const clearPriceLines = useCallback(() => {
     const seriesType = priceLinesRef.current.seriesType;
@@ -383,17 +410,17 @@ export function TradingChart({
         series = chartRef.current.addSeries(LineSeries, {
           color,
           lineWidth: 2,
+          priceScaleId: "right",
         });
         comparisonSeriesRef.current.set(symbol, series);
       } else {
         series.applyOptions({ color, lineWidth: 2 });
       }
 
-      series.applyOptions(lineFormat);
       const seriesData = comparisonData?.[symbol] ?? emptyLines;
       series.setData(seriesData);
     }
-  }, [comparisons, comparisonData, showComparisons, lineFormat]);
+  }, [comparisons, comparisonData, showComparisons]);
 
   return <div ref={containerRef} className={className} style={{ width: "100%", height: "100%" }} />;
 }

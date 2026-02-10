@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   ArrowLeftRight,
@@ -174,75 +174,6 @@ function toLineData(bars: Bar[]): LineData<Time>[] {
   }));
 }
 
-function toPercentLineData(bars: Bar[], basePrice: number, startIndex: number): LineData<Time>[] {
-  if (!Number.isFinite(basePrice) || basePrice <= 0) return [];
-  const data: LineData<Time>[] = [];
-  for (let i = startIndex; i < bars.length; i++) {
-    const bar = bars[i];
-    const time = Math.floor(normalizeTimestamp(bar.startTime) / 1000) as Time;
-    const value = ((bar.close / basePrice) - 1) * 100;
-    data.push({ time, value });
-  }
-  return data;
-}
-
-function buildComparisonLines(
-  symbols: string[],
-  seriesBySymbol: Record<string, Bar[]>
-): { primary: LineData<Time>[]; comparisons: Record<string, LineData<Time>[]> } {
-  if (!symbols.length) return { primary: [], comparisons: {} };
-
-  const firstTimes: number[] = [];
-  for (const symbol of symbols) {
-    const bars = seriesBySymbol[symbol];
-    if (!bars || bars.length === 0) continue;
-    const first = normalizeTimestamp(bars[0].startTime);
-    if (Number.isFinite(first)) firstTimes.push(first);
-  }
-
-  if (firstTimes.length === 0) {
-    return { primary: [], comparisons: {} };
-  }
-
-  const referenceStart = Math.max(...firstTimes);
-  const series: Record<string, LineData<Time>[]> = {};
-
-  for (const symbol of symbols) {
-    const bars = seriesBySymbol[symbol];
-    if (!bars || bars.length === 0) {
-      series[symbol] = [];
-      continue;
-    }
-
-    let baselineIndex = -1;
-    for (let i = 0; i < bars.length; i++) {
-      const time = normalizeTimestamp(bars[i].startTime);
-      if (time >= referenceStart && bars[i].close > 0) {
-        baselineIndex = i;
-        break;
-      }
-    }
-
-    if (baselineIndex === -1) {
-      series[symbol] = [];
-      continue;
-    }
-
-    const basePrice = bars[baselineIndex].close;
-    series[symbol] = toPercentLineData(bars, basePrice, baselineIndex);
-  }
-
-  const [primarySymbol, ...rest] = symbols;
-  const comparisons: Record<string, LineData<Time>[]> = {};
-  for (const symbol of rest) {
-    comparisons[symbol] = series[symbol] ?? [];
-  }
-
-  return {
-    primary: primarySymbol ? series[primarySymbol] ?? [] : [],
-    comparisons,
-  };
-}
 
 function buildSpreadSeries(
   legs: SpreadLeg[],
@@ -287,6 +218,19 @@ function buildSpreadSeries(
   return data;
 }
 
+function reorderSymbols(order: string[], from: string, to: string): string[] {
+  if (from === to) return order;
+  if (!order.includes(from)) return order;
+  const next = order.filter((symbol) => symbol !== from);
+  const targetIndex = next.indexOf(to);
+  if (targetIndex === -1) {
+    next.push(from);
+    return next;
+  }
+  next.splice(targetIndex, 0, from);
+  return next;
+}
+
 export function TickerModal() {
   const {
     isOpen,
@@ -294,6 +238,7 @@ export function TickerModal() {
     close,
     isSidebarOpen,
     toggleSidebar,
+    setSidebarOpen,
     comparisons,
     timeframe,
     setTimeframe,
@@ -307,6 +252,7 @@ export function TickerModal() {
     reverseSpreadLegs,
     applySpreadPreset,
     removeComparison,
+    reorderSelection,
   } = useTickerModal();
   const { openWithMode } = useSpotlight();
   const mode = useTickerStore((state) => state.mode);
@@ -317,6 +263,9 @@ export function TickerModal() {
   const setTrackedSymbols = useTickerStore((state) => state.setTrackedSymbols);
   const [showLegs, setShowLegs] = useState(true);
   const setShowSessionLevels = useTickerStore((state) => state.setShowSessionLevels);
+  const [dragSymbol, setDragSymbol] = useState<string | null>(null);
+  const [dragOverSymbol, setDragOverSymbol] = useState<string | null>(null);
+  const dragSymbolRef = useRef<string | null>(null);
   const orderedSymbols = useMemo(() => {
     if (!primarySymbol) return comparisons;
     return [primarySymbol, ...comparisons];
@@ -330,48 +279,107 @@ export function TickerModal() {
   const [displayMode, setDisplayMode] = useState<"single" | "compare" | "spread">(initialMode);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const transitionRef = useRef<number | null>(null);
+  const transitionCountRef = useRef(0);
   const latestSignatureRef = useRef<Map<string, string>>(new Map());
   const mergedHistoryRef = useRef<Map<string, { key: string; series: Bar[] }>>(new Map());
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const targetMode: "single" | "compare" | "spread" = spreadEnabled
     ? "spread"
     : compareMode
       ? "compare"
       : "single";
 
+  const beginTransition = useCallback((duration: number) => {
+    transitionCountRef.current += 1;
+    setIsTransitioning(true);
+    const handle = window.setTimeout(() => {
+      transitionCountRef.current = Math.max(0, transitionCountRef.current - 1);
+      if (transitionCountRef.current === 0) {
+        setIsTransitioning(false);
+      }
+    }, duration);
+    return handle;
+  }, []);
+
   useEffect(() => {
     if (displayMode === targetMode) return;
     if (transitionRef.current) {
       window.clearTimeout(transitionRef.current);
     }
-    setIsTransitioning(true);
 
+    const transitionHandle = beginTransition(260);
     transitionRef.current = window.setTimeout(() => {
       setDisplayMode(targetMode);
-      transitionRef.current = window.setTimeout(() => {
-        setIsTransitioning(false);
-      }, 140);
     }, 120);
 
     return () => {
       if (transitionRef.current) {
         window.clearTimeout(transitionRef.current);
       }
+      window.clearTimeout(transitionHandle);
     };
-  }, [displayMode, targetMode]);
+  }, [displayMode, targetMode, beginTransition]);
+
+  useEffect(() => {
+    if (!primarySymbol) return;
+    const handle = beginTransition(160);
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [primarySymbol, beginTransition]);
 
   const displayCompare = displayMode === "compare";
   const displaySpread = displayMode === "spread";
 
   useEffect(() => {
-    const stored = localStorage.getItem("terminal-show-session-levels");
-    if (stored !== null) {
-      setShowSessionLevels(stored === "true");
+    const storedTimeframe = localStorage.getItem("terminal-chart-timeframe");
+    if (storedTimeframe && TIMEFRAMES.includes(storedTimeframe as Timeframe)) {
+      setTimeframe(storedTimeframe as Timeframe);
     }
-  }, [setShowSessionLevels]);
+
+    const storedSpread = localStorage.getItem("terminal-chart-spread-enabled");
+    if (storedSpread === "true" || storedSpread === "false") {
+      setSpreadEnabled(storedSpread === "true");
+    }
+
+    const storedShowLegs = localStorage.getItem("terminal-chart-show-legs");
+    if (storedShowLegs === "true" || storedShowLegs === "false") {
+      setShowLegs(storedShowLegs === "true");
+    }
+
+    const storedSidebar = localStorage.getItem("terminal-chart-sidebar-open");
+    if (storedSidebar === "true" || storedSidebar === "false") {
+      setSidebarOpen(storedSidebar === "true");
+    }
+
+    setSettingsLoaded(true);
+  }, [setTimeframe, setSpreadEnabled, setShowLegs, setSidebarOpen]);
 
   useEffect(() => {
+    if (!settingsLoaded) return;
     localStorage.setItem("terminal-show-session-levels", String(showSessionLevels));
-  }, [showSessionLevels]);
+  }, [showSessionLevels, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("terminal-chart-timeframe", timeframe);
+  }, [timeframe, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("terminal-chart-spread-enabled", String(spreadEnabled));
+  }, [spreadEnabled, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("terminal-chart-show-legs", String(showLegs));
+  }, [showLegs, settingsLoaded]);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("terminal-chart-sidebar-open", String(isSidebarOpen));
+  }, [isSidebarOpen, settingsLoaded]);
+
 
   const headerSymbols = useMemo(() => {
     if (spreadEnabled && spreadLegs.length > 0) {
@@ -454,10 +462,11 @@ export function TickerModal() {
 
   const bars = primarySymbol ? chartSeriesBySymbol[primarySymbol] : undefined;
 
-  const compareLines = useMemo(() => {
-    if (!compareMode && displayMode !== "compare") return null;
-    return buildComparisonLines(orderedSymbols, chartSeriesBySymbol);
-  }, [compareMode, displayMode, orderedSymbols, chartSeriesBySymbol]);
+  const primaryLineData = useMemo(() => {
+    if (!bars || bars.length === 0) return [];
+    return toLineData(bars);
+  }, [bars]);
+
 
   // Handle escape key
   useEffect(() => {
@@ -549,9 +558,6 @@ export function TickerModal() {
       : [];
 
   const comparisonData = useMemo(() => {
-    if (displayCompare) {
-      return compareLines?.comparisons ?? {};
-    }
     const data: Record<string, LineData<Time>[]> = {};
     const symbols = new Set(overlaySymbols);
     for (const symbol of symbols) {
@@ -563,7 +569,7 @@ export function TickerModal() {
       data[symbol] = toLineData(series);
     }
     return data;
-  }, [displayCompare, compareLines, overlaySymbols, chartSeriesBySymbol]);
+  }, [overlaySymbols, chartSeriesBySymbol]);
 
   const spreadData = useMemo(() => {
     if (!spreadEnabled) return [];
@@ -695,6 +701,7 @@ export function TickerModal() {
                 >
                   Levels
                 </Button>
+
               </div>
 
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -716,13 +723,72 @@ export function TickerModal() {
                 </ToggleGroup>
 
                 {!spreadEnabled && (
-                  <div className="flex items-center gap-2 overflow-x-auto">
+                  <div
+                    className="flex items-center gap-2 overflow-x-auto"
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      if (dragOverSymbol) setDragOverSymbol(null);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const source =
+                        event.dataTransfer.getData("text/plain") || dragSymbolRef.current;
+                      if (!source) return;
+                      const nextOrder = reorderSymbols(orderedSymbols, source, "__end__");
+                      reorderSelection(nextOrder);
+                      dragSymbolRef.current = null;
+                      setDragSymbol(null);
+                      setDragOverSymbol(null);
+                    }}
+                  >
                     {orderedSymbols.map((symbol, index) => (
                       <div
                         key={symbol}
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", symbol);
+                          dragSymbolRef.current = symbol;
+                          setDragSymbol(symbol);
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          if (symbol !== dragSymbolRef.current) {
+                            setDragOverSymbol(symbol);
+                          }
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverSymbol === symbol) setDragOverSymbol(null);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const source =
+                            event.dataTransfer.getData("text/plain") || dragSymbolRef.current;
+                          if (!source) return;
+                          const nextOrder = reorderSymbols(orderedSymbols, source, symbol);
+                          if (nextOrder.join("|") === orderedSymbols.join("|")) {
+                            dragSymbolRef.current = null;
+                            setDragSymbol(null);
+                            setDragOverSymbol(null);
+                            return;
+                          }
+                          reorderSelection(nextOrder);
+                          dragSymbolRef.current = null;
+                          setDragSymbol(null);
+                          setDragOverSymbol(null);
+                        }}
+                        onDragEnd={() => {
+                          dragSymbolRef.current = null;
+                          setDragSymbol(null);
+                          setDragOverSymbol(null);
+                        }}
                         className={cn(
                           "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-                          "bg-white/5 hover:bg-white/10 transition-colors"
+                          "bg-white/5 hover:bg-white/10 transition-colors",
+                          dragSymbol === symbol && "opacity-60",
+                          dragOverSymbol === symbol && "ring-1 ring-white/30"
                         )}
                       >
                         <span
@@ -899,11 +965,11 @@ export function TickerModal() {
                   displaySpread
                     ? spreadData
                     : displayCompare
-                      ? compareLines?.primary ?? []
+                      ? primaryLineData
                       : undefined
                 }
                 comparisons={overlaySymbols}
-                comparisonData={displayCompare ? compareLines?.comparisons ?? {} : comparisonData}
+                comparisonData={comparisonData}
                 showComparisons={displaySpread ? showLegs : displayCompare}
                 fitKey={fitKey}
                 visibleBars={visibleBars}

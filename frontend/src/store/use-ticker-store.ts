@@ -19,6 +19,14 @@ import { extractRoot } from "@/lib/month-utils";
 const MAX_BARS_DEFAULT = 86400;
 const MAX_BARS_TRACKED = 86400;
 
+function getStoredBoolean(key: string, fallback: boolean): boolean {
+  if (typeof window === "undefined") return fallback;
+  const stored = localStorage.getItem(key);
+  if (stored === "true") return true;
+  if (stored === "false") return false;
+  return fallback;
+}
+
 const emptySelection = (): TickerSelectionState => ({
   primary: null,
   selected: [],
@@ -130,6 +138,7 @@ interface TickerStoreState {
   toggleSelectShift: (symbol: string) => void;
   addComparison: (symbol: string) => void;
   removeComparison: (symbol: string) => void;
+  reorderSelection: (order: string[]) => void;
   toggleSpreadLegSign: (symbol: string) => void;
   moveSpreadLeg: (symbol: string, direction: -1 | 1) => void;
   reverseSpreadLegs: () => void;
@@ -139,6 +148,7 @@ interface TickerStoreState {
 
   setTimeframe: (tf: Timeframe) => void;
   toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
   setShowSessionLevels: (enabled: boolean) => void;
   toggleShowSessionLevels: () => void;
   setSpreadEnabled: (enabled: boolean) => void;
@@ -155,8 +165,8 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
   snapshotsBySymbol: {},
   sessionsBySymbol: {},
   timeframe: "1m",
-  isSidebarOpen: true,
-  showSessionLevels: true,
+  isSidebarOpen: getStoredBoolean("terminal-chart-sidebar-open", true),
+  showSessionLevels: getStoredBoolean("terminal-show-session-levels", false),
 
   setMode: (mode) =>
     set((state) => ({
@@ -401,6 +411,32 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       };
     }),
 
+  reorderSelection: (order) =>
+    set((state) => {
+      const mode = state.mode;
+      const selection = state.selectionByMode[mode];
+      const allowed = new Set(selection.selected);
+      const nextOrdered = order.filter((symbol) => allowed.has(symbol));
+      const missing = selection.selected.filter((symbol) => !nextOrdered.includes(symbol));
+      const nextSelected = [...nextOrdered, ...missing];
+      const nextPrimary = nextSelected[0] ?? null;
+      const nextLegs = selection.spreadEnabled
+        ? normalizeLegs(selection.spreadLegs, nextPrimary)
+        : selection.spreadLegs;
+
+      return {
+        selectionByMode: {
+          ...state.selectionByMode,
+          [mode]: {
+            ...selection,
+            primary: nextPrimary,
+            selected: nextSelected,
+            spreadLegs: nextLegs,
+          },
+        },
+      };
+    }),
+
   toggleSpreadLegSign: (symbol) =>
     set((state) => {
       const mode = state.mode;
@@ -538,6 +574,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
 
   setTimeframe: (tf) => set({ timeframe: tf }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+  setSidebarOpen: (open) => set({ isSidebarOpen: open }),
   setShowSessionLevels: (enabled) => set({ showSessionLevels: enabled }),
   toggleShowSessionLevels: () =>
     set((state) => ({ showSessionLevels: !state.showSessionLevels })),

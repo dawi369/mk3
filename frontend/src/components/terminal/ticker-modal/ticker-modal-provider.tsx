@@ -24,11 +24,14 @@ interface TickerModalState {
   setTimeframe: (tf: Timeframe) => void;
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
   showSessionLevels: boolean;
   toggleShowSessionLevels: () => void;
 
   addComparison: (symbol: string) => void;
   removeComparison: (symbol: string) => void;
+  reorderSelection: (order: string[]) => void;
+  reorderSelection: (order: string[]) => void;
 
   spreadEnabled: boolean;
   setSpreadEnabled: (enabled: boolean) => void;
@@ -48,10 +51,12 @@ export function useTickerModal(): TickerModalState {
   const setTimeframe = useTickerStore((state) => state.setTimeframe);
   const isSidebarOpen = useTickerStore((state) => state.isSidebarOpen);
   const toggleSidebar = useTickerStore((state) => state.toggleSidebar);
+  const setSidebarOpen = useTickerStore((state) => state.setSidebarOpen);
   const showSessionLevels = useTickerStore((state) => state.showSessionLevels);
   const toggleShowSessionLevels = useTickerStore((state) => state.toggleShowSessionLevels);
   const addComparison = useTickerStore((state) => state.addComparison);
   const removeComparison = useTickerStore((state) => state.removeComparison);
+  const reorderSelection = useTickerStore((state) => state.reorderSelection);
   const setSpreadEnabled = useTickerStore((state) => state.setSpreadEnabled);
   const toggleSpreadLegSign = useTickerStore((state) => state.toggleSpreadLegSign);
   const moveSpreadLeg = useTickerStore((state) => state.moveSpreadLeg);
@@ -78,10 +83,12 @@ export function useTickerModal(): TickerModalState {
     setTimeframe,
     isSidebarOpen,
     toggleSidebar,
+    setSidebarOpen,
     showSessionLevels,
     toggleShowSessionLevels,
     addComparison,
     removeComparison,
+    reorderSelection,
     spreadEnabled: selection.spreadEnabled,
     setSpreadEnabled,
     toggleSpreadLegSign,
