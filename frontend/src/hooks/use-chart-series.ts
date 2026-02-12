@@ -61,6 +61,7 @@ interface UseChartSeriesReturn {
   fitKey: string;
   visibleBars: number;
   secondsVisible: boolean;
+  isHistoryReady: boolean;
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -114,7 +115,7 @@ export function useChartSeries({
 
   // ── History fetch ──────────────────────────────────────────────────────
 
-  const { seriesBySymbol: historySeriesBySymbol } = useChartHistory({
+  const { seriesBySymbol: historySeriesBySymbol, isReady: historyReady } = useChartHistory({
     symbols: chartSymbols,
     timeframe,
     enabled: isOpen,
@@ -324,5 +325,6 @@ export function useChartSeries({
     fitKey,
     visibleBars,
     secondsVisible,
+    isHistoryReady: isOpen ? historyReady : false,
   };
 }

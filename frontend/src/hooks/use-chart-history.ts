@@ -147,7 +147,9 @@ export function useChartHistory({
   );
 
   const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, Bar[]>>({});
+  const [isReady, setIsReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
   const lastSeenRef = useRef<Map<string, string>>(new Map());
 
   // Stable primitive keys for effects
@@ -172,13 +174,17 @@ export function useChartHistory({
   // Guard: only reset if we have data to clear and component is enabled
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      if (isReady) setIsReady(false);
+      return;
+    }
 
     const nextKey = `${timeframe}:${symbolKey}:${rangeKey}`;
     if (seriesKeyRef.current === nextKey) return;
 
     seriesKeyRef.current = nextKey;
     lastSeenRef.current.clear();
+    if (isReady) setIsReady(false);
 
     // Only clear state if there's actual data (prevents redundant updates)
     setSeriesBySymbol((prev) => {
@@ -192,6 +198,7 @@ export function useChartHistory({
 
   useEffect(() => {
     if (!enabled || uniqueSymbols.length === 0) {
+      if (isReady) setIsReady(false);
       // Only clear if there's data (prevents loop when already empty)
       setSeriesBySymbol((prev) => {
         if (Object.keys(prev).length === 0) return prev;
@@ -206,6 +213,9 @@ export function useChartHistory({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+    if (isReady) setIsReady(false);
 
     const { start, end } = buildRange(timeframe, rangeOverride, windowMs);
 
@@ -258,6 +268,10 @@ export function useChartHistory({
       } catch (error) {
         if ((error as { name?: string }).name !== "AbortError") {
           console.warn("[useChartHistory] Failed to load history", error);
+        }
+      } finally {
+        if (requestIdRef.current === requestId && !controller.signal.aborted) {
+          setIsReady(true);
         }
       }
     };
@@ -351,5 +365,6 @@ export function useChartHistory({
 
   return {
     seriesBySymbol,
+    isReady,
   };
 }

@@ -274,25 +274,30 @@ export function TickerModal() {
                 isTransitioning && "opacity-70"
               )}
             >
-              <TradingChart
-                ticker={primarySymbol}
-                data={displaySpread || displayCompare ? undefined : series.chartData}
-                lineData={
-                  displaySpread
-                    ? series.spreadData
-                    : displayCompare
-                      ? series.primaryLineData
-                      : undefined
-                }
-                comparisons={series.overlaySymbols}
-                comparisonData={series.comparisonData}
-                showComparisons={displaySpread ? settings.showLegs : displayCompare}
-                fitKey={series.fitKey}
-                visibleBars={series.visibleBars}
-                secondsVisible={series.secondsVisible}
-                sessionLevels={series.sessionLevels}
-                compareMode={displayCompare}
-              />
+              {series.isHistoryReady ? (
+                <TradingChart
+                  key={series.fitKey}
+                  ticker={primarySymbol}
+                  data={displaySpread || displayCompare ? undefined : series.chartData}
+                  lineData={
+                    displaySpread
+                      ? series.spreadData
+                      : displayCompare
+                        ? series.primaryLineData
+                        : undefined
+                  }
+                  comparisons={series.overlaySymbols}
+                  comparisonData={series.comparisonData}
+                  showComparisons={displaySpread ? settings.showLegs : displayCompare}
+                  fitKey={series.fitKey}
+                  visibleBars={series.visibleBars}
+                  secondsVisible={series.secondsVisible}
+                  sessionLevels={series.sessionLevels}
+                  compareMode={displayCompare}
+                />
+              ) : (
+                <div className="h-full" />
+              )}
             </div>
           </div>
 
