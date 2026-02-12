@@ -34,6 +34,7 @@ const HISTORY_WINDOWS_MS: Record<Timeframe, number> = {
 };
 
 const MAX_SERIES_POINTS = 200_000;
+const MIN_VISIBLE_BARS = 100;
 
 function normalizeTimestampMs(value: number): number {
   if (!Number.isFinite(value)) return value;
@@ -43,12 +44,13 @@ function normalizeTimestampMs(value: number): number {
 function buildRange(
   timeframe: Timeframe,
   override?: { start: number; end: number } | null,
+  windowMsOverride?: number,
 ): { start: number; end: number } {
   if (override) {
     return { start: override.start, end: override.end };
   }
   const end = Date.now();
-  const windowMs = HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
+  const windowMs = windowMsOverride ?? HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
   const start = end - windowMs;
   return { start, end };
 }
@@ -134,7 +136,11 @@ export function useChartHistory({
   }, [symbolKey]);
 
   const bucketMs = TIMEFRAME_MS[timeframe];
-  const windowMs = rangeOverride ? rangeOverride.end - rangeOverride.start : HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
+  const baseWindowMs = HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
+  const minWindowMs = MIN_VISIBLE_BARS * bucketMs;
+  const windowMs = rangeOverride
+    ? rangeOverride.end - rangeOverride.start
+    : Math.max(baseWindowMs, minWindowMs);
   const maxPoints = useMemo(
     () => Math.min(MAX_SERIES_POINTS, Math.ceil(windowMs / bucketMs) + 2),
     [windowMs, bucketMs],
@@ -201,7 +207,7 @@ export function useChartHistory({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const { start, end } = buildRange(timeframe, rangeOverride);
+    const { start, end } = buildRange(timeframe, rangeOverride, windowMs);
 
     const load = async () => {
       try {

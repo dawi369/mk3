@@ -56,10 +56,7 @@ export function TradingChart({
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const lastFitKeyRef = useRef<string | null>(null);
   const lastTickerRef = useRef<string | null>(null);
-  const lastRangeKeyRef = useRef<string | null>(null);
-  const autoFollowRef = useRef(true);
   const programmaticRangeRef = useRef(false);
-  const expectedToRef = useRef(0);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
@@ -172,11 +169,6 @@ export function TradingChart({
 
     const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
     const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
-    const lastPoint = useLinePrimary
-      ? lineData?.[length - 1]?.time
-      : data?.[length - 1]?.time;
-    const rangeKey = `${length}:${lastPoint ?? "none"}`;
-
     if (useLinePrimary) {
       primaryCandleRef.current?.setData(emptyCandles);
       primaryLineRef.current?.setData(lineData ?? emptyLines);
@@ -207,15 +199,11 @@ export function TradingChart({
       },
     });
 
-    const expectedTo = length > 0 ? length - 1 + rightOffsetRef.current : 0;
-    expectedToRef.current = expectedTo;
-
     if (lastFitKeyRef.current !== nextFitKey) {
       if (length > 0) {
-        const from = Math.max(0, length - 1 - activeWindow);
-        const to = expectedTo;
+        const to = length - 1 + rightOffsetRef.current;
+        const from = Math.max(0, to - activeWindow);
         if (from <= to) {
-          autoFollowRef.current = true;
           programmaticRangeRef.current = true;
           chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
           queueMicrotask(() => {
@@ -224,20 +212,6 @@ export function TradingChart({
         }
       }
       lastFitKeyRef.current = nextFitKey;
-      lastRangeKeyRef.current = rangeKey;
-      return;
-    }
-
-    if (length > 0 && lastRangeKeyRef.current !== rangeKey) {
-      if (autoFollowRef.current) {
-        const from = Math.max(0, expectedTo - activeWindow);
-        programmaticRangeRef.current = true;
-        chartRef.current.timeScale().setVisibleLogicalRange({ from, to: expectedTo });
-        queueMicrotask(() => {
-          programmaticRangeRef.current = false;
-        });
-      }
-      lastRangeKeyRef.current = rangeKey;
     }
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
 
@@ -290,10 +264,7 @@ export function TradingChart({
           });
         }
       }
-      const expectedTo = expectedToRef.current;
-      const distance = expectedTo - range.to;
-      const isNearRight = distance <= rightOffsetRef.current + 1 && distance >= -1;
-      autoFollowRef.current = isNearRight;
+      // auto-follow disabled: keep user's range stable on updates
     };
 
     timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
