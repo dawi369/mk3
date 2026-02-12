@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 import type { SpreadLeg, Timeframe } from "@/types/ticker.types";
 import { useTickerStore } from "@/store/use-ticker-store";
@@ -30,7 +31,6 @@ interface TickerModalState {
 
   addComparison: (symbol: string) => void;
   removeComparison: (symbol: string) => void;
-  reorderSelection: (order: string[]) => void;
   reorderSelection: (order: string[]) => void;
 
   spreadEnabled: boolean;
@@ -70,7 +70,10 @@ export function useTickerModal(): TickerModalState {
     }
   };
 
-  const comparisons = selection.selected.filter((symbol) => symbol !== selection.primary);
+  const comparisons = useMemo(
+    () => selection.selected.filter((symbol) => symbol !== selection.primary),
+    [selection.selected, selection.primary],
+  );
 
   return {
     isOpen,

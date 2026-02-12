@@ -18,6 +18,12 @@ import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-p
 import { useChartSeries } from "@/hooks/use-chart-series";
 import { useChartSettings } from "@/hooks/use-chart-settings";
 import type { SpreadPresetId } from "@/lib/chart-utils";
+import { useDisplayModeTransition } from "@/components/terminal/ticker-modal/use-display-mode-transition";
+
+const MODE_SWITCH_MS = 120;
+const MODE_FADE_MS = 260;
+const SYMBOL_FLASH_MS = 160;
+const DRAWER_CLOSE_MS = 260;
 
 export function TickerModal() {
   const {
@@ -67,50 +73,13 @@ export function TickerModal() {
       ? "compare"
       : "single";
 
-  const initialMode: "single" | "compare" | "spread" = targetMode;
-  const [displayMode, setDisplayMode] = useState<"single" | "compare" | "spread">(initialMode);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const transitionRef = useRef<number | null>(null);
-  const transitionCountRef = useRef(0);
-
-  const beginTransition = useCallback((duration: number) => {
-    transitionCountRef.current += 1;
-    setIsTransitioning(true);
-    const handle = window.setTimeout(() => {
-      transitionCountRef.current = Math.max(0, transitionCountRef.current - 1);
-      if (transitionCountRef.current === 0) {
-        setIsTransitioning(false);
-      }
-    }, duration);
-    return handle;
-  }, []);
-
-  useEffect(() => {
-    if (displayMode === targetMode) return;
-    if (transitionRef.current) {
-      window.clearTimeout(transitionRef.current);
-    }
-
-    const transitionHandle = beginTransition(260);
-    transitionRef.current = window.setTimeout(() => {
-      setDisplayMode(targetMode);
-    }, 120);
-
-    return () => {
-      if (transitionRef.current) {
-        window.clearTimeout(transitionRef.current);
-      }
-      window.clearTimeout(transitionHandle);
-    };
-  }, [displayMode, targetMode, beginTransition]);
-
-  useEffect(() => {
-    if (!primarySymbol) return;
-    const handle = beginTransition(160);
-    return () => {
-      window.clearTimeout(handle);
-    };
-  }, [primarySymbol, beginTransition]);
+  const { displayMode, isTransitioning } = useDisplayModeTransition({
+    targetMode,
+    primarySymbol,
+    modeSwitchMs: MODE_SWITCH_MS,
+    modeFadeMs: MODE_FADE_MS,
+    symbolFlashMs: SYMBOL_FLASH_MS,
+  });
 
   const displayCompare = displayMode === "compare";
   const displaySpread = displayMode === "spread";
@@ -148,46 +117,66 @@ export function TickerModal() {
     return orderedSymbols;
   }, [orderedSymbols, spreadEnabled, spreadLegs]);
 
+  const headerSymbolsKey = useMemo(() => headerSymbols.join("|"), [headerSymbols]);
+  const trackedSymbolsKeyRef = useRef("");
+
   useEffect(() => {
     if (!isOpen) {
-      setTrackedSymbols([]);
+      if (trackedSymbolsKeyRef.current !== "") {
+        trackedSymbolsKeyRef.current = "";
+        setTrackedSymbols([]);
+      }
       return;
     }
+    if (trackedSymbolsKeyRef.current === headerSymbolsKey) return;
+    trackedSymbolsKeyRef.current = headerSymbolsKey;
     setTrackedSymbols(headerSymbols);
-  }, [isOpen, headerSymbols, setTrackedSymbols]);
+  }, [isOpen, headerSymbols, headerSymbolsKey, setTrackedSymbols]);
 
   // ── Drawer animation ────────────────────────────────────────────────────
   // Decouple from store to let vaul animate before unmounting.
   // `drawerOpen` controls vaul's `open` prop. When dismissing, we set
   // it to false first (vaul slides down), then call the real close()
-  // only after the animation finishes via onAnimationEnd.
+  // after the animation duration.
 
   const [drawerOpen, setDrawerOpen] = useState(isOpen);
   const closingRef = useRef(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
 
   // Sync open: when store opens the modal, open the drawer
   useEffect(() => {
     if (isOpen) {
-      setDrawerOpen(true);
-      closingRef.current = false;
+      if (!closingRef.current) {
+        clearCloseTimer();
+        setDrawerOpen(true);
+      }
+      return;
     }
-  }, [isOpen]);
+    closingRef.current = false;
+    clearCloseTimer();
+    setDrawerOpen(false);
+  }, [isOpen, clearCloseTimer]);
+
+  useEffect(() => () => clearCloseTimer(), [clearCloseTimer]);
 
   const handleDismiss = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
     setDrawerOpen(false); // triggers vaul's close animation
-  }, []);
-
-  const handleAnimationEnd = useCallback(
-    (open: boolean) => {
-      if (!open && closingRef.current) {
-        close(); // now safe to unmount — animation is done
-        closingRef.current = false;
-      }
-    },
-    [close],
-  );
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      close();
+      closingRef.current = false;
+      closeTimerRef.current = null;
+    }, DRAWER_CLOSE_MS);
+  }, [close, clearCloseTimer]);
 
   // ── Escape key ─────────────────────────────────────────────────────────
 
@@ -204,7 +193,7 @@ export function TickerModal() {
   if (!primarySymbol) return null;
 
   return (
-    <Drawer open={drawerOpen} onOpenChange={(open) => !open && handleDismiss()} onAnimationEnd={handleAnimationEnd}>
+    <Drawer open={drawerOpen} onOpenChange={(open) => !open && handleDismiss()}>
       <DrawerContent className="h-[94vh] max-h-none! rounded-t-2xl [&>div.bg-muted]:hidden" data-vaul-no-drag>
         {/* Accessibility: Hidden title and description for screen readers */}
         <DrawerTitle asChild>
