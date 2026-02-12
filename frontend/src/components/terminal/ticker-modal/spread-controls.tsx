@@ -50,8 +50,9 @@ export function SpreadControls({
   onApplyPreset,
 }: SpreadControlsProps) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center flex-wrap gap-2">
+    <>
+      {/* Spread pills */}
+      <div className="flex items-center flex-wrap gap-2 flex-1">
         {spreadLegs.length === 0 && (
           <span className="text-xs text-muted-foreground">
             Select up to {MAX_SPREAD_LEGS} symbols to build a spread.
@@ -113,6 +114,7 @@ export function SpreadControls({
         ))}
       </div>
 
+      {/* Action buttons - right aligned */}
       <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -167,6 +169,6 @@ export function SpreadControls({
           {showLegs ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
         </Button>
       </div>
-    </div>
+    </>
   );
 }

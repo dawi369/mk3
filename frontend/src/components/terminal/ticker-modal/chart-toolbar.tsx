@@ -38,8 +38,7 @@ export function ChartToolbar({
   onAddSymbol,
 }: ChartToolbarProps) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center flex-wrap gap-2">
+    <div className="flex items-center flex-wrap gap-2">
         <Button
           variant="ghost"
           size="sm"
@@ -133,7 +132,6 @@ export function ChartToolbar({
             Levels
           </Button>
         </div>
-      </div>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useCallback, useRef, useState } from "react";
+import React, { useEffect, useMemo, useCallback, useRef, useId } from "react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useTickerModal,
 } from "@/components/terminal/ticker-modal/ticker-modal-provider";
-import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { TradingChart } from "@/components/terminal/ticker-modal/trading-chart";
 import { AISidebar } from "@/components/terminal/ticker-modal/ai-sidebar";
 import { ModalHeader } from "@/components/terminal/ticker-modal/modal-header";
@@ -19,11 +19,12 @@ import { useChartSeries } from "@/hooks/use-chart-series";
 import { useChartSettings } from "@/hooks/use-chart-settings";
 import type { SpreadPresetId } from "@/lib/chart-utils";
 import { useDisplayModeTransition } from "@/components/terminal/ticker-modal/use-display-mode-transition";
+import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const MODE_SWITCH_MS = 120;
 const MODE_FADE_MS = 260;
 const SYMBOL_FLASH_MS = 160;
-const DRAWER_CLOSE_MS = 260;
 
 export function TickerModal() {
   const {
@@ -134,105 +135,112 @@ export function TickerModal() {
   }, [isOpen, headerSymbols, headerSymbolsKey, setTrackedSymbols]);
 
   // ── Drawer animation ────────────────────────────────────────────────────
-  // Decouple from store to let vaul animate before unmounting.
-  // `drawerOpen` controls vaul's `open` prop. When dismissing, we set
-  // it to false first (vaul slides down), then call the real close()
-  // after the animation duration.
+  // Let Vaul control its own state. We use isOpen from store as the single
+  // source of truth and let vaul handle all animations internally.
+  // Step 2: Detach onOpenChange to prevent controlled/uncontrolled feedback loop.
 
-  const [drawerOpen, setDrawerOpen] = useState(isOpen);
-  const closingRef = useRef(false);
-  const closeTimerRef = useRef<number | null>(null);
-
-  const clearCloseTimer = useCallback(() => {
-    if (closeTimerRef.current) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  }, []);
-
-  // Sync open: when store opens the modal, open the drawer
-  useEffect(() => {
-    if (isOpen) {
-      if (!closingRef.current) {
-        clearCloseTimer();
-        setDrawerOpen(true);
-      }
-      return;
-    }
-    closingRef.current = false;
-    clearCloseTimer();
-    setDrawerOpen(false);
-  }, [isOpen, clearCloseTimer]);
-
-  useEffect(() => () => clearCloseTimer(), [clearCloseTimer]);
-
-  const handleDismiss = useCallback(() => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setDrawerOpen(false); // triggers vaul's close animation
-    clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      close();
-      closingRef.current = false;
-      closeTimerRef.current = null;
-    }, DRAWER_CLOSE_MS);
-  }, [close, clearCloseTimer]);
+  const handleCloseClick = useCallback(() => {
+    if (!isOpen) return;
+    close();
+  }, [close, isOpen]);
 
   // ── Escape key ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
-        handleDismiss();
+        close();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleDismiss]);
+  }, [isOpen, close]);
 
-  if (!primarySymbol) return null;
+  const titleId = useId();
+  const descriptionId = useId();
+
+  // Step 1: Gate rendering with both isOpen && primarySymbol.
+  // Only render Drawer when both are truthy to avoid mounting in unstable state.
+  if (!isOpen || !primarySymbol) return null;
 
   return (
-    <Drawer open={drawerOpen} onOpenChange={(open) => !open && handleDismiss()}>
-      <DrawerContent className="h-[94vh] max-h-none! rounded-t-2xl [&>div.bg-muted]:hidden" data-vaul-no-drag>
+    <div className="fixed inset-0 z-50">
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-black/50"
+        onClick={handleCloseClick}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="absolute inset-x-0 bottom-0 z-50 flex h-[94vh] max-h-none flex-col rounded-t-2xl border-t border-white/10 bg-background"
+      >
         {/* Accessibility: Hidden title and description for screen readers */}
-        <DrawerTitle asChild>
-           <VisuallyHidden.Root>{primarySymbol} Details</VisuallyHidden.Root>
-        </DrawerTitle>
-        <DrawerDescription asChild>
-           <VisuallyHidden.Root>Trading view for {primarySymbol}</VisuallyHidden.Root>
-        </DrawerDescription>
+        <VisuallyHidden.Root id={titleId}>{primarySymbol} Details</VisuallyHidden.Root>
+        <VisuallyHidden.Root id={descriptionId}>Trading view for {primarySymbol}</VisuallyHidden.Root>
 
         {/* Header */}
         <div className="px-4 pt-3 pb-2 bg-black/20 border-b border-white/10">
             <ModalHeader
               headerItems={series.headerItems}
-              onClose={handleDismiss}
+              onClose={handleCloseClick}
             />
 
           <div className="mt-3 flex flex-col gap-2">
-            <ChartToolbar
-              timeframe={timeframe}
-              onTimeframeChange={settings.handleTimeframeChange}
-              rangePreset={settings.rangePreset}
-              onRangePresetChange={settings.handleRangePresetChange}
-              showSessionLevels={showSessionLevels}
-              onToggleSessionLevels={toggleShowSessionLevels}
-              displayCompare={displayCompare}
-              onAddSymbol={() => openWithMode("ticker-compare")}
-            />
+            {/* Row 1: Main toolbar + Compare/Spread toggle */}
+            <div className="flex items-center justify-between gap-3">
+              <ChartToolbar
+                timeframe={timeframe}
+                onTimeframeChange={settings.handleTimeframeChange}
+                rangePreset={settings.rangePreset}
+                onRangePresetChange={settings.handleRangePresetChange}
+                showSessionLevels={showSessionLevels}
+                onToggleSessionLevels={toggleShowSessionLevels}
+                displayCompare={displayCompare}
+                onAddSymbol={() => openWithMode("ticker-compare")}
+              />
 
-            <SymbolChips
-              orderedSymbols={orderedSymbols}
-              spreadEnabled={spreadEnabled}
-              onSetSpreadEnabled={setSpreadEnabled}
-              onRemoveComparison={removeComparison}
-              onReorderSelection={reorderSelection}
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={toggleSidebar}
-            />
+              <div className="flex items-center gap-2">
+                {/* Compare/Spread toggle */}
+                <ToggleGroup
+                  type="single"
+                  value={spreadEnabled ? "spread" : "compare"}
+                  onValueChange={(val) => {
+                    if (!val) return;
+                    setSpreadEnabled(val === "spread");
+                  }}
+                  className="bg-muted/50 p-0.5 rounded-md border border-white/5"
+                >
+                  <ToggleGroupItem value="compare" size="sm" className="h-7 px-2 text-xs data-[state=on]:bg-background">
+                    Compare
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="spread" size="sm" className="h-7 px-2 text-xs data-[state=on]:bg-background">
+                    Spread
+                  </ToggleGroupItem>
+                </ToggleGroup>
 
-            {spreadEnabled && (
+                {/* Sidebar toggle */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={toggleSidebar}
+                  aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                >
+                  {isSidebarOpen ? (
+                    <PanelRightClose className="w-3.5 h-3.5" />
+                ) : (
+                  <PanelRightOpen className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Row 2: Pills/controls */}
+          <div className="flex items-center justify-between gap-3">
+            {spreadEnabled ? (
               <SpreadControls
                 spreadLegs={spreadLegs}
                 primarySymbol={primarySymbol}
@@ -245,11 +253,18 @@ export function TickerModal() {
                 onReverse={reverseSpreadLegs}
                 onApplyPreset={(id: SpreadPresetId) => applySpreadPreset(id)}
               />
+            ) : (
+              <SymbolChips
+                orderedSymbols={orderedSymbols}
+                onRemoveComparison={removeComparison}
+                onReorderSelection={reorderSelection}
+              />
             )}
           </div>
         </div>
+      </div>
 
-        {/* Main content area with chart and sidebar */}
+      {/* Main content area with chart and sidebar */}
         <div className="flex-1 flex overflow-hidden">
           {/* Chart area */}
           <div className="flex-1 p-3 overflow-hidden">
@@ -285,7 +300,7 @@ export function TickerModal() {
           <AISidebar isOpen={isSidebarOpen} />
         </div>
 
-      </DrawerContent>
-    </Drawer>
+      </div>
+    </div>
   );
 }

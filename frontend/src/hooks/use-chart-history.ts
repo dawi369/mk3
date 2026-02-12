@@ -133,10 +133,13 @@ export function useChartHistory({
   );
 
   const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, Bar[]>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const lastSeenRef = useRef<Map<string, string>>(new Map());
   const rangeKey = rangeOverride ? `${rangeOverride.start}:${rangeOverride.end}` : "default";
+  const requestKey = useMemo(
+    () => `${enabled ? "1" : "0"}:${timeframe}:${symbolKey}:${rangeKey}:${maxPoints}`,
+    [enabled, timeframe, symbolKey, rangeKey, maxPoints],
+  );
   const seriesKeyRef = useRef<string>(`${timeframe}:${symbolKey}:${rangeKey}`);
 
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
@@ -174,7 +177,6 @@ export function useChartHistory({
     const { start, end } = buildRange(timeframe, rangeOverride);
 
     const load = async () => {
-      setIsLoading(true);
       try {
         const results = await Promise.all(
           uniqueSymbols.map(async (symbol) => {
@@ -224,8 +226,6 @@ export function useChartHistory({
         if ((error as { name?: string }).name !== "AbortError") {
           console.warn("[useChartHistory] Failed to load history", error);
         }
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -234,7 +234,7 @@ export function useChartHistory({
     return () => {
       controller.abort();
     };
-  }, [enabled, timeframe, symbolKey, maxPoints, rangeKey, rangeOverride]);
+  }, [requestKey]);
 
   useEffect(() => {
     if (!enabled || uniqueSymbols.length === 0) return;
@@ -304,6 +304,5 @@ export function useChartHistory({
 
   return {
     seriesBySymbol,
-    isLoading,
   };
 }

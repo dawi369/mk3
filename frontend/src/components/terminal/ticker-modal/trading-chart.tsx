@@ -8,6 +8,7 @@ import {
   IChartApi,
   ISeriesApi,
   LineStyle,
+  LineWidth,
   CandlestickData,
   LineData,
   Time,
@@ -330,7 +331,7 @@ export function TradingChart({
         color: string;
         title: string;
         lineStyle: LineStyle;
-        lineWidth: number;
+        lineWidth: LineWidth;
       }
     ) => {
       const existing = priceLinesRef.current[key];
