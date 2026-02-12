@@ -43,7 +43,7 @@ export function TradingChart({
   comparisonData,
   showComparisons = true,
   fitKey,
-  visibleBars = 200,
+  visibleBars = 100,
   secondsVisible = false,
   sessionLevels,
   compareMode = false,
@@ -68,7 +68,8 @@ export function TradingChart({
   }>({});
 
   const useLinePrimary = lineData !== undefined;
-  const rightOffset = Math.max(2, Math.floor(visibleBars * 0.2));
+  const windowSizeRef = useRef(Math.max(10, visibleBars));
+  const rightOffsetRef = useRef(Math.max(2, Math.floor(windowSizeRef.current * 0.2)));
 
   // Initialize chart
   const initChart = useCallback(() => {
@@ -169,13 +170,12 @@ export function TradingChart({
   useEffect(() => {
     if (!chartRef.current) return;
 
-    chartRef.current.applyOptions({
-      timeScale: {
-        timeVisible: true,
-        secondsVisible,
-        rightOffset,
-      },
-    });
+    const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
+    const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
+    const lastPoint = useLinePrimary
+      ? lineData?.[length - 1]?.time
+      : data?.[length - 1]?.time;
+    const rangeKey = `${length}:${lastPoint ?? "none"}`;
 
     if (useLinePrimary) {
       primaryCandleRef.current?.setData(emptyCandles);
@@ -185,26 +185,43 @@ export function TradingChart({
       primaryCandleRef.current?.setData(data ?? emptyCandles);
     }
 
-    const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
-    const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
-    const lastPoint = useLinePrimary
-      ? lineData?.[length - 1]?.time
-      : data?.[length - 1]?.time;
-    const rangeKey = `${length}:${lastPoint ?? "none"}`;
-    const clampedVisible = Math.max(10, visibleBars);
-    const expectedTo = length > 0 ? length - 1 + rightOffset : 0;
+    const defaultWindow = Math.max(10, Math.min(visibleBars, length || visibleBars));
+    const currentWindow = windowSizeRef.current;
+    const adjustedWindow = length > 0 ? Math.min(currentWindow, length) : currentWindow;
+    const activeWindow = lastFitKeyRef.current !== nextFitKey ? defaultWindow : Math.max(10, adjustedWindow);
+
+    if (windowSizeRef.current !== activeWindow) {
+      windowSizeRef.current = activeWindow;
+    }
+
+    const dynamicRightOffset = Math.max(2, Math.floor(activeWindow * 0.2));
+    if (rightOffsetRef.current !== dynamicRightOffset) {
+      rightOffsetRef.current = dynamicRightOffset;
+    }
+
+    chartRef.current.applyOptions({
+      timeScale: {
+        timeVisible: true,
+        secondsVisible,
+        rightOffset: rightOffsetRef.current,
+      },
+    });
+
+    const expectedTo = length > 0 ? length - 1 + rightOffsetRef.current : 0;
     expectedToRef.current = expectedTo;
 
-    if (lastFitKeyRef.current !== nextFitKey && length > 0) {
-      const from = Math.max(0, expectedTo - clampedVisible);
-      const to = expectedTo;
-      if (from <= to) {
-        autoFollowRef.current = true;
-        programmaticRangeRef.current = true;
-        chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
-        queueMicrotask(() => {
-          programmaticRangeRef.current = false;
-        });
+    if (lastFitKeyRef.current !== nextFitKey) {
+      if (length > 0) {
+        const from = Math.max(0, length - 1 - activeWindow);
+        const to = expectedTo;
+        if (from <= to) {
+          autoFollowRef.current = true;
+          programmaticRangeRef.current = true;
+          chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+          queueMicrotask(() => {
+            programmaticRangeRef.current = false;
+          });
+        }
       }
       lastFitKeyRef.current = nextFitKey;
       lastRangeKeyRef.current = rangeKey;
@@ -213,7 +230,7 @@ export function TradingChart({
 
     if (length > 0 && lastRangeKeyRef.current !== rangeKey) {
       if (autoFollowRef.current) {
-        const from = Math.max(0, expectedTo - clampedVisible);
+        const from = Math.max(0, expectedTo - activeWindow);
         programmaticRangeRef.current = true;
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to: expectedTo });
         queueMicrotask(() => {
@@ -222,7 +239,7 @@ export function TradingChart({
       }
       lastRangeKeyRef.current = rangeKey;
     }
-  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, rightOffset]);
+  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -260,9 +277,22 @@ export function TradingChart({
     const timeScale = chartRef.current.timeScale();
     const handleRangeChange = (range: { from: number; to: number } | null) => {
       if (!range || programmaticRangeRef.current) return;
+      const nextWindow = Math.max(10, Math.round(range.to - range.from));
+      if (windowSizeRef.current !== nextWindow) {
+        windowSizeRef.current = nextWindow;
+        const nextOffset = Math.max(2, Math.floor(nextWindow * 0.2));
+        if (rightOffsetRef.current !== nextOffset) {
+          rightOffsetRef.current = nextOffset;
+          chartRef.current?.applyOptions({
+            timeScale: {
+              rightOffset: nextOffset,
+            },
+          });
+        }
+      }
       const expectedTo = expectedToRef.current;
       const distance = expectedTo - range.to;
-      const isNearRight = distance <= rightOffset + 1 && distance >= -1;
+      const isNearRight = distance <= rightOffsetRef.current + 1 && distance >= -1;
       autoFollowRef.current = isNearRight;
     };
 
@@ -270,7 +300,7 @@ export function TradingChart({
     return () => {
       timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
     };
-  }, [rightOffset]);
+  }, []);
 
   const clearPriceLines = useCallback(() => {
     const seriesType = priceLinesRef.current.seriesType;

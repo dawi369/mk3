@@ -120,11 +120,19 @@ export function useChartHistory({
   mode,
   rangeOverride = null,
 }: UseChartHistoryOptions) {
-  const uniqueSymbols = useMemo(() => {
+  // ── Stable key computation ──────────────────────────────────────────────
+  // Build deterministic keys from primitive values to avoid render loops
+
+  const symbolKey = useMemo(() => {
     const list = Array.from(new Set(symbols.filter(Boolean)));
-    return list.sort();
+    return list.sort().join("|");
   }, [symbols]);
-  const symbolKey = uniqueSymbols.join("|");
+
+  const uniqueSymbols = useMemo(() => {
+    if (!symbolKey) return [];
+    return symbolKey.split("|").filter(Boolean);
+  }, [symbolKey]);
+
   const bucketMs = TIMEFRAME_MS[timeframe];
   const windowMs = rangeOverride ? rangeOverride.end - rangeOverride.start : HISTORY_WINDOWS_MS[timeframe] ?? ONE_WEEK_MS;
   const maxPoints = useMemo(
@@ -135,11 +143,13 @@ export function useChartHistory({
   const [seriesBySymbol, setSeriesBySymbol] = useState<Record<string, Bar[]>>({});
   const abortRef = useRef<AbortController | null>(null);
   const lastSeenRef = useRef<Map<string, string>>(new Map());
-  const rangeKey = rangeOverride ? `${rangeOverride.start}:${rangeOverride.end}` : "default";
-  const requestKey = useMemo(
-    () => `${enabled ? "1" : "0"}:${timeframe}:${symbolKey}:${rangeKey}:${maxPoints}`,
-    [enabled, timeframe, symbolKey, rangeKey, maxPoints],
-  );
+
+  // Stable primitive keys for effects
+  const rangeKey = useMemo(() => {
+    if (!rangeOverride) return "default";
+    return `${rangeOverride.start}:${rangeOverride.end}`;
+  }, [rangeOverride?.start, rangeOverride?.end]);
+
   const seriesKeyRef = useRef<string>(`${timeframe}:${symbolKey}:${rangeKey}`);
 
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
@@ -150,20 +160,37 @@ export function useChartHistory({
       result[symbol] = entities[symbol]?.latestBar;
     }
     return result;
-  }, [entities, symbolKey, uniqueSymbols]);
+  }, [entities, symbolKey]);
+
+  // ── Reset state when key inputs change ──────────────────────────────────
+  // Guard: only reset if we have data to clear and component is enabled
 
   useEffect(() => {
+    if (!enabled) return;
+
     const nextKey = `${timeframe}:${symbolKey}:${rangeKey}`;
-    if (seriesKeyRef.current !== nextKey) {
-      seriesKeyRef.current = nextKey;
-      lastSeenRef.current.clear();
-      setSeriesBySymbol({});
-    }
-  }, [timeframe, symbolKey, rangeKey]);
+    if (seriesKeyRef.current === nextKey) return;
+
+    seriesKeyRef.current = nextKey;
+    lastSeenRef.current.clear();
+
+    // Only clear state if there's actual data (prevents redundant updates)
+    setSeriesBySymbol((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+      return {};
+    });
+  }, [enabled, timeframe, symbolKey, rangeKey]);
+
+  // ── Fetch history data ──────────────────────────────────────────────────
+  // Use stable primitive deps instead of objects/arrays
 
   useEffect(() => {
     if (!enabled || uniqueSymbols.length === 0) {
-      setSeriesBySymbol({});
+      // Only clear if there's data (prevents loop when already empty)
+      setSeriesBySymbol((prev) => {
+        if (Object.keys(prev).length === 0) return prev;
+        return {};
+      });
       return;
     }
 
@@ -234,7 +261,21 @@ export function useChartHistory({
     return () => {
       controller.abort();
     };
-  }, [requestKey]);
+  }, [enabled, timeframe, symbolKey, rangeKey, maxPoints, windowMs, bucketMs]);
+
+  // ── Live update effect ─────────────────────────────────────────────────
+  // Only runs when latestBars actually changes (signature-based comparison)
+
+  const latestBarsSignature = useMemo(() => {
+    const signatures: string[] = [];
+    for (const symbol of uniqueSymbols) {
+      const bar = latestBars[symbol];
+      if (bar) {
+        signatures.push(`${symbol}:${bar.startTime}:${bar.close}:${bar.volume}:${bar.trades}`);
+      }
+    }
+    return signatures.sort().join("|");
+  }, [latestBars, symbolKey]);
 
   useEffect(() => {
     if (!enabled || uniqueSymbols.length === 0) return;
@@ -300,7 +341,7 @@ export function useChartHistory({
 
       return updated ? next : prev;
     });
-  }, [latestBars, enabled, timeframe, symbolKey, bucketMs, maxPoints]);
+  }, [latestBarsSignature, enabled, symbolKey, bucketMs, maxPoints]);
 
   return {
     seriesBySymbol,

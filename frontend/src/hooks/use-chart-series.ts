@@ -290,7 +290,7 @@ export function useChartSeries({
   // ── Chart config ───────────────────────────────────────────────────────
 
   const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${displaySpread ? "spread" : displayCompare ? "compare" : "single"}`;
-  const visibleBars = 200;
+  const visibleBars = 100;
   const secondsVisible = timeframe.endsWith("s");
 
   return {
