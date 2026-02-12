@@ -112,26 +112,29 @@ export function ChartToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div
+        <ToggleGroup
+          type="single"
+          value={showSessionLevels ? "levels" : ""}
+          onValueChange={(val) => {
+            if ((val === "levels") !== showSessionLevels) {
+              onToggleSessionLevels();
+            }
+          }}
           className={cn(
-            "transition-all duration-200 overflow-hidden",
+            "bg-muted/50 p-0.5 rounded-md border border-white/5 transition-all duration-200",
             displayCompare
-              ? "opacity-0 max-w-0 pointer-events-none"
-              : "opacity-100 max-w-[120px]"
+              ? "opacity-0 max-w-0 pointer-events-none overflow-hidden"
+              : "opacity-100 max-w-[100px]"
           )}
         >
-          <Button
-            variant="ghost"
+          <ToggleGroupItem
+            value="levels"
             size="sm"
-            className={cn(
-              "h-7 px-2 text-xs gap-1",
-              showSessionLevels && "bg-white/10 text-foreground"
-            )}
-            onClick={onToggleSessionLevels}
+            className="h-7 px-2 text-xs data-[state=on]:bg-background"
           >
             Levels
-          </Button>
-        </div>
+          </ToggleGroupItem>
+        </ToggleGroup>
     </div>
   );
 }

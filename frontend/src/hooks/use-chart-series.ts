@@ -226,14 +226,27 @@ export function useChartSeries({
     );
   }, [primarySymbol, resolvedSeriesBySymbol, entities, snapshots, sessions]);
 
+  // Session levels should come from actual session data (current trading session)
+  // NOT from chart bar summaries
   const sessionLevels = useMemo(() => {
-    if (!showSessionLevels || !primarySnapshot || displaySpread || displayCompare) return undefined;
+    if (!showSessionLevels || !primarySymbol || displaySpread || displayCompare) return undefined;
+    
+    const session = sessions[primarySymbol];
+    const snapshot = snapshots[primarySymbol];
+    
+    // Prioritize session data (real-time day high/low), then snapshot data
+    const sessionHigh = session?.dayHigh ?? snapshot?.sessionHigh ?? null;
+    const sessionLow = session?.dayLow ?? snapshot?.sessionLow ?? null;
+    const lastPrice = entities[primarySymbol]?.latestBar?.close ?? snapshot?.sessionClose ?? null;
+    
+    if (!sessionHigh && !sessionLow) return undefined;
+    
     return {
-      high: primarySnapshot.session_high,
-      low: primarySnapshot.session_low,
-      last: primarySnapshot.last_price,
+      high: sessionHigh,
+      low: sessionLow,
+      last: lastPrice,
     };
-  }, [showSessionLevels, primarySnapshot, displaySpread, displayCompare]);
+  }, [showSessionLevels, primarySymbol, sessions, snapshots, entities, displaySpread, displayCompare]);
 
   // ── Header items ───────────────────────────────────────────────────────
 
