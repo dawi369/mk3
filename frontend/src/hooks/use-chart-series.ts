@@ -303,7 +303,10 @@ export function useChartSeries({
   // ── Chart config ───────────────────────────────────────────────────────
 
   const rangeKey = rangeOverride ? `${rangeOverride.start}:${rangeOverride.end}` : "default";
-  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${displaySpread ? "spread" : displayCompare ? "compare" : "single"}:${rangeKey}`;
+  const viewKey = displaySpread ? "spread" : displayCompare ? "compare" : "single";
+  // NOTE: include viewKey so compare/spread switches re-fit the chart.
+  // To disable that behavior, remove `:${viewKey}` from fitKey below.
+  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${viewKey}:${rangeKey}`;
   const visibleBars = 100;
   const secondsVisible = timeframe.endsWith("s");
 

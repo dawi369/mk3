@@ -56,6 +56,7 @@ export function TradingChart({
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const lastFitKeyRef = useRef<string | null>(null);
   const lastTickerRef = useRef<string | null>(null);
+  const pendingFitRef = useRef(true);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
@@ -168,6 +169,9 @@ export function TradingChart({
 
     const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
     const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
+    if (lastFitKeyRef.current !== nextFitKey) {
+      pendingFitRef.current = true;
+    }
 
     if (useLinePrimary) {
       primaryCandleRef.current?.setData(emptyCandles);
@@ -178,31 +182,30 @@ export function TradingChart({
     }
 
     // Only enforce margin + window on initial load or timeframe/range change
-    if (lastFitKeyRef.current !== nextFitKey) {
-      const defaultWindow = Math.max(10, Math.min(visibleBars, length || visibleBars));
-      windowSizeRef.current = defaultWindow;
+    if (!pendingFitRef.current || length === 0) return;
 
-      const dynamicRightOffset = Math.max(2, Math.floor(defaultWindow * 0.2));
-      rightOffsetRef.current = dynamicRightOffset;
+    const defaultWindow = Math.max(10, Math.min(visibleBars, length || visibleBars));
+    windowSizeRef.current = defaultWindow;
 
-      chartRef.current.applyOptions({
-        timeScale: {
-          timeVisible: true,
-          secondsVisible,
-          rightOffset: rightOffsetRef.current,
-        },
-      });
+    const dynamicRightOffset = Math.max(2, Math.floor(defaultWindow * 0.2));
+    rightOffsetRef.current = dynamicRightOffset;
 
-      if (length > 0) {
-        const to = length - 1 + rightOffsetRef.current;
-        const from = Math.max(0, to - defaultWindow);
-        if (from <= to) {
-          chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
-        }
-      }
+    chartRef.current.applyOptions({
+      timeScale: {
+        timeVisible: true,
+        secondsVisible,
+        rightOffset: rightOffsetRef.current,
+      },
+    });
 
-      lastFitKeyRef.current = nextFitKey;
+    const to = length - 1 + rightOffsetRef.current;
+    const from = Math.max(0, to - defaultWindow);
+    if (from <= to) {
+      chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
     }
+
+    lastFitKeyRef.current = nextFitKey;
+    pendingFitRef.current = false;
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
 
   useEffect(() => {
