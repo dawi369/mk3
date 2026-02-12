@@ -302,7 +302,8 @@ export function useChartSeries({
 
   // ── Chart config ───────────────────────────────────────────────────────
 
-  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${displaySpread ? "spread" : displayCompare ? "compare" : "single"}`;
+  const rangeKey = rangeOverride ? `${rangeOverride.start}:${rangeOverride.end}` : "default";
+  const fitKey = `${primarySymbol ?? "none"}:${timeframe}:${displaySpread ? "spread" : displayCompare ? "compare" : "single"}:${rangeKey}`;
   const visibleBars = 100;
   const secondsVisible = timeframe.endsWith("s");
 

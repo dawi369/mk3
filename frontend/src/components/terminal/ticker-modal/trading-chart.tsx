@@ -56,7 +56,6 @@ export function TradingChart({
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const lastFitKeyRef = useRef<string | null>(null);
   const lastTickerRef = useRef<string | null>(null);
-  const programmaticRangeRef = useRef(false);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
@@ -169,6 +168,7 @@ export function TradingChart({
 
     const length = useLinePrimary ? lineData?.length ?? 0 : data?.length ?? 0;
     const nextFitKey = fitKey ?? `${ticker}:${useLinePrimary ? "line" : "candle"}`;
+
     if (useLinePrimary) {
       primaryCandleRef.current?.setData(emptyCandles);
       primaryLineRef.current?.setData(lineData ?? emptyLines);
@@ -177,40 +177,30 @@ export function TradingChart({
       primaryCandleRef.current?.setData(data ?? emptyCandles);
     }
 
-    const defaultWindow = Math.max(10, Math.min(visibleBars, length || visibleBars));
-    const currentWindow = windowSizeRef.current;
-    const adjustedWindow = length > 0 ? Math.min(currentWindow, length) : currentWindow;
-    const activeWindow = lastFitKeyRef.current !== nextFitKey ? defaultWindow : Math.max(10, adjustedWindow);
-
-    if (windowSizeRef.current !== activeWindow) {
-      windowSizeRef.current = activeWindow;
-    }
-
-    const dynamicRightOffset = Math.max(2, Math.floor(activeWindow * 0.2));
-    if (rightOffsetRef.current !== dynamicRightOffset) {
-      rightOffsetRef.current = dynamicRightOffset;
-    }
-
-    chartRef.current.applyOptions({
-      timeScale: {
-        timeVisible: true,
-        secondsVisible,
-        rightOffset: rightOffsetRef.current,
-      },
-    });
-
+    // Only enforce margin + window on initial load or timeframe/range change
     if (lastFitKeyRef.current !== nextFitKey) {
+      const defaultWindow = Math.max(10, Math.min(visibleBars, length || visibleBars));
+      windowSizeRef.current = defaultWindow;
+
+      const dynamicRightOffset = Math.max(2, Math.floor(defaultWindow * 0.2));
+      rightOffsetRef.current = dynamicRightOffset;
+
+      chartRef.current.applyOptions({
+        timeScale: {
+          timeVisible: true,
+          secondsVisible,
+          rightOffset: rightOffsetRef.current,
+        },
+      });
+
       if (length > 0) {
         const to = length - 1 + rightOffsetRef.current;
-        const from = Math.max(0, to - activeWindow);
+        const from = Math.max(0, to - defaultWindow);
         if (from <= to) {
-          programmaticRangeRef.current = true;
           chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
-          queueMicrotask(() => {
-            programmaticRangeRef.current = false;
-          });
         }
       }
+
       lastFitKeyRef.current = nextFitKey;
     }
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
@@ -248,30 +238,13 @@ export function TradingChart({
 
   useEffect(() => {
     if (!chartRef.current) return;
-    const timeScale = chartRef.current.timeScale();
-    const handleRangeChange = (range: { from: number; to: number } | null) => {
-      if (!range || programmaticRangeRef.current) return;
-      const nextWindow = Math.max(10, Math.round(range.to - range.from));
-      if (windowSizeRef.current !== nextWindow) {
-        windowSizeRef.current = nextWindow;
-        const nextOffset = Math.max(2, Math.floor(nextWindow * 0.2));
-        if (rightOffsetRef.current !== nextOffset) {
-          rightOffsetRef.current = nextOffset;
-          chartRef.current?.applyOptions({
-            timeScale: {
-              rightOffset: nextOffset,
-            },
-          });
-        }
-      }
-      // auto-follow disabled: keep user's range stable on updates
-    };
-
-    timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
-    return () => {
-      timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
-    };
-  }, []);
+    chartRef.current.applyOptions({
+      timeScale: {
+        timeVisible: true,
+        secondsVisible,
+      },
+    });
+  }, [secondsVisible]);
 
   const clearPriceLines = useCallback(() => {
     const seriesType = priceLinesRef.current.seriesType;
