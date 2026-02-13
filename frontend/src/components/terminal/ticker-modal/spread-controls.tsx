@@ -149,7 +149,6 @@ export function SpreadControls({
               return (
                 <DropdownMenuItem
                   key={preset.id}
-                  disabled={disabled}
                   className={cn("text-xs", preset.id === activePreset && "bg-accent")}
                   onClick={() => onApplyPreset(preset.id)}
                 >

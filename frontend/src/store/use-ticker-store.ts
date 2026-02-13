@@ -123,17 +123,13 @@ function applyPresetWeights(
   primary: string | null,
 ): { legs: SpreadLeg[]; preset: SpreadPresetId } {
   let weights = PRESET_WEIGHTS[preset];
-  let activePreset = preset;
-  // Fall back to calendar if not enough symbols for the requested preset
-  if (ordered.length < weights.length) {
-    weights = PRESET_WEIGHTS.calendar;
-    activePreset = "calendar";
-  }
+  // If not enough symbols, we still return the requested preset but with partial legs
+  // The UI will handle showing the "Add X tickers" message
   const legs = weights.map((weight, idx) => ({
     symbol: ordered[idx] ?? "",
     weight,
   })).filter(leg => leg.symbol !== "");
-  return { legs: normalizeLegs(legs, primary), preset: activePreset };
+  return { legs: normalizeLegs(legs, primary), preset };
 }
 
 function orderSelection(primary: string | null, selected: string[]): string[] {
@@ -413,7 +409,17 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       let nextLegs = selection.spreadLegs;
       let nextPreset = selection.spreadPreset;
       if (selection.spreadEnabled) {
-        const result = applyPresetWeights(ordered, selection.spreadPreset, selection.primary);
+        // Auto-advance preset if the new count matches a specific preset
+        // 2 -> 3: Calendar -> Butterfly
+        // 3 -> 4: Butterfly -> Condor
+        const count = nextSelected.length;
+        if (count === 3 && selection.spreadPreset === "calendar") {
+          nextPreset = "butterfly";
+        } else if (count === 4 && selection.spreadPreset === "butterfly") {
+          nextPreset = "condor";
+        }
+
+        const result = applyPresetWeights(ordered, nextPreset, selection.primary);
         nextLegs = result.legs;
         nextPreset = result.preset;
       }

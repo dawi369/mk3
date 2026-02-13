@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   CommandDialog,
   CommandEmpty,
@@ -16,7 +17,7 @@ import {
   SpotlightCommand,
 } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import { useTickerStore } from "@/store/use-ticker-store";
-import type { TickerSearchResult } from "@/types/ticker.types";
+import { type TickerSearchResult, MAX_SPREAD_LEGS } from "@/types/ticker.types";
 import type { Bar } from "@/types/common.types";
 import { getChangeMetrics, resolveLastPrice } from "@/lib/ticker-snapshot";
 import type { SnapshotData, SessionData } from "@/types/redis.types";
@@ -143,6 +144,7 @@ function useDefaultCommands(): SpotlightCommand[] {
 export function Spotlight() {
   const { isOpen, mode: spotlightMode, open, openWithMode, close, toggle, commands, registerCommands, unregisterCommands } = useSpotlight();
   const mode = useTickerStore((state) => state.mode);
+  const selection = useTickerStore((state) => state.selectionByMode[mode]);
   const entities = useTickerStore((state) => state.entitiesByMode[mode]);
   const series = useTickerStore((state) => state.seriesByMode[mode]);
   const snapshots = useTickerStore((state) => state.snapshotsBySymbol);
@@ -234,6 +236,18 @@ export function Spotlight() {
 
   const handleTickerSelect = (t: TickerSearchResult) => {
     if (isModalOpen || spotlightMode === "ticker-compare") {
+      // Check limit before adding
+      // MAX_SPREAD_LEGS is 4. If we have 4 selected, we cannot add another.
+      // selected includes primary.
+      const currentCount = selection.selected.length;
+      // If we are about to add one, new count will be currentCount + 1
+      // If currentCount >= MAX_SPREAD_LEGS, we cannot add more.
+      
+      if (currentCount >= MAX_SPREAD_LEGS) {
+        toast.error(`Cannot add more than ${MAX_SPREAD_LEGS} tickers.`);
+        return;
+      }
+
       addComparison(t.symbol);
     } else {
       openPrimary(t.symbol);

@@ -17,7 +17,7 @@ import { useTickerStore } from "@/store/use-ticker-store";
 import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import { useChartSeries } from "@/hooks/use-chart-series";
 import { useChartSettings } from "@/hooks/use-chart-settings";
-import type { SpreadPresetId, RangePresetId } from "@/lib/chart-utils";
+import { SPREAD_PRESETS, type SpreadPresetId, type RangePresetId } from "@/lib/chart-utils";
 import { useDisplayModeTransition } from "@/components/terminal/ticker-modal/use-display-mode-transition";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -373,13 +373,23 @@ export function TickerModal() {
               )}
             >
               {/* Empty spread overlay */}
-              {displaySpread && spreadLegs.length < 2 && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/40 backdrop-blur-sm">
-                  <span className="text-sm text-muted-foreground">
-                    Add another symbol to calculate a spread.
-                  </span>
-                </div>
-              )}
+              {displaySpread && (() => {
+                const activePresetDef = SPREAD_PRESETS.find(p => p.id === spreadPreset);
+                const required = activePresetDef ? activePresetDef.weights.length : 2;
+                const current = spreadLegs.length;
+                if (current < required) {
+                  const needed = required - current;
+                  const label = activePresetDef ? activePresetDef.label.split(" ")[0] : "Spread";
+                  return (
+                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/40 backdrop-blur-sm">
+                      <span className="text-sm text-muted-foreground">
+                        Add {needed} more ticker{needed > 1 ? "s" : ""} to view {label} spread.
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <div className={cn(
                 "h-full w-full relative",
                 chartDisplayState !== 'ready' && "invisible"
