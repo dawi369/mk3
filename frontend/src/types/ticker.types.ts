@@ -42,7 +42,7 @@ export interface SpreadLeg {
   weight: number;
 }
 
-export type SpreadPresetId = "calendar" | "ratio" | "butterfly" | "condor";
+export type SpreadPresetId = "calendar" | "butterfly" | "condor";
 
 export interface TickerSeries {
   symbol: string;

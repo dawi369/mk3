@@ -6,7 +6,6 @@ export type { SpreadPresetId };
 
 export const SPREAD_PRESETS: Array<{ id: SpreadPresetId; label: string; weights: number[] }> = [
   { id: "calendar", label: "Calendar (1:-1)", weights: [1, -1] },
-  { id: "ratio", label: "Ratio (1:-1)", weights: [1, -1] },
   { id: "butterfly", label: "Butterfly (1:-2:1)", weights: [1, -2, 1] },
   { id: "condor", label: "Condor (1:-1:-1:1)", weights: [1, -1, -1, 1] },
 ];

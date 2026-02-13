@@ -4,8 +4,6 @@ import React, { useState, useRef, useCallback } from "react";
 import {
   ArrowLeftRight,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,7 +59,6 @@ interface SpreadControlsProps {
   activePreset: SpreadPresetId;
 
   onToggleSign: (symbol: string) => void;
-  onMoveLeg: (symbol: string, dir: -1 | 1) => void;
   onRemove: (symbol: string) => void;
   onReverse: () => void;
   onApplyPreset: (id: SpreadPresetId) => void;
@@ -74,7 +71,6 @@ export function SpreadControls({
   activePreset,
 
   onToggleSign,
-  onMoveLeg,
   onRemove,
   onReverse,
   onApplyPreset,
@@ -109,25 +105,6 @@ export function SpreadControls({
               style={{ backgroundColor: SYMBOL_COLORS[(index + 1) % SYMBOL_COLORS.length] }}
             />
             <span className="font-mono">{leg.symbol}</span>
-            <div className="flex items-center gap-0.5 ml-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => onMoveLeg(leg.symbol, -1)}
-                disabled={index === 0}
-              >
-                <ChevronLeft className="w-3 h-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => onMoveLeg(leg.symbol, 1)}
-                disabled={index === spreadLegs.length - 1}
-              >
-                <ChevronRight className="w-3 h-3" />
-              </Button>
               {spreadLegs.length > 1 && (
                 <Button
                   variant="ghost"
@@ -138,7 +115,6 @@ export function SpreadControls({
                   <X className="w-3 h-3" />
                 </Button>
               )}
-            </div>
           </div>
         ))}
       </div>

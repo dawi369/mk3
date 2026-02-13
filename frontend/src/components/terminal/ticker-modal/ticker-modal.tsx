@@ -349,7 +349,6 @@ export function TickerModal() {
                   orderedSymbols={orderedSymbols}
                   activePreset={spreadPreset}
                   onToggleSign={toggleSpreadLegSign}
-                  onMoveLeg={moveSpreadLeg}
                   onRemove={removeComparison}
                   onReverse={reverseSpreadLegs}
                   onApplyPreset={(id: SpreadPresetId) => applySpreadPreset(id)}

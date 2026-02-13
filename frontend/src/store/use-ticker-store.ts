@@ -112,7 +112,6 @@ function buildDefaultLegs(selected: string[], primary: string | null): SpreadLeg
 
 const PRESET_WEIGHTS: Record<SpreadPresetId, number[]> = {
   calendar: [1, -1],
-  ratio: [1, -1],
   butterfly: [1, -2, 1],
   condor: [1, -1, -1, 1],
 };
@@ -172,7 +171,7 @@ interface TickerStoreState {
   toggleSpreadLegSign: (symbol: string) => void;
   moveSpreadLeg: (symbol: string, direction: -1 | 1) => void;
   reverseSpreadLegs: () => void;
-  applySpreadPreset: (preset: "calendar" | "ratio" | "butterfly" | "condor") => void;
+  applySpreadPreset: (preset: SpreadPresetId) => void;
   clearSelection: () => void;
   closeModal: () => void;
 
