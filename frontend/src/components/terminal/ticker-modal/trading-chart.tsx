@@ -28,6 +28,9 @@ interface TradingChartProps {
   secondsVisible?: boolean;
   sessionLevels?: { high?: number | null; low?: number | null; last?: number | null };
   compareMode?: boolean;
+  onUserRangeChange?: () => void;
+  onFitApplied?: () => void;
+  isHistoryReady?: boolean;
   className?: string;
 }
 
@@ -47,6 +50,9 @@ export function TradingChart({
   secondsVisible = false,
   sessionLevels,
   compareMode = false,
+  onUserRangeChange,
+  onFitApplied,
+  isHistoryReady = true,
   className,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +64,7 @@ export function TradingChart({
   const lastTickerRef = useRef<string | null>(null);
   const pendingFitRef = useRef(true);
   const fitLengthRef = useRef(0);
+  const programmaticRangeRef = useRef(false);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
@@ -105,6 +112,10 @@ export function TradingChart({
       },
       handleScroll: { vertTouchDrag: false },
     });
+
+    // Hide watermark/logo if present (not in type defs for this version).
+    // @ts-expect-error watermark is supported at runtime
+    chart.applyOptions({ watermark: { visible: false } });
 
     chartRef.current = chart;
 
@@ -192,7 +203,7 @@ export function TradingChart({
     }
 
     // Only enforce margin + window on initial load or timeframe/range change
-    if (!pendingFitRef.current || length === 0) return;
+    if (!pendingFitRef.current || length === 0 || !isHistoryReady) return;
     windowSizeRef.current = defaultWindow;
     const dynamicRightOffset = Math.max(2, Math.floor(defaultWindow * 0.2));
     rightOffsetRef.current = dynamicRightOffset;
@@ -202,7 +213,11 @@ export function TradingChart({
       const to = Math.max(0, length - 1);
       const from = Math.max(0, to - defaultWindow);
       if (from <= to) {
+        programmaticRangeRef.current = true;
         chartRef.current.timeScale().setVisibleLogicalRange({ from, to });
+        queueMicrotask(() => {
+          programmaticRangeRef.current = false;
+        });
       }
       chartRef.current.applyOptions({
         timeScale: {
@@ -211,6 +226,7 @@ export function TradingChart({
           rightOffset: rightOffsetRef.current,
         },
       });
+      onFitApplied?.();
     };
 
     // Defer fit until after data renders to avoid missing the margin.
@@ -221,7 +237,21 @@ export function TradingChart({
     lastFitKeyRef.current = nextFitKey;
     pendingFitRef.current = false;
     fitLengthRef.current = length;
-  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible]);
+  }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, isHistoryReady, onFitApplied]);
+
+  useEffect(() => {
+    if (!chartRef.current || !onUserRangeChange) return;
+    const timeScale = chartRef.current.timeScale();
+    const handleRangeChange = (range: { from: number; to: number } | null) => {
+      if (!range || programmaticRangeRef.current) return;
+      onUserRangeChange();
+    };
+
+    timeScale.subscribeVisibleLogicalRangeChange(handleRangeChange);
+    return () => {
+      timeScale.unsubscribeVisibleLogicalRangeChange(handleRangeChange);
+    };
+  }, [onUserRangeChange]);
 
   useEffect(() => {
     if (!chartRef.current) return;

@@ -1,30 +1,34 @@
 "use client";
 
-import React, { useEffect, useMemo, useCallback, useRef, useId } from "react";
+import React, { useEffect, useMemo, useCallback, useRef, useId, useState } from "react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  useTickerModal,
-} from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import { useTickerModal } from "@/components/terminal/ticker-modal/ticker-modal-provider";
 import { TradingChart } from "@/components/terminal/ticker-modal/trading-chart";
 import { AISidebar } from "@/components/terminal/ticker-modal/ai-sidebar";
 import { ModalHeader } from "@/components/terminal/ticker-modal/modal-header";
 import { ChartToolbar } from "@/components/terminal/ticker-modal/chart-toolbar";
 import { SymbolChips } from "@/components/terminal/ticker-modal/symbol-chips";
 import { SpreadControls } from "@/components/terminal/ticker-modal/spread-controls";
+import { ChartRangeSelector } from "@/components/terminal/ticker-modal/chart-range-selector";
+import { ChartTimeDisplay } from "@/components/terminal/ticker-modal/chart-time-display";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { useSpotlight } from "@/components/terminal/layout/spotlight/spotlight-provider";
 import { useChartSeries } from "@/hooks/use-chart-series";
 import { useChartSettings } from "@/hooks/use-chart-settings";
-import type { SpreadPresetId } from "@/lib/chart-utils";
+import type { SpreadPresetId, RangePresetId } from "@/lib/chart-utils";
 import { useDisplayModeTransition } from "@/components/terminal/ticker-modal/use-display-mode-transition";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const MODE_SWITCH_MS = 120;
 const MODE_FADE_MS = 260;
 const SYMBOL_FLASH_MS = 160;
+
+// Chart display state machine
+type ChartDisplayState = 'hidden' | 'fitting' | 'ready';
 
 export function TickerModal() {
   const {
@@ -135,9 +139,6 @@ export function TickerModal() {
   }, [isOpen, headerSymbols, headerSymbolsKey, setTrackedSymbols]);
 
   // ── Drawer animation ────────────────────────────────────────────────────
-  // Let Vaul control its own state. We use isOpen from store as the single
-  // source of truth and let vaul handle all animations internally.
-  // Step 2: Detach onOpenChange to prevent controlled/uncontrolled feedback loop.
 
   const handleCloseClick = useCallback(() => {
     if (!isOpen) return;
@@ -158,9 +159,104 @@ export function TickerModal() {
 
   const titleId = useId();
   const descriptionId = useId();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date | undefined>(undefined);
+  const [activeRangePreset, setActiveRangePreset] = useState<RangePresetId | null>(null);
+  const rangePresetInitializedRef = useRef(false);
+  
+  // Chart display state machine
+  const [chartDisplayState, setChartDisplayState] = useState<ChartDisplayState>('hidden');
+  const currentFitKeyRef = useRef<string | null>(null);
+  const safetyTimerRef = useRef<number | null>(null);
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setSelectedCalendarDate(date);
+    setCalendarOpen(false);
+  };
+
+  // Track fitKey changes and manage chart display state
+  useEffect(() => {
+    const fitKey = series.fitKey;
+    
+    // If fitKey changed, reset to hidden (new data coming)
+    if (currentFitKeyRef.current !== fitKey) {
+      currentFitKeyRef.current = fitKey;
+      
+      // Clear any pending safety timer
+      if (safetyTimerRef.current) {
+        window.clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+      
+      // If we were already ready, stay ready (show last frame while loading)
+      // Only hide if this is the initial load
+      if (chartDisplayState === 'hidden') {
+        // Wait for data to be ready before showing
+        if (series.isHistoryReady) {
+          setChartDisplayState('fitting');
+        }
+      }
+    }
+  }, [series.fitKey, series.isHistoryReady, chartDisplayState]);
+
+  // When history becomes ready, transition to fitting
+  useEffect(() => {
+    if (series.isHistoryReady && chartDisplayState === 'hidden') {
+      setChartDisplayState('fitting');
+    }
+  }, [series.isHistoryReady, chartDisplayState]);
+
+  // Safety timeout: if fitting for too long, show anyway
+  useEffect(() => {
+    if (chartDisplayState !== 'fitting') return;
+    
+    // Safety: show after 200ms even if fit hasn't reported
+    safetyTimerRef.current = window.setTimeout(() => {
+      setChartDisplayState('ready');
+    }, 200);
+    
+    return () => {
+      if (safetyTimerRef.current) {
+        window.clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+    };
+  }, [chartDisplayState]);
+
+  useEffect(() => {
+    if (settings.rangePreset === "custom") {
+      setActiveRangePreset(null);
+      return;
+    }
+    if (!rangePresetInitializedRef.current) {
+      setActiveRangePreset(settings.rangePreset);
+      rangePresetInitializedRef.current = true;
+    }
+  }, [settings.rangePreset]);
+
+  const handleRangePresetChange = useCallback(
+    (preset: "custom" | RangePresetId) => {
+      settings.handleRangePresetChange(preset);
+      if (preset === "custom") {
+        setActiveRangePreset(null);
+        return;
+      }
+      setActiveRangePreset(preset);
+    },
+    [settings],
+  );
+
+  const handleFitApplied = useCallback(() => {
+    // Clear safety timer since fit completed naturally
+    if (safetyTimerRef.current) {
+      window.clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+    setChartDisplayState('ready');
+  }, []);
 
   // Step 1: Gate rendering with both isOpen && primarySymbol.
-  // Only render Drawer when both are truthy to avoid mounting in unstable state.
   if (!isOpen || !primarySymbol) return null;
 
   return (
@@ -177,25 +273,17 @@ export function TickerModal() {
         aria-describedby={descriptionId}
         className="absolute inset-x-0 bottom-0 z-50 flex h-[94vh] max-h-none flex-col rounded-t-2xl border-t border-white/10 bg-background"
       >
-        {/* Accessibility: Hidden title and description for screen readers */}
         <VisuallyHidden.Root id={titleId}>{primarySymbol} Details</VisuallyHidden.Root>
         <VisuallyHidden.Root id={descriptionId}>Trading view for {primarySymbol}</VisuallyHidden.Root>
 
-        {/* Header */}
         <div className="px-4 pt-3 pb-2 bg-black/20 border-b border-white/10">
-            <ModalHeader
-              headerItems={series.headerItems}
-              onClose={handleCloseClick}
-            />
+          <ModalHeader headerItems={series.headerItems} onClose={handleCloseClick} />
 
           <div className="mt-3 flex flex-col gap-2">
-            {/* Row 1: Main toolbar + Compare/Spread toggle */}
             <div className="flex items-center justify-between gap-3">
               <ChartToolbar
                 timeframe={timeframe}
                 onTimeframeChange={settings.handleTimeframeChange}
-                rangePreset={settings.rangePreset}
-                onRangePresetChange={settings.handleRangePresetChange}
                 showSessionLevels={showSessionLevels}
                 onToggleSessionLevels={toggleShowSessionLevels}
                 displayCompare={displayCompare}
@@ -203,7 +291,6 @@ export function TickerModal() {
               />
 
               <div className="flex items-center gap-2">
-                {/* Compare/Spread toggle */}
                 <ToggleGroup
                   type="single"
                   value={spreadEnabled ? "spread" : "compare"}
@@ -221,7 +308,6 @@ export function TickerModal() {
                   </ToggleGroupItem>
                 </ToggleGroup>
 
-                {/* Sidebar toggle */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -231,52 +317,52 @@ export function TickerModal() {
                 >
                   {isSidebarOpen ? (
                     <PanelRightClose className="w-3.5 h-3.5" />
-                ) : (
-                  <PanelRightOpen className="w-3.5 h-3.5" />
-                )}
-              </Button>
+                  ) : (
+                    <PanelRightOpen className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              {spreadEnabled ? (
+                <SpreadControls
+                  spreadLegs={spreadLegs}
+                  primarySymbol={primarySymbol}
+                  orderedSymbols={orderedSymbols}
+                  showLegs={settings.showLegs}
+                  onSetShowLegs={settings.setShowLegs}
+                  onToggleSign={toggleSpreadLegSign}
+                  onMoveLeg={moveSpreadLeg}
+                  onRemove={removeComparison}
+                  onReverse={reverseSpreadLegs}
+                  onApplyPreset={(id: SpreadPresetId) => applySpreadPreset(id)}
+                />
+              ) : (
+                <SymbolChips
+                  orderedSymbols={orderedSymbols}
+                  onRemoveComparison={removeComparison}
+                  onReorderSelection={reorderSelection}
+                />
+              )}
             </div>
           </div>
-
-          {/* Row 2: Pills/controls */}
-          <div className="flex items-center justify-between gap-3">
-            {spreadEnabled ? (
-              <SpreadControls
-                spreadLegs={spreadLegs}
-                primarySymbol={primarySymbol}
-                orderedSymbols={orderedSymbols}
-                showLegs={settings.showLegs}
-                onSetShowLegs={settings.setShowLegs}
-                onToggleSign={toggleSpreadLegSign}
-                onMoveLeg={moveSpreadLeg}
-                onRemove={removeComparison}
-                onReverse={reverseSpreadLegs}
-                onApplyPreset={(id: SpreadPresetId) => applySpreadPreset(id)}
-              />
-            ) : (
-              <SymbolChips
-                orderedSymbols={orderedSymbols}
-                onRemoveComparison={removeComparison}
-                onReorderSelection={reorderSelection}
-              />
-            )}
-          </div>
         </div>
-      </div>
 
-      {/* Main content area with chart and sidebar */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Chart area */}
-          <div className="flex-1 p-3 overflow-hidden">
+          <div className="flex-1 flex flex-col p-3 overflow-hidden">
             <div
               className={cn(
-                "h-full rounded-xl border border-white/10 bg-black/20 overflow-hidden transition-opacity duration-200",
+                "flex-1 relative rounded-xl border border-white/10 bg-black/20 overflow-hidden transition-opacity duration-200",
                 isTransitioning && "opacity-70"
               )}
             >
-              {series.isHistoryReady ? (
+              <div className="h-full w-full relative">
+                <div className={cn(
+                  "absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] transition-opacity duration-150",
+                  chartDisplayState === 'ready' ? "opacity-0 pointer-events-none" : "opacity-100"
+                )} />
                 <TradingChart
-                  key={series.fitKey}
                   ticker={primarySymbol}
                   data={displaySpread || displayCompare ? undefined : series.chartData}
                   lineData={
@@ -294,17 +380,46 @@ export function TickerModal() {
                   secondsVisible={series.secondsVisible}
                   sessionLevels={series.sessionLevels}
                   compareMode={displayCompare}
+                  isHistoryReady={series.isHistoryReady}
+                  onUserRangeChange={() => setActiveRangePreset(null)}
+                  onFitApplied={handleFitApplied}
                 />
-              ) : (
-                <div className="h-full" />
+              </div>
+              {calendarOpen && (
+                <>
+                  <div
+                    className="absolute inset-0 bg-black/50 z-40"
+                    onClick={() => setCalendarOpen(false)}
+                  />
+                  <div className="absolute inset-0 flex items-start justify-center z-50 pointer-events-none pt-8">
+                    <div
+                      className="pointer-events-auto bg-background border border-white/10 rounded-lg shadow-xl p-3 min-w-[280px]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={selectedCalendarDate}
+                        onSelect={handleCalendarSelect}
+                        initialFocus
+                        fixedWeeks
+                      />
+                    </div>
+                  </div>
+                </>
               )}
+            </div>
+            <div className="mt-2 h-8 px-2 flex items-center justify-between border-t border-white/10">
+              <ChartRangeSelector
+                activePreset={activeRangePreset}
+                onRangePresetChange={handleRangePresetChange}
+                onCalendarOpen={() => setCalendarOpen(true)}
+              />
+              <ChartTimeDisplay />
             </div>
           </div>
 
-          {/* AI Sidebar */}
           <AISidebar isOpen={isSidebarOpen} />
         </div>
-
       </div>
     </div>
   );

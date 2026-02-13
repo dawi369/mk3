@@ -227,27 +227,59 @@ export function useChartSeries({
     );
   }, [primarySymbol, resolvedSeriesBySymbol, entities, snapshots, sessions]);
 
-  // Session levels should come from actual session data (current trading session)
-  // NOT from chart bar summaries
+  // Session levels should reflect current session only (not full history).
   const sessionLevels = useMemo(() => {
-    if (!showSessionLevels || !primarySymbol || displaySpread || displayCompare) return undefined;
-    
+    if (!isOpen || !showSessionLevels || !primarySymbol || displaySpread || displayCompare) return undefined;
+
     const session = sessions[primarySymbol];
-    const snapshot = snapshots[primarySymbol];
-    
-    // Prioritize session data (real-time day high/low), then snapshot data
-    const sessionHigh = session?.dayHigh ?? snapshot?.sessionHigh ?? null;
-    const sessionLow = session?.dayLow ?? snapshot?.sessionLow ?? null;
-    const lastPrice = entities[primarySymbol]?.latestBar?.close ?? snapshot?.sessionClose ?? null;
-    
-    if (!sessionHigh && !sessionLow) return undefined;
-    
+    const latestBar = entities[primarySymbol]?.latestBar;
+
+    // Prefer real-time session data when available.
+    if (session?.dayHigh != null || session?.dayLow != null) {
+      return {
+        high: session?.dayHigh ?? null,
+        low: session?.dayLow ?? null,
+        last: latestBar?.close ?? null,
+      };
+    }
+
+    const symbolBars = resolvedSeriesBySymbol[primarySymbol] ?? [];
+    if (symbolBars.length === 0) return undefined;
+
+    const latestMs = normalizeTimestamp(
+      session?.timestamp ?? latestBar?.startTime ?? symbolBars[symbolBars.length - 1]?.startTime
+    );
+    if (!Number.isFinite(latestMs)) return undefined;
+
+    // Fallback: approximate current session as the last 24h window.
+    const sessionStart = latestMs - 24 * 60 * 60 * 1000;
+
+    let high = -Infinity;
+    let low = Infinity;
+    for (const bar of symbolBars) {
+      const barMs = normalizeTimestamp(bar.startTime);
+      if (!Number.isFinite(barMs) || barMs < sessionStart) continue;
+      if (bar.high > high) high = bar.high;
+      if (bar.low < low) low = bar.low;
+    }
+
+    if (!Number.isFinite(high) || !Number.isFinite(low)) return undefined;
+
     return {
-      high: sessionHigh,
-      low: sessionLow,
-      last: lastPrice,
+      high,
+      low,
+      last: latestBar?.close ?? symbolBars[symbolBars.length - 1]?.close ?? null,
     };
-  }, [showSessionLevels, primarySymbol, sessions, snapshots, entities, displaySpread, displayCompare]);
+  }, [
+    isOpen,
+    showSessionLevels,
+    primarySymbol,
+    sessions,
+    entities,
+    resolvedSeriesBySymbol,
+    displaySpread,
+    displayCompare,
+  ]);
 
   // ── Header items ───────────────────────────────────────────────────────
 

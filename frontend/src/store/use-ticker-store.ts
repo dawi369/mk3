@@ -166,7 +166,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
   sessionsBySymbol: {},
   timeframe: "1m",
   isSidebarOpen: getStoredBoolean("terminal-chart-sidebar-open", true),
-  showSessionLevels: getStoredBoolean("terminal-show-session-levels", false),
+  showSessionLevels: false,
 
   setMode: (mode) =>
     set((state) => ({

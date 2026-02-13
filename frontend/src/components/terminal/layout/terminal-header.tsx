@@ -103,7 +103,6 @@ export function TerminalHeader() {
             </motion.div> */}
           </motion.div>
         );
-      case "sentiment":
       case "ai-lab":
       default:
         return null;

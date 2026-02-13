@@ -186,11 +186,7 @@ export function useChartHistory({
     lastSeenRef.current.clear();
     if (isReady) setIsReady(false);
 
-    // Only clear state if there's actual data (prevents redundant updates)
-    setSeriesBySymbol((prev) => {
-      if (Object.keys(prev).length === 0) return prev;
-      return {};
-    });
+    // Keep existing data until new history arrives to avoid flicker.
   }, [enabled, timeframe, symbolKey, rangeKey]);
 
   // ── Fetch history data ──────────────────────────────────────────────────
