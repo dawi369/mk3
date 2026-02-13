@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useRef, useState } from "react";
-import { X } from "lucide-react";
+import React from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { reorderSymbols } from "@/lib/chart-utils";
 import { SYMBOL_COLORS } from "@/components/terminal/ticker-modal/ticker-modal-provider";
+import { Button } from "@/components/ui/button";
 
 interface SymbolChipsProps {
   orderedSymbols: string[];
@@ -17,96 +17,63 @@ export function SymbolChips({
   onRemoveComparison,
   onReorderSelection,
 }: SymbolChipsProps) {
-  const [dragSymbol, setDragSymbol] = useState<string | null>(null);
-  const [dragOverSymbol, setDragOverSymbol] = useState<string | null>(null);
-  const dragSymbolRef = useRef<string | null>(null);
+  const move = (symbol: string, dir: -1 | 1) => {
+    const idx = orderedSymbols.indexOf(symbol);
+    if (idx < 0) return;
+    const target = idx + dir;
+    if (target < 0 || target >= orderedSymbols.length) return;
+    const next = [...orderedSymbols];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onReorderSelection(next);
+  };
 
   return (
     <div className="flex items-center flex-wrap gap-2 flex-1">
-      <div
-        className="flex items-center gap-2 overflow-x-auto"
-        onDragOver={(event) => {
-          event.preventDefault();
-          if (dragOverSymbol) setDragOverSymbol(null);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          const source =
-            event.dataTransfer.getData("text/plain") || dragSymbolRef.current;
-          if (!source) return;
-          const nextOrder = reorderSymbols(orderedSymbols, source, "__end__");
-          onReorderSelection(nextOrder);
-          dragSymbolRef.current = null;
-          setDragSymbol(null);
-          setDragOverSymbol(null);
-        }}
-      >
-        {orderedSymbols.map((symbol, index) => (
-          <div
-            key={symbol}
-            draggable
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", symbol);
-              dragSymbolRef.current = symbol;
-              setDragSymbol(symbol);
-            }}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (symbol !== dragSymbolRef.current) {
-                setDragOverSymbol(symbol);
-              }
-            }}
-            onDragLeave={() => {
-              if (dragOverSymbol === symbol) setDragOverSymbol(null);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              const source =
-                event.dataTransfer.getData("text/plain") || dragSymbolRef.current;
-              if (!source) return;
-              const nextOrder = reorderSymbols(orderedSymbols, source, symbol);
-              if (nextOrder.join("|") === orderedSymbols.join("|")) {
-                dragSymbolRef.current = null;
-                setDragSymbol(null);
-                setDragOverSymbol(null);
-                return;
-              }
-              onReorderSelection(nextOrder);
-              dragSymbolRef.current = null;
-              setDragSymbol(null);
-              setDragOverSymbol(null);
-            }}
-            onDragEnd={() => {
-              dragSymbolRef.current = null;
-              setDragSymbol(null);
-              setDragOverSymbol(null);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
-              "bg-white/5 hover:bg-white/10 transition-colors",
-              dragSymbol === symbol && "opacity-60",
-              dragOverSymbol === symbol && "ring-1 ring-white/30"
-            )}
-          >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: SYMBOL_COLORS[index % SYMBOL_COLORS.length] }}
-            />
-            <span className="font-mono">{symbol}</span>
+      {orderedSymbols.map((symbol, index) => (
+        <div
+          key={symbol}
+          className={cn(
+            "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium",
+            "bg-white/5 hover:bg-white/10 transition-colors"
+          )}
+        >
+          <span
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: SYMBOL_COLORS[index % SYMBOL_COLORS.length] }}
+          />
+          <span className="font-mono">{symbol}</span>
+          <div className="flex items-center gap-0.5 ml-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={() => move(symbol, -1)}
+              disabled={index === 0}
+            >
+              <ChevronLeft className="w-3 h-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={() => move(symbol, 1)}
+              disabled={index === orderedSymbols.length - 1}
+            >
+              <ChevronRight className="w-3 h-3" />
+            </Button>
             {orderedSymbols.length > 1 && (
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
                 onClick={() => onRemoveComparison(symbol)}
-                className="ml-1 p-0.5 rounded hover:bg-white/10 transition-colors"
               >
                 <X className="w-3 h-3" />
-              </button>
+              </Button>
             )}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

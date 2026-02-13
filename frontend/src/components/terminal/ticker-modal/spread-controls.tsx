@@ -86,13 +86,7 @@ export function SpreadControls({
     <>
       {/* Spread pills */}
       <div className="flex items-center flex-wrap gap-2 flex-1">
-        {spreadLegs.length <= 1 && (
-          <span className="text-xs text-muted-foreground">
-            {spreadLegs.length === 0
-              ? `Select up to ${MAX_SPREAD_LEGS} symbols to build a spread.`
-              : "Add another symbol to calculate a spread."}
-          </span>
-        )}
+
         {spreadLegs.map((leg, index) => (
           <div
             key={leg.symbol}
@@ -134,14 +128,16 @@ export function SpreadControls({
               >
                 <ChevronRight className="w-3 h-3" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => onRemove(leg.symbol)}
-              >
-                <X className="w-3 h-3" />
-              </Button>
+              {spreadLegs.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  onClick={() => onRemove(leg.symbol)}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
             </div>
           </div>
         ))}
