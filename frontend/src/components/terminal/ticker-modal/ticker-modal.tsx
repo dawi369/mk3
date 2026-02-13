@@ -169,6 +169,18 @@ export function TickerModal() {
   const currentFitKeyRef = useRef<string | null>(null);
   const safetyTimerRef = useRef<number | null>(null);
 
+  // Reset display state when modal closes (component persists — hooks don't remount)
+  useEffect(() => {
+    if (!isOpen) {
+      setChartDisplayState('hidden');
+      currentFitKeyRef.current = null;
+      if (safetyTimerRef.current) {
+        window.clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+    }
+  }, [isOpen]);
+
   const handleCalendarSelect = (date: Date | undefined) => {
     if (!date) return;
     setSelectedCalendarDate(date);
@@ -357,7 +369,10 @@ export function TickerModal() {
                 isTransitioning && "opacity-70"
               )}
             >
-              <div className="h-full w-full relative">
+              <div className={cn(
+                "h-full w-full relative",
+                chartDisplayState !== 'ready' && "invisible"
+              )}>
                 <div className={cn(
                   "absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] transition-opacity duration-150",
                   chartDisplayState === 'ready' ? "opacity-0 pointer-events-none" : "opacity-100"
@@ -374,14 +389,17 @@ export function TickerModal() {
                   }
                   comparisons={series.overlaySymbols}
                   comparisonData={series.comparisonData}
-                  showComparisons={displaySpread ? settings.showLegs : displayCompare}
+                  showComparisons={displaySpread ? false : displayCompare}
                   fitKey={series.fitKey}
                   visibleBars={series.visibleBars}
                   secondsVisible={series.secondsVisible}
                   sessionLevels={series.sessionLevels}
                   compareMode={displayCompare}
                   isHistoryReady={series.isHistoryReady}
-                  onUserRangeChange={() => setActiveRangePreset(null)}
+                  onUserRangeChange={() => {
+                    setActiveRangePreset(null);
+                    settings.handleRangePresetChange("custom");
+                  }}
                   onFitApplied={handleFitApplied}
                 />
               </div>

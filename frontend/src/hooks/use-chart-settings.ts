@@ -33,7 +33,7 @@ export function useChartSettings({
   isSidebarOpen,
   setSidebarOpen,
 }: UseChartSettingsOptions): UseChartSettingsReturn {
-  const [showLegs, setShowLegs] = useState(true);
+  const [showLegs, setShowLegs] = useState(false);
   const [rangePreset, setRangePreset] = useState<RangePresetId | "custom">("custom");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 

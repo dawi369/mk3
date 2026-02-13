@@ -158,30 +158,63 @@ export function buildSpreadSeries(
 ): LineData<Time>[] {
   if (!legs || legs.length === 0) return [];
 
-  const legMaps = legs.map((leg) => {
+  // Build sorted arrays for each leg (sorted by normalized timestamp)
+  const legArrays = legs.map((leg) => {
     const bars = seriesBySymbol[leg.symbol];
-    if (!bars || bars.length === 0) return { leg, map: new Map<number, number>() };
-    const map = new Map<number, number>();
+    if (!bars || bars.length === 0) return { leg, times: [] as number[], closes: [] as number[] };
+    const times: number[] = [];
+    const closes: number[] = [];
     for (const bar of bars) {
-      map.set(normalizeTimestamp(bar.startTime), bar.close);
+      times.push(normalizeTimestamp(bar.startTime));
+      closes.push(bar.close);
     }
-    return { leg, map };
+    return { leg, times, closes };
   });
 
-  const base = legMaps[0];
+  const base = legArrays[0];
+  if (base.times.length === 0) return [];
+
+  // Infer bar interval from the base leg for tolerance calculation
+  const intervalMs = base.times.length >= 2 ? base.times[1] - base.times[0] : 60_000;
+  const tolerance = Math.max(intervalMs * 1.5, 2000); // At least 2s tolerance
+
+  // Binary search: find nearest value in sorted array within tolerance
+  const findNearest = (times: number[], closes: number[], target: number): number | null => {
+    let lo = 0;
+    let hi = times.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      if (times[mid] < target) lo = mid + 1;
+      else if (times[mid] > target) hi = mid - 1;
+      else return closes[mid]; // exact match
+    }
+    // Check the two candidates around the insertion point
+    let bestIdx = -1;
+    let bestDist = tolerance;
+    if (hi >= 0 && Math.abs(times[hi] - target) < bestDist) {
+      bestDist = Math.abs(times[hi] - target);
+      bestIdx = hi;
+    }
+    if (lo < times.length && Math.abs(times[lo] - target) < bestDist) {
+      bestIdx = lo;
+    }
+    return bestIdx >= 0 ? closes[bestIdx] : null;
+  };
+
   const data: LineData<Time>[] = [];
 
-  for (const [time, baseValue] of base.map) {
-    let sum = baseValue * base.leg.weight;
+  for (let b = 0; b < base.times.length; b++) {
+    const time = base.times[b];
+    let sum = base.closes[b] * base.leg.weight;
     let valid = true;
 
-    for (let i = 1; i < legMaps.length; i++) {
-      const nextValue = legMaps[i].map.get(time);
-      if (nextValue === undefined) {
+    for (let i = 1; i < legArrays.length; i++) {
+      const value = findNearest(legArrays[i].times, legArrays[i].closes, time);
+      if (value === null) {
         valid = false;
         break;
       }
-      sum += nextValue * legMaps[i].leg.weight;
+      sum += value * legArrays[i].leg.weight;
     }
 
     if (valid) {

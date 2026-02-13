@@ -227,35 +227,53 @@ export function useChartSeries({
     );
   }, [primarySymbol, resolvedSeriesBySymbol, entities, snapshots, sessions]);
 
-  // Session levels should reflect current session only (not full history).
+  // Session levels: show session high/low/last on the chart.
+  // Priority: 1) SnapshotData (exchange-session-scoped from Polygon)
+  //           2) SessionData (accumulates from 2AM ET reset, less precise)
+  //           3) bar fallback (last 24h of chart data)
   const sessionLevels = useMemo(() => {
     if (!isOpen || !showSessionLevels || !primarySymbol || displaySpread || displayCompare) return undefined;
 
     const session = sessions[primarySymbol];
+    const snapshot = snapshots[primarySymbol];
     const latestBar = entities[primarySymbol]?.latestBar;
+    const lastPrice = latestBar?.close ?? null;
 
-    // Prefer real-time session data when available.
-    if (session?.dayHigh != null || session?.dayLow != null) {
-      return {
-        high: session?.dayHigh ?? null,
-        low: session?.dayLow ?? null,
-        last: latestBar?.close ?? null,
-      };
+    // Helper: accept only positive finite numbers (backend defaults missing to 0)
+    const validPrice = (v: unknown): number | null =>
+      typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+
+    // 1) Snapshot data from Polygon (exchange-session-scoped)
+    if (snapshot) {
+      const high = validPrice(snapshot.sessionHigh);
+      const low = validPrice(snapshot.sessionLow);
+      if (high !== null || low !== null) {
+        return { high, low, last: lastPrice ?? validPrice(snapshot.sessionClose) };
+      }
     }
 
-    const symbolBars = resolvedSeriesBySymbol[primarySymbol] ?? [];
+    // 2) Real-time session data (polled every 60s, resets at 2AM ET)
+    if (session) {
+      const high = validPrice(session.dayHigh);
+      const low = validPrice(session.dayLow);
+      if (high !== null || low !== null) {
+        return { high, low, last: lastPrice };
+      }
+    }
+
+    // 3) Bar fallback: scan only the last 24h of the primary chart data
+    const symbolBars = chartSeriesBySymbol[primarySymbol] ?? [];
     if (symbolBars.length === 0) return undefined;
 
-    const latestMs = normalizeTimestamp(
-      session?.timestamp ?? latestBar?.startTime ?? symbolBars[symbolBars.length - 1]?.startTime
+    const lastBarTime = normalizeTimestamp(
+      latestBar?.startTime ?? symbolBars[symbolBars.length - 1]?.startTime
     );
-    if (!Number.isFinite(latestMs)) return undefined;
+    if (!Number.isFinite(lastBarTime)) return undefined;
 
-    // Fallback: approximate current session as the last 24h window.
-    const sessionStart = latestMs - 24 * 60 * 60 * 1000;
-
+    const sessionStart = lastBarTime - 24 * 60 * 60 * 1000;
     let high = -Infinity;
     let low = Infinity;
+
     for (const bar of symbolBars) {
       const barMs = normalizeTimestamp(bar.startTime);
       if (!Number.isFinite(barMs) || barMs < sessionStart) continue;
@@ -268,15 +286,16 @@ export function useChartSeries({
     return {
       high,
       low,
-      last: latestBar?.close ?? symbolBars[symbolBars.length - 1]?.close ?? null,
+      last: lastPrice ?? symbolBars[symbolBars.length - 1]?.close ?? null,
     };
   }, [
     isOpen,
     showSessionLevels,
     primarySymbol,
     sessions,
+    snapshots,
     entities,
-    resolvedSeriesBySymbol,
+    chartSeriesBySymbol,
     displaySpread,
     displayCompare,
   ]);

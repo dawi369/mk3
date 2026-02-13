@@ -61,15 +61,15 @@ export function TradingChart({
   const primaryLineRef = useRef<ISeriesApi<"Line"> | null>(null);
   const comparisonSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const lastFitKeyRef = useRef<string | null>(null);
-  const lastTickerRef = useRef<string | null>(null);
+
   const pendingFitRef = useRef(true);
   const fitLengthRef = useRef(0);
   const programmaticRangeRef = useRef(false);
+  const fitRafRef = useRef<number | null>(null);
   const priceLinesRef = useRef<{
     high?: PriceLineRef;
     low?: PriceLineRef;
     last?: PriceLineRef;
-    seriesType?: "line" | "candle";
   }>({});
 
   const useLinePrimary = lineData !== undefined;
@@ -206,10 +206,20 @@ export function TradingChart({
 
     // Only enforce margin + window on initial load or timeframe/range change
     if (!pendingFitRef.current || length === 0 || !isHistoryReady) {
-      // No fit needed — set data immediately (live updates)
-      setDataOnChart();
+      // No fit needed — set data immediately (live updates).
+      // But skip if a fit rAF is pending (avoid flashing data at the wrong zoom).
+      if (fitRafRef.current === null) {
+        setDataOnChart();
+      }
       return;
     }
+
+    // Cancel any previous fit rAF (stale from a prior effect run)
+    if (fitRafRef.current !== null) {
+      cancelAnimationFrame(fitRafRef.current);
+      fitRafRef.current = null;
+    }
+
     windowSizeRef.current = defaultWindow;
     const dynamicRightOffset = Math.max(2, Math.floor(defaultWindow * 0.2));
     rightOffsetRef.current = dynamicRightOffset;
@@ -235,15 +245,16 @@ export function TradingChart({
       onFitApplied?.();
     };
 
+    lastFitKeyRef.current = nextFitKey;
+    fitLengthRef.current = length;
+
     // Batch data + fit in a single frame so the chart never paints at the wrong zoom.
-    requestAnimationFrame(() => {
+    fitRafRef.current = requestAnimationFrame(() => {
+      fitRafRef.current = null;
+      pendingFitRef.current = false;
       setDataOnChart();
       applyFit();
     });
-
-    lastFitKeyRef.current = nextFitKey;
-    pendingFitRef.current = false;
-    fitLengthRef.current = length;
   }, [ticker, data, lineData, useLinePrimary, fitKey, visibleBars, secondsVisible, isHistoryReady, onFitApplied]);
 
   useEffect(() => {
@@ -302,47 +313,26 @@ export function TradingChart({
     });
   }, [secondsVisible]);
 
+  // Clear all price lines from both series (safe even if refs are stale)
   const clearPriceLines = useCallback(() => {
-    const seriesType = priceLinesRef.current.seriesType;
-    const series =
-      seriesType === "line"
-        ? primaryLineRef.current
-        : seriesType === "candle"
-          ? primaryCandleRef.current
-          : null;
-    if (!series) return;
     const { high, low, last } = priceLinesRef.current;
-    if (high) series.removePriceLine(high);
-    if (low) series.removePriceLine(low);
-    if (last) series.removePriceLine(last);
-    priceLinesRef.current.high = undefined;
-    priceLinesRef.current.low = undefined;
-    priceLinesRef.current.last = undefined;
+    const targets = [primaryLineRef.current, primaryCandleRef.current].filter(Boolean);
+    for (const series of targets) {
+      try { if (high) series!.removePriceLine(high); } catch { /* already removed */ }
+      try { if (low) series!.removePriceLine(low); } catch { /* already removed */ }
+      try { if (last) series!.removePriceLine(last); } catch { /* already removed */ }
+    }
+    priceLinesRef.current = {};
   }, []);
 
+  // Session level price lines — always clear-and-recreate for robustness
   useEffect(() => {
     const activeSeries = useLinePrimary ? primaryLineRef.current : primaryCandleRef.current;
-    const nextType = useLinePrimary ? "line" : "candle";
 
-    if (lastTickerRef.current !== ticker) {
-      clearPriceLines();
-      priceLinesRef.current.seriesType = nextType;
-      lastTickerRef.current = ticker;
-    }
+    // Clear previous lines first
+    clearPriceLines();
 
-    if (priceLinesRef.current.seriesType && priceLinesRef.current.seriesType !== nextType) {
-      clearPriceLines();
-      priceLinesRef.current.seriesType = nextType;
-    }
-
-    if (!priceLinesRef.current.seriesType) {
-      priceLinesRef.current.seriesType = nextType;
-    }
-
-    if (!activeSeries || !sessionLevels) {
-      clearPriceLines();
-      return;
-    }
+    if (!activeSeries || !sessionLevels) return;
 
     const toPrice = (value?: number | null) =>
       typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -354,36 +344,13 @@ export function TradingChart({
       [high, low] = [low, high];
     }
 
-    const upsertLine = (
+    const createLine = (
       key: "high" | "low" | "last",
       price: number | null,
-      options: {
-        color: string;
-        title: string;
-        lineStyle: LineStyle;
-        lineWidth: LineWidth;
-      }
+      options: { color: string; title: string; lineStyle: LineStyle; lineWidth: LineWidth },
     ) => {
-      const existing = priceLinesRef.current[key];
-      if (price === null) {
-        if (existing) {
-          activeSeries.removePriceLine(existing);
-          priceLinesRef.current[key] = undefined;
-        }
-        return;
-      }
-      if (!existing) {
-        priceLinesRef.current[key] = activeSeries.createPriceLine({
-          price,
-          axisLabelVisible: true,
-          title: options.title,
-          lineStyle: options.lineStyle,
-          lineWidth: options.lineWidth,
-          color: options.color,
-        });
-        return;
-      }
-      existing.applyOptions({
+      if (price === null) return;
+      priceLinesRef.current[key] = activeSeries.createPriceLine({
         price,
         axisLabelVisible: true,
         title: options.title,
@@ -393,25 +360,25 @@ export function TradingChart({
       });
     };
 
-    upsertLine("high", high, {
+    createLine("high", high, {
       color: "#10b981",
       title: "SESSION HIGH",
       lineStyle: LineStyle.Dashed,
       lineWidth: 1,
     });
-    upsertLine("low", low, {
+    createLine("low", low, {
       color: "#f43f5e",
       title: "SESSION LOW",
       lineStyle: LineStyle.Dashed,
       lineWidth: 1,
     });
-    upsertLine("last", last, {
+    createLine("last", last, {
       color: "#e2e8f0",
       title: "LAST",
       lineStyle: LineStyle.Solid,
       lineWidth: 2,
     });
-  }, [sessionLevels, useLinePrimary, ticker, clearPriceLines]);
+  }, [sessionLevels, useLinePrimary, ticker, data, lineData, clearPriceLines]);
 
   // Handle comparison symbols
   useEffect(() => {
