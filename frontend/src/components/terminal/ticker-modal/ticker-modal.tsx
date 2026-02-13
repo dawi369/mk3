@@ -359,7 +359,7 @@ export function TickerModal() {
             >
               <div className="h-full w-full relative">
                 <div className={cn(
-                  "absolute inset-0 z-10 bg-black transition-opacity duration-150",
+                  "absolute inset-0 z-10 bg-black/50 backdrop-blur-[1px] transition-opacity duration-150",
                   chartDisplayState === 'ready' ? "opacity-0 pointer-events-none" : "opacity-100"
                 )} />
                 <TradingChart

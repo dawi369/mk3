@@ -185,13 +185,15 @@ export function TradingChart({
       pendingFitRef.current = true;
     }
 
-    if (useLinePrimary) {
-      primaryCandleRef.current?.setData(emptyCandles);
-      primaryLineRef.current?.setData(lineData ?? emptyLines);
-    } else {
-      primaryLineRef.current?.setData(emptyLines);
-      primaryCandleRef.current?.setData(data ?? emptyCandles);
-    }
+    const setDataOnChart = () => {
+      if (useLinePrimary) {
+        primaryCandleRef.current?.setData(emptyCandles);
+        primaryLineRef.current?.setData(lineData ?? emptyLines);
+      } else {
+        primaryLineRef.current?.setData(emptyLines);
+        primaryCandleRef.current?.setData(data ?? emptyCandles);
+      }
+    };
 
     const defaultWindow = Math.max(10, Math.min(visibleBars, length || visibleBars));
 
@@ -203,7 +205,11 @@ export function TradingChart({
     }
 
     // Only enforce margin + window on initial load or timeframe/range change
-    if (!pendingFitRef.current || length === 0 || !isHistoryReady) return;
+    if (!pendingFitRef.current || length === 0 || !isHistoryReady) {
+      // No fit needed — set data immediately (live updates)
+      setDataOnChart();
+      return;
+    }
     windowSizeRef.current = defaultWindow;
     const dynamicRightOffset = Math.max(2, Math.floor(defaultWindow * 0.2));
     rightOffsetRef.current = dynamicRightOffset;
@@ -229,9 +235,10 @@ export function TradingChart({
       onFitApplied?.();
     };
 
-    // Defer fit until after data renders to avoid missing the margin.
+    // Batch data + fit in a single frame so the chart never paints at the wrong zoom.
     requestAnimationFrame(() => {
-      requestAnimationFrame(applyFit);
+      setDataOnChart();
+      applyFit();
     });
 
     lastFitKeyRef.current = nextFitKey;
