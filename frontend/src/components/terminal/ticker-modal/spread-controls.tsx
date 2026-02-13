@@ -1,13 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   ArrowLeftRight,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  EyeOff,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,12 +22,44 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+/** Delay (ms) before closing a hover-opened dropdown */
+const HOVER_CLOSE_DELAY = 150;
+
+function useHoverDropdown() {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearClose = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    clearClose();
+    closeTimer.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY);
+  }, [clearClose]);
+
+  const triggerProps = {
+    onPointerEnter: () => { clearClose(); setOpen(true); },
+    onPointerLeave: scheduleClose,
+  };
+
+  const contentProps = {
+    onPointerEnter: clearClose,
+    onPointerLeave: scheduleClose,
+  };
+
+  return { open, setOpen, triggerProps, contentProps };
+}
+
 interface SpreadControlsProps {
   spreadLegs: SpreadLeg[];
   primarySymbol: string;
   orderedSymbols: string[];
-  showLegs: boolean;
-  onSetShowLegs: (v: boolean | ((prev: boolean) => boolean)) => void;
+  activePreset: SpreadPresetId;
+
   onToggleSign: (symbol: string) => void;
   onMoveLeg: (symbol: string, dir: -1 | 1) => void;
   onRemove: (symbol: string) => void;
@@ -41,21 +71,26 @@ export function SpreadControls({
   spreadLegs,
   primarySymbol,
   orderedSymbols,
-  showLegs,
-  onSetShowLegs,
+  activePreset,
+
   onToggleSign,
   onMoveLeg,
   onRemove,
   onReverse,
   onApplyPreset,
 }: SpreadControlsProps) {
+  const presetsDropdown = useHoverDropdown();
+  const activePresetLabel = SPREAD_PRESETS.find(p => p.id === activePreset)?.label.split(" ")[0] ?? "Calendar";
+
   return (
     <>
       {/* Spread pills */}
       <div className="flex items-center flex-wrap gap-2 flex-1">
-        {spreadLegs.length === 0 && (
+        {spreadLegs.length <= 1 && (
           <span className="text-xs text-muted-foreground">
-            Select up to {MAX_SPREAD_LEGS} symbols to build a spread.
+            {spreadLegs.length === 0
+              ? `Select up to ${MAX_SPREAD_LEGS} symbols to build a spread.`
+              : "Add another symbol to calculate a spread."}
           </span>
         )}
         {spreadLegs.map((leg, index) => (
@@ -99,16 +134,14 @@ export function SpreadControls({
               >
                 <ChevronRight className="w-3 h-3" />
               </Button>
-              {leg.symbol !== primarySymbol && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => onRemove(leg.symbol)}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => onRemove(leg.symbol)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
             </div>
           </div>
         ))}
@@ -116,29 +149,42 @@ export function SpreadControls({
 
       {/* Action buttons - right aligned */}
       <div className="flex items-center gap-2">
-        <DropdownMenu>
+        <DropdownMenu open={presetsDropdown.open} onOpenChange={presetsDropdown.setOpen} modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1">
-              Presets
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              {...presetsDropdown.triggerProps}
+            >
+              {activePresetLabel}
               <ChevronDown className="w-3 h-3" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px]">
-            <DropdownMenuLabel className="text-xs">Popular Spreads</DropdownMenuLabel>
+          <DropdownMenuContent
+            align="end"
+            className="min-w-[180px]"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            {...presetsDropdown.contentProps}
+          >
+            <DropdownMenuLabel className="text-xs">Spreads</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {SPREAD_PRESETS.map((preset) => {
-              const disabled = orderedSymbols.length < preset.weights.length;
+              const needed = preset.weights.length;
+              const have = orderedSymbols.length;
+              const disabled = have < needed;
+              const extra = needed - have;
               return (
                 <DropdownMenuItem
                   key={preset.id}
                   disabled={disabled}
-                  className="text-xs"
+                  className={cn("text-xs", preset.id === activePreset && "bg-accent")}
                   onClick={() => onApplyPreset(preset.id)}
                 >
-                  {preset.label}
+                  <span className="flex-1">{preset.label}</span>
                   {disabled && (
                     <span className="ml-auto text-[10px] text-muted-foreground">
-                      Need {preset.weights.length}
+                      +{extra} more
                     </span>
                   )}
                 </DropdownMenuItem>
@@ -156,17 +202,6 @@ export function SpreadControls({
         >
           <ArrowLeftRight className="w-3 h-3" />
           Reverse
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0"
-          onClick={() => onSetShowLegs((prev: boolean) => !prev)}
-          disabled={spreadLegs.length === 0}
-          aria-label={showLegs ? "Hide leg overlays" : "Show leg overlays"}
-        >
-          {showLegs ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
         </Button>
       </div>
     </>

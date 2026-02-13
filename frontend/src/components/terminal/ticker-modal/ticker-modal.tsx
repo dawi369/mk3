@@ -44,6 +44,7 @@ export function TickerModal() {
     showSessionLevels,
     toggleShowSessionLevels,
     spreadEnabled,
+    spreadPreset,
     setSpreadEnabled,
     spreadLegs,
     toggleSpreadLegSign,
@@ -289,7 +290,11 @@ export function TickerModal() {
         <VisuallyHidden.Root id={descriptionId}>Trading view for {primarySymbol}</VisuallyHidden.Root>
 
         <div className="px-4 pt-3 pb-2 bg-black/20 border-b border-white/10">
-          <ModalHeader headerItems={series.headerItems} onClose={handleCloseClick} />
+          <ModalHeader
+            headerItems={series.headerItems}
+            spreadValue={displaySpread ? series.spreadValue : null}
+            onClose={handleCloseClick}
+          />
 
           <div className="mt-3 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
@@ -342,8 +347,7 @@ export function TickerModal() {
                   spreadLegs={spreadLegs}
                   primarySymbol={primarySymbol}
                   orderedSymbols={orderedSymbols}
-                  showLegs={settings.showLegs}
-                  onSetShowLegs={settings.setShowLegs}
+                  activePreset={spreadPreset}
                   onToggleSign={toggleSpreadLegSign}
                   onMoveLeg={moveSpreadLeg}
                   onRemove={removeComparison}
@@ -369,6 +373,14 @@ export function TickerModal() {
                 isTransitioning && "opacity-70"
               )}
             >
+              {/* Empty spread overlay */}
+              {displaySpread && spreadLegs.length < 2 && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/40 backdrop-blur-sm">
+                  <span className="text-sm text-muted-foreground">
+                    Add another symbol to calculate a spread.
+                  </span>
+                </div>
+              )}
               <div className={cn(
                 "h-full w-full relative",
                 chartDisplayState !== 'ready' && "invisible"

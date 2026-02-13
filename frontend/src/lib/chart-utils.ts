@@ -1,10 +1,8 @@
 import type { Bar } from "@/types/common.types";
 import type { CandlestickData, LineData, Time } from "lightweight-charts";
-import type { SpreadLeg, Timeframe } from "@/types/ticker.types";
+import type { SpreadLeg, SpreadPresetId, Timeframe } from "@/types/ticker.types";
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-export type SpreadPresetId = "calendar" | "ratio" | "butterfly" | "condor";
+export type { SpreadPresetId };
 
 export const SPREAD_PRESETS: Array<{ id: SpreadPresetId; label: string; weights: number[] }> = [
   { id: "calendar", label: "Calendar (1:-1)", weights: [1, -1] },

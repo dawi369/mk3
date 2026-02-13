@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Bar } from "@/types/common.types";
 import type {
   SpreadLeg,
+  SpreadPresetId,
   Timeframe,
   TickerEntity,
   TickerMode,
@@ -33,6 +34,7 @@ const emptySelection = (): TickerSelectionState => ({
   selected: [],
   spreadEnabled: false,
   spreadLegs: [],
+  spreadPreset: "calendar",
 });
 
 const emptyAssetIndex = () =>
@@ -106,6 +108,33 @@ function buildDefaultLegs(selected: string[], primary: string | null): SpreadLeg
     legs.push({ symbol, weight: -1 });
   }
   return legs;
+}
+
+const PRESET_WEIGHTS: Record<SpreadPresetId, number[]> = {
+  calendar: [1, -1],
+  ratio: [1, -1],
+  butterfly: [1, -2, 1],
+  condor: [1, -1, -1, 1],
+};
+
+/** Build spread legs from an ordered symbol list and a preset. Falls back to calendar if not enough symbols. */
+function applyPresetWeights(
+  ordered: string[],
+  preset: SpreadPresetId,
+  primary: string | null,
+): { legs: SpreadLeg[]; preset: SpreadPresetId } {
+  let weights = PRESET_WEIGHTS[preset];
+  let activePreset = preset;
+  // Fall back to calendar if not enough symbols for the requested preset
+  if (ordered.length < weights.length) {
+    weights = PRESET_WEIGHTS.calendar;
+    activePreset = "calendar";
+  }
+  const legs = weights.map((weight, idx) => ({
+    symbol: ordered[idx] ?? "",
+    weight,
+  })).filter(leg => leg.symbol !== "");
+  return { legs: normalizeLegs(legs, primary), preset: activePreset };
 }
 
 function orderSelection(primary: string | null, selected: string[]): string[] {
@@ -270,9 +299,13 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       const mode = state.mode;
       const selection = state.selectionByMode[mode];
       const nextSelected = [symbol];
-      const nextSpreadLegs = selection.spreadEnabled
-        ? buildDefaultLegs(nextSelected, symbol)
-        : selection.spreadLegs;
+      let nextLegs = selection.spreadLegs;
+      let nextPreset = selection.spreadPreset;
+      if (selection.spreadEnabled) {
+        const result = applyPresetWeights(nextSelected, selection.spreadPreset, symbol);
+        nextLegs = result.legs;
+        nextPreset = result.preset;
+      }
       return {
         isModalOpen: true,
         selectionByMode: {
@@ -281,7 +314,8 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             ...selection,
             primary: symbol,
             selected: nextSelected,
-            spreadLegs: nextSpreadLegs,
+            spreadLegs: nextLegs,
+            spreadPreset: nextPreset,
           },
         },
       };
@@ -296,15 +330,11 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
 
       let nextSelected = selected;
       let nextPrimary = selection.primary;
-      let nextLegs = selection.spreadLegs;
 
       if (isSelected) {
         nextSelected = selected.filter((s) => s !== symbol);
         if (selection.primary === symbol) {
           nextPrimary = nextSelected.length > 0 ? nextSelected[0] : null;
-        }
-        if (selection.spreadEnabled) {
-          nextLegs = nextLegs.filter((leg) => leg.symbol !== symbol);
         }
       } else {
         if (!nextPrimary) {
@@ -315,14 +345,15 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
           if (selected.length >= MAX_COMPARISONS + 1) return {};
           nextSelected = [...selected, symbol];
         }
-
-        if (selection.spreadEnabled && nextLegs.length < MAX_SPREAD_LEGS) {
-          nextLegs = normalizeLegs([...nextLegs, { symbol, weight: -1 }], nextPrimary);
-        }
       }
 
+      let nextLegs = selection.spreadLegs;
+      let nextPreset = selection.spreadPreset;
       if (selection.spreadEnabled) {
-        nextLegs = normalizeLegs(nextLegs, nextPrimary);
+        const ordered = orderSelection(nextPrimary, nextSelected);
+        const result = applyPresetWeights(ordered, selection.spreadPreset, nextPrimary);
+        nextLegs = result.legs;
+        nextPreset = result.preset;
       }
 
       const shouldOpen = !state.isModalOpen && nextSelected.length >= 2;
@@ -336,6 +367,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             primary: nextPrimary,
             selected: nextSelected,
             spreadLegs: nextLegs,
+            spreadPreset: nextPreset,
           },
         },
       };
@@ -358,6 +390,10 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       }
 
       if (!selection.primary) {
+        const nextSelected = [symbol];
+        const result = selection.spreadEnabled
+          ? applyPresetWeights(nextSelected, selection.spreadPreset, symbol)
+          : { legs: selection.spreadLegs, preset: selection.spreadPreset };
         return {
           isModalOpen: true,
           selectionByMode: {
@@ -365,19 +401,23 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             [mode]: {
               ...selection,
               primary: symbol,
-              selected: [symbol],
-              spreadLegs: selection.spreadEnabled
-                ? buildDefaultLegs([symbol], symbol)
-                : selection.spreadLegs,
+              selected: nextSelected,
+              spreadLegs: result.legs,
+              spreadPreset: result.preset,
             },
           },
         };
       }
 
       const nextSelected = [...selected, symbol];
-      const nextLegs = selection.spreadEnabled
-        ? normalizeLegs([...selection.spreadLegs, { symbol, weight: -1 }], selection.primary)
-        : selection.spreadLegs;
+      const ordered = orderSelection(selection.primary, nextSelected);
+      let nextLegs = selection.spreadLegs;
+      let nextPreset = selection.spreadPreset;
+      if (selection.spreadEnabled) {
+        const result = applyPresetWeights(ordered, selection.spreadPreset, selection.primary);
+        nextLegs = result.legs;
+        nextPreset = result.preset;
+      }
 
       return {
         isModalOpen: true,
@@ -387,6 +427,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             ...selection,
             selected: nextSelected,
             spreadLegs: nextLegs,
+            spreadPreset: nextPreset,
           },
         },
       };
@@ -399,12 +440,16 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       const nextSelectedRaw = selection.selected.filter((s) => s !== symbol);
       const nextPrimary = selection.primary === symbol ? nextSelectedRaw[0] ?? null : selection.primary;
       const nextSelected = orderSelection(nextPrimary, nextSelectedRaw);
-      const nextLegs = selection.spreadEnabled
-        ? normalizeLegs(
-            selection.spreadLegs.filter((leg) => leg.symbol !== symbol),
-            nextPrimary
-          )
-        : selection.spreadLegs;
+      let nextLegs = selection.spreadLegs;
+      let nextPreset = selection.spreadPreset;
+      if (selection.spreadEnabled) {
+        const ordered = orderSelection(nextPrimary, nextSelected);
+        const result = applyPresetWeights(ordered, selection.spreadPreset, nextPrimary);
+        nextLegs = result.legs;
+        nextPreset = result.preset;
+      } else {
+        nextLegs = selection.spreadLegs.filter((leg) => leg.symbol !== symbol);
+      }
 
       return {
         selectionByMode: {
@@ -414,6 +459,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             primary: nextPrimary,
             selected: nextSelected,
             spreadLegs: nextLegs,
+            spreadPreset: nextPreset,
           },
         },
       };
@@ -515,29 +561,15 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
         ? [selection.primary, ...selection.selected.filter((s) => s !== selection.primary)]
         : [...selection.selected];
 
-      const weightsByPreset: Record<typeof preset, number[]> = {
-        calendar: [1, -1],
-        ratio: [1, -1],
-        butterfly: [1, -2, 1],
-        condor: [1, -1, -1, 1],
-      };
-
-      const weights = weightsByPreset[preset];
-      if (ordered.length < weights.length) {
-        return {};
-      }
-
-      const legs = weights.map((weight, idx) => ({
-        symbol: ordered[idx],
-        weight,
-      }));
+      const result = applyPresetWeights(ordered, preset, selection.primary);
 
       return {
         selectionByMode: {
           ...state.selectionByMode,
           [mode]: {
             ...selection,
-            spreadLegs: normalizeLegs(legs, selection.primary),
+            spreadLegs: result.legs,
+            spreadPreset: result.preset,
           },
         },
       };
@@ -548,9 +580,14 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
       const mode = state.mode;
       const selection = state.selectionByMode[mode];
       const nextSelected = selection.primary ? [selection.primary as string] : [];
-      const nextLegs = selection.spreadEnabled
-        ? buildDefaultLegs(nextSelected, selection.primary)
-        : selection.spreadLegs;
+      let nextLegs = selection.spreadLegs;
+      let nextPreset = selection.spreadPreset;
+      if (selection.spreadEnabled) {
+        const ordered = orderSelection(selection.primary, nextSelected);
+        const result = applyPresetWeights(ordered, selection.spreadPreset, selection.primary);
+        nextLegs = result.legs;
+        nextPreset = result.preset;
+      }
       return {
         selectionByMode: {
           ...state.selectionByMode,
@@ -558,6 +595,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             ...selection,
             selected: nextSelected,
             spreadLegs: nextLegs,
+            spreadPreset: nextPreset,
           },
         },
       };
@@ -590,14 +628,14 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
     set((state) => {
       const mode = state.mode;
       const selection = state.selectionByMode[mode];
-      const nextLegs = enabled
-        ? normalizeLegs(
-            selection.spreadLegs.length > 0
-              ? selection.spreadLegs
-              : buildDefaultLegs(selection.selected, selection.primary),
-            selection.primary
-          )
-        : selection.spreadLegs;
+      let nextLegs = selection.spreadLegs;
+      let nextPreset = selection.spreadPreset;
+      if (enabled) {
+        const ordered = orderSelection(selection.primary, selection.selected);
+        const result = applyPresetWeights(ordered, selection.spreadPreset, selection.primary);
+        nextLegs = result.legs;
+        nextPreset = result.preset;
+      }
       return {
         selectionByMode: {
           ...state.selectionByMode,
@@ -605,6 +643,7 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
             ...selection,
             spreadEnabled: enabled,
             spreadLegs: nextLegs,
+            spreadPreset: nextPreset,
           },
         },
       };

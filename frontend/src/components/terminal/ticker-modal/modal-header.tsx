@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 
 interface ModalHeaderProps {
   headerItems: { symbol: string; price: number; changePercent: number }[];
+  spreadValue?: number | null;
   onClose: () => void;
 }
 
-export function ModalHeader({ headerItems, onClose }: ModalHeaderProps) {
+export function ModalHeader({ headerItems, spreadValue, onClose }: ModalHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0">
@@ -33,6 +34,12 @@ export function ModalHeader({ headerItems, onClose }: ModalHeaderProps) {
             )}
           </div>
         ))}
+        {spreadValue != null && (
+          <div className="flex items-baseline gap-2 ml-1 pl-3 border-l border-white/10">
+            <span className="text-sm text-muted-foreground">Spread</span>
+            <span className="text-base font-mono font-bold">{formatNumber(spreadValue)}</span>
+          </div>
+        )}
       </div>
 
       <Button

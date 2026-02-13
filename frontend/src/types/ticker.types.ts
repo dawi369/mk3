@@ -34,12 +34,15 @@ export interface TickerSelectionState {
   selected: string[];
   spreadEnabled: boolean;
   spreadLegs: SpreadLeg[];
+  spreadPreset: SpreadPresetId;
 }
 
 export interface SpreadLeg {
   symbol: string;
   weight: number;
 }
+
+export type SpreadPresetId = "calendar" | "ratio" | "butterfly" | "condor";
 
 export interface TickerSeries {
   symbol: string;

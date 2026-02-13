@@ -44,6 +44,7 @@ interface UseChartSeriesReturn {
   primaryLineData: LineData<Time>[];
   comparisonData: Record<string, LineData<Time>[]>;
   spreadData: LineData<Time>[];
+  spreadValue: number | null;
   bars: Bar[] | undefined;
   depthInfo: {
     first: number;
@@ -352,6 +353,20 @@ export function useChartSeries({
     return buildSpreadSeries(spreadLegs, chartSeriesBySymbol);
   }, [spreadEnabled, spreadLegs, chartSeriesBySymbol]);
 
+  // ── Live spread value (from latest bars) ────────────────────────────────
+
+  const spreadValue = useMemo((): number | null => {
+    if (!spreadEnabled || spreadLegs.length === 0) return null;
+    let sum = 0;
+    for (const leg of spreadLegs) {
+      const entity = entities[leg.symbol];
+      const latestClose = entity?.latestBar?.close;
+      if (latestClose == null) return null; // missing leg data
+      sum += latestClose * leg.weight;
+    }
+    return sum;
+  }, [spreadEnabled, spreadLegs, entities]);
+
   // ── Chart config ───────────────────────────────────────────────────────
 
   const rangeKey = rangeOverride ? `${rangeOverride.start}:${rangeOverride.end}` : "default";
@@ -367,6 +382,7 @@ export function useChartSeries({
     primaryLineData,
     comparisonData,
     spreadData,
+    spreadValue,
     bars,
     depthInfo,
     primarySnapshot,

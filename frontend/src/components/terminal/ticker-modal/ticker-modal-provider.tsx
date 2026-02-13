@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type { ReactNode } from "react";
-import type { SpreadLeg, Timeframe } from "@/types/ticker.types";
+import type { SpreadLeg, SpreadPresetId, Timeframe } from "@/types/ticker.types";
 import { useTickerStore } from "@/store/use-ticker-store";
 
 // Symbol colors for chart overlay
@@ -34,11 +34,12 @@ interface TickerModalState {
   reorderSelection: (order: string[]) => void;
 
   spreadEnabled: boolean;
+  spreadPreset: SpreadPresetId;
   setSpreadEnabled: (enabled: boolean) => void;
   toggleSpreadLegSign: (symbol: string) => void;
   moveSpreadLeg: (symbol: string, direction: -1 | 1) => void;
   reverseSpreadLegs: () => void;
-  applySpreadPreset: (preset: "calendar" | "ratio" | "butterfly" | "condor") => void;
+  applySpreadPreset: (preset: SpreadPresetId) => void;
 }
 
 export function useTickerModal(): TickerModalState {
@@ -93,6 +94,7 @@ export function useTickerModal(): TickerModalState {
     removeComparison,
     reorderSelection,
     spreadEnabled: selection.spreadEnabled,
+    spreadPreset: selection.spreadPreset,
     setSpreadEnabled,
     toggleSpreadLegSign,
     moveSpreadLeg,
