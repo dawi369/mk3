@@ -1,137 +1,16 @@
 import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
-import { POLYGON_API_KEY } from "@/config/env.js";
-import activeMonthsData from "../../tickers/active_months.json" with { type: "json" };
 import type {
-  FrontMonthInfo,
   FrontMonthCache,
   FrontMonthJobStatus,
-  PolygonSnapshotResponse,
-  PolygonSnapshotContract,
 } from "@/types/front_month.types.js";
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import { getAllConfiguredProducts } from "@/utils/futures_universe.js";
+import { contractProvider } from "@/utils/contract_provider.js";
+import { fetchTickerSnapshotContract } from "@/utils/polygon_snapshots.js";
+import { resolveFrontMonth } from "@/utils/front_month_resolver.js";
 
-const POLYGON_SNAPSHOT_URL = "https://api.polygon.io/futures/vX/snapshot";
 const REDIS_CACHE_KEY = "cache:front-months";
 const REDIS_STATUS_KEY = "job:front-months:status";
-
-// Map active.json categories to PolygonAssetClass
-const CATEGORY_TO_ASSET_CLASS: Record<string, PolygonAssetClass> = {
-  INTEREST_RATES: "currencies",
-  GRAINS: "grains",
-  METALS: "metals",
-  SOFTS: "softs",
-  US_INDICES: "us_indices",
-  ENERGY_VOLATILES: "volatiles",
-};
-
-// Extract all product codes from active.json with their asset class
-function getProductCodes(): Array<{ code: string; assetClass: PolygonAssetClass }> {
-  const products: Array<{ code: string; assetClass: PolygonAssetClass }> = [];
-
-  for (const [category, tickers] of Object.entries(activeMonthsData.FUTURES_ACTIVE_MONTHS)) {
-    const assetClass = CATEGORY_TO_ASSET_CLASS[category];
-    if (!assetClass) continue;
-
-    for (const code of Object.keys(tickers)) {
-      products.push({ code, assetClass });
-    }
-  }
-
-  return products;
-}
-
-async function fetchSnapshot(productCode: string): Promise<PolygonSnapshotContract[]> {
-  const url = `${POLYGON_SNAPSHOT_URL}?product_code=${productCode}&apiKey=${POLYGON_API_KEY}`;
-
-  try {
-    const response = await fetch(url);
-    const data = (await response.json()) as PolygonSnapshotResponse;
-
-    if (data.status !== "OK" || !data.results) {
-      console.warn(`[FrontMonthJob] No snapshot data for ${productCode}`);
-      return [];
-    }
-
-    return data.results;
-  } catch (error) {
-    console.error(`[FrontMonthJob] Error fetching snapshot for ${productCode}:`, error);
-    return [];
-  }
-}
-
-function analyzeContracts(
-  contracts: PolygonSnapshotContract[],
-  productCode: string,
-  assetClass: PolygonAssetClass
-): FrontMonthInfo | null {
-  const now = new Date();
-
-  // Filter and analyze outright contracts (no spreads)
-  const outrights = contracts
-    .filter((c) => !c.details.ticker.includes("-"))
-    .map((c) => {
-      // Parse settlement_date - can be string (YYYY-MM-DD) or number (ns/ms)
-      let settlementDate: Date;
-      let expiryDateStr = "";
-      const rawDate = c.details.settlement_date;
-
-      if (typeof rawDate === "string") {
-        settlementDate = new Date(rawDate);
-        expiryDateStr = rawDate;
-      } else if (typeof rawDate === "number") {
-        // Try nanoseconds first (very large number), then milliseconds
-        const ms = rawDate > 1e15 ? rawDate / 1_000_000 : rawDate;
-        settlementDate = new Date(ms);
-        if (!isNaN(settlementDate.getTime())) {
-          expiryDateStr = settlementDate.toISOString().split("T")[0]!;
-        }
-      } else {
-        settlementDate = new Date(NaN);
-      }
-
-      const daysToExpiry = isNaN(settlementDate.getTime())
-        ? -1
-        : Math.ceil(
-            (settlementDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-          );
-
-      return {
-        ticker: c.details.ticker,
-        volume: c.session?.volume || 0,
-        daysToExpiry,
-        lastPrice: c.last_trade?.price || c.session?.close || null,
-        expiryDate: expiryDateStr,
-      };
-    })
-    .filter((c) => c.daysToExpiry > 0); // Only future contracts
-
-  if (outrights.length === 0) {
-    return null;
-  }
-
-  // Find nearest expiry
-  const nearest = [...outrights].sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0];
-
-  // Find highest volume
-  const highestVolume = [...outrights].sort((a, b) => b.volume - a.volume)[0];
-
-  if (!nearest || !highestVolume) {
-    return null;
-  }
-
-  return {
-    frontMonth: highestVolume.ticker,
-    productCode,
-    assetClass,
-    volume: highestVolume.volume,
-    daysToExpiry: highestVolume.daysToExpiry,
-    nearestExpiry: nearest.ticker,
-    isRolling: highestVolume.ticker !== nearest.ticker,
-    lastPrice: highestVolume.lastPrice,
-    expiryDate: highestVolume.expiryDate || "",
-  };
-}
 
 class FrontMonthJob {
   private status: FrontMonthJobStatus = {
@@ -197,28 +76,36 @@ class FrontMonthJob {
     this.status.lastRunTime = Date.now();
 
     try {
-      const products = getProductCodes();
+      const products = await getAllConfiguredProducts();
       const newCache: FrontMonthCache = {
         lastUpdated: Date.now(),
         products: {},
       };
 
       for (const { code, assetClass } of products) {
-        const contracts = await fetchSnapshot(code);
-        const frontMonth = analyzeContracts(contracts, code, assetClass);
+        const contracts = await contractProvider.fetchActiveContractsDetailed(code);
+        await redisStore.writeActiveContracts(code, contracts);
+
+        const snapshots = await Promise.all(
+          contracts.map(async (contract) => ({
+            contract,
+            snapshot: await fetchTickerSnapshotContract(contract.ticker),
+          })),
+        );
+
+        const frontMonth = resolveFrontMonth(snapshots, code, assetClass);
 
         if (frontMonth) {
           newCache.products[code] = frontMonth;
           const rollIndicator = frontMonth.isRolling ? " (ROLLING)" : "";
           console.log(
-            `[FrontMonthJob] ${code}: ${frontMonth.frontMonth} (${frontMonth.volume.toLocaleString()} vol)${rollIndicator}`
+            `[FrontMonthJob] ${code}: ${frontMonth.frontMonth} (${frontMonth.volume.toLocaleString()} vol, confidence=${frontMonth.confidence})${rollIndicator}`
           );
         } else {
           console.warn(`[FrontMonthJob] ${code}: No front month detected`);
         }
 
-        // Small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
       this.cache = newCache;

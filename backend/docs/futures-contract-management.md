@@ -10,12 +10,22 @@ Futures contracts expire and roll to new contracts. The system must handle:
 
 ### Contract Builders (`src/utils/cbs/schedule_cb.ts`)
 
-Uses Polygon API to dynamically fetch active contracts:
+Uses active-contract discovery first and only falls back to static month-code generation if the contracts endpoint does not return usable data:
 
 ```typescript
 const request = await scheduleBuilder.buildRequestAsync("us_indices", "A");
 // Returns: { ev: "A", symbols: ["ESH6", "NQH6", ...], assetClass: "us_indices" }
 ```
+
+### Front-Month Resolution (`src/jobs/front_month_job.ts`)
+
+Front month is resolved from:
+
+1. active contracts for a product root
+2. per-contract snapshot liquidity signals
+3. nearest valid expiry as fallback
+
+The resolver ranks candidates by session volume, then open interest, then expiry proximity. This is more robust than assuming the first calendar contract is always the front month.
 
 ### Supported Asset Classes
 
@@ -33,7 +43,7 @@ const request = await scheduleBuilder.buildRequestAsync("us_indices", "A");
 Monthly cron job (`refresh_subscriptions.ts`) handles updates:
 
 - **Schedule:** 1st of month @ 00:05 ET
-- **Logic:** Rebuilds requests using current date, compares with active subscriptions
+- **Logic:** Rebuilds requests from currently active contracts, compares with active subscriptions
 - **Zero downtime:** WS stays connected during update
 
 ### Manual Trigger

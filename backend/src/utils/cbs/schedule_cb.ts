@@ -1,7 +1,8 @@
 import type { PolygonWsRequest, PolygonAssetClass } from "@/types/polygon.types.js";
-import { Tickers } from "@/utils/tickers.js";
 import { SUBSCRIPTION_CONFIG } from "@/config/subscriptions.js";
 import activeMonthsData from "../../../tickers/active_months.json" with { type: "json" };
+import { contractProvider } from "@/utils/contract_provider.js";
+import { getProductRoots } from "@/utils/futures_universe.js";
 
 // Month code to month number mapping
 const MONTH_ORDER: Record<string, number> = {
@@ -91,28 +92,37 @@ function generateContractSymbols(ticker: string, limit: number): string[] {
 }
 
 class ScheduleContractBuilder {
-  private tickers: Tickers | null = null;
-
-  private async getTickers(): Promise<Tickers> {
-    if (!this.tickers) {
-      this.tickers = await Tickers.create();
-    }
-    return this.tickers;
-  }
-
   async buildRequestAsync(
     assetClass: PolygonAssetClass,
     eventType: "A" | "AM"
   ): Promise<PolygonWsRequest> {
-    const tickers = await this.getTickers();
-    const tickerRoots = tickers.listCodes(assetClass as any);
+    const tickerRoots = await getProductRoots(assetClass);
     const symbols: string[] = [];
     const limit = LIMITS_MAP[assetClass] || 1;
 
-    for (const root of tickerRoots) {
-      if (!root) continue;
-      const contractSymbols = generateContractSymbols(root, limit);
-      symbols.push(...contractSymbols);
+    const contractResults = await Promise.allSettled(
+      tickerRoots.map(async (root) => {
+        const liveContracts = await contractProvider.fetchActiveContracts(root);
+        if (liveContracts.length > 0) {
+          return liveContracts.slice(0, limit);
+        }
+
+        return generateContractSymbols(root, limit);
+      }),
+    );
+
+    for (let index = 0; index < contractResults.length; index++) {
+      const root = tickerRoots[index];
+      const result = contractResults[index];
+      if (!root || !result) continue;
+
+      if (result.status === "fulfilled") {
+        symbols.push(...result.value);
+        continue;
+      }
+
+      const fallbackContracts = generateContractSymbols(root, limit);
+      symbols.push(...fallbackContracts);
     }
 
     console.log(`[ScheduleBuilder] ${assetClass}: ${symbols.length} symbols`);

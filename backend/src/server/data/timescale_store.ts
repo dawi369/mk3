@@ -11,11 +11,16 @@ const unzipAsync = promisify(unzip);
 class TimescaleStore {
   private sql: postgres.Sql | null = null;
   private connected = false;
+  private readonly enabled = Boolean(DATABASE_URL);
 
   constructor() {}
 
   get isConnected(): boolean {
     return this.connected;
+  }
+
+  get isEnabled(): boolean {
+    return this.enabled;
   }
 
   /**
@@ -32,7 +37,7 @@ class TimescaleStore {
   }
 
   async init() {
-    if (!DATABASE_URL) {
+    if (!this.enabled || !DATABASE_URL) {
       console.warn("DATABASE_URL not set, skipping TimescaleDB init");
       return;
     }
@@ -133,8 +138,7 @@ class TimescaleStore {
           "❌ TimescaleDB connection refused. Is the 'timescaledb' container running? (docker compose up -d timescaledb)",
         );
       }
-      console.error("Fatal: TimescaleDB connection failed. Exiting...");
-      process.exit(1);
+      this.connected = false;
     }
   }
 
@@ -331,7 +335,9 @@ class TimescaleStore {
   async close() {
     if (this.sql) {
       await this.sql.end();
+      this.sql = null;
     }
+    this.connected = false;
   }
 }
 

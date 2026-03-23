@@ -6,6 +6,11 @@ function getEnvVar(key: string): string {
   return value;
 }
 
+function getOptionalEnvVar(key: string): string | undefined {
+  const value = Bun.env[key];
+  return value && value.length > 0 ? value : undefined;
+}
+
 function getEnvVarAsInt(key: string): number {
   const value = getEnvVar(key);
   const parsed = parseInt(value, 10);
@@ -40,5 +45,5 @@ export const HUB_PORT = getEnvVarAsInt("HUB_PORT");
 export const REDIS_HOST = redisConfig.host;
 export const REDIS_PORT = redisConfig.port;
 export const REDIS_PASSWORD = redisConfig.password;
-export const DATABASE_URL = getEnvVar("DATABASE_URL");
+export const DATABASE_URL = getOptionalEnvVar("DATABASE_URL");
 export const HUB_API_KEY = getEnvVar("HUB_API_KEY");

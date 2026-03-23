@@ -1,10 +1,9 @@
 import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
-import { POLYGON_API_KEY } from "@/config/env.js";
-import type { SnapshotData } from "@/types/common.types.js";
-import type { PolygonSnapshotResponse } from "@/types/front_month.types.js";
-
-const POLYGON_SNAPSHOT_URL = "https://api.polygon.io/futures/vX/snapshot";
+import {
+  fetchTickerSnapshotContract,
+  snapshotContractToSnapshotData,
+} from "@/utils/polygon_snapshots.js";
 const REDIS_STATUS_KEY = "job:snapshot:status";
 
 interface SnapshotJobStatus {
@@ -13,62 +12,6 @@ interface SnapshotJobStatus {
   lastError: string | null;
   symbolsUpdated: number;
   totalRuns: number;
-}
-
-/**
- * Fetch snapshot for a specific ticker from Polygon
- */
-async function fetchTickerSnapshot(
-  ticker: string
-): Promise<SnapshotData | null> {
-  const url = `${POLYGON_SNAPSHOT_URL}?ticker=${ticker}&apiKey=${POLYGON_API_KEY}`;
-
-  try {
-    const response = await fetch(url);
-    const data = (await response.json()) as PolygonSnapshotResponse;
-
-    if (data.status !== "OK" || !data.results || data.results.length === 0) {
-      console.warn(`[SnapshotJob] No snapshot data for ${ticker}`);
-      return null;
-    }
-
-    const contract = data.results[0];
-    if (!contract) return null;
-
-    const session = contract.session || {};
-
-    // Parse settlement_date - can be string (YYYY-MM-DD) or number (ns/ms)
-    let settlementDate = "";
-    const rawDate = contract.details.settlement_date;
-    if (typeof rawDate === "string") {
-      settlementDate = rawDate;
-    } else if (typeof rawDate === "number") {
-      // Try nanoseconds first (very large number), then milliseconds
-      const ms = rawDate > 1e15 ? rawDate / 1_000_000 : rawDate;
-      const date = new Date(ms);
-      if (!isNaN(date.getTime())) {
-        settlementDate = date.toISOString().split("T")[0]!;
-      }
-    }
-
-    return {
-      productCode: contract.details.product_code || "",
-      settlementDate,
-      sessionOpen: session.open || 0,
-      sessionHigh: session.high || 0,
-      sessionLow: session.low || 0,
-      sessionClose: session.close || 0,
-      settlementPrice: session.settlement_price || 0,
-      prevSettlement: session.previous_settlement || 0,
-      change: session.change || 0,
-      changePct: session.change_percent || 0,
-      openInterest: contract.open_interest || null,
-      timestamp: Date.now(),
-    };
-  } catch (error) {
-    console.error(`[SnapshotJob] Error fetching snapshot for ${ticker}:`, error);
-    return null;
-  }
 }
 
 class SnapshotJob {
@@ -117,8 +60,14 @@ class SnapshotJob {
     this.status.lastRunTime = Date.now();
 
     try {
-      // Get list of active symbols from bar:latest
-      const symbols = await redisStore.getSymbols();
+      const [subscribedSymbols, cachedContractSymbols] = await Promise.all([
+        redisStore.getSubscribedSymbols(),
+        redisStore.getCachedActiveContractSymbols(),
+      ]);
+
+      const symbols = Array.from(
+        new Set([...subscribedSymbols, ...cachedContractSymbols]),
+      ).sort();
 
       if (symbols.length === 0) {
         console.log("[SnapshotJob] No active symbols found");
@@ -132,7 +81,8 @@ class SnapshotJob {
 
       let updated = 0;
       for (const symbol of symbols) {
-        const snapshot = await fetchTickerSnapshot(symbol);
+        const contract = await fetchTickerSnapshotContract(symbol);
+        const snapshot = contract ? snapshotContractToSnapshotData(contract) : null;
 
         if (snapshot) {
           await redisStore.writeSnapshot(symbol, snapshot);

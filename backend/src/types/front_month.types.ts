@@ -26,6 +26,10 @@ export interface FrontMonthInfo {
   lastPrice: number | null;
   /** Settlement/expiry date of the front month */
   expiryDate: string;
+  /** Resolution confidence based on the available liquidity signals */
+  confidence: "low" | "medium" | "high";
+  /** Number of valid candidate contracts considered */
+  candidateCount: number;
 }
 
 /**
@@ -56,7 +60,7 @@ export interface PolygonSnapshotContract {
   details: {
     ticker: string;
     product_code: string;
-    settlement_date: number; // nanoseconds
+    settlement_date?: string | number | null;
   };
   session?: {
     open?: number;

@@ -21,8 +21,13 @@ async function startHubServer() {
   try {
     console.log("Starting Hub server...");
 
-    // Initialize TimescaleDB
-    // await timescaleStore.init();
+    await redisStore.ping();
+
+    if (timescaleStore.isEnabled) {
+      await timescaleStore.init();
+    } else {
+      console.log("TimescaleDB disabled for current runtime");
+    }
 
     polygonClient = new PolygonWSClient();
     const futuresMarket: PolygonMarketType = "futures";
@@ -45,6 +50,13 @@ async function startHubServer() {
     await polygonClient.subscribe(grainsReq);
     await polygonClient.subscribe(softsReq);
     await polygonClient.subscribe(volatilesReq);
+
+    monthlySubscriptionJob.attachClient(polygonClient);
+    await redisStore.setSubscribedSymbols(
+      polygonClient
+        .getSubscriptions()
+        .flatMap((subscription) => subscription.symbols),
+    );
 
     // Brief pause before continuing
     await Bun.sleep(1000);

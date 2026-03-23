@@ -1,13 +1,13 @@
 # MK3 Backend (Bun)
 
-Real-time futures data backend using Polygon.io WebSocket API.
+Real-time futures data backend using Massive/Polygon futures APIs.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) v1.3.3+
 - Redis (Docker or local)
-- Valid Polygon.io API key
-- TimescaleDB (optional, for historical storage)
+- Valid Massive/Polygon API key
+- TimescaleDB is paused until futures flat-file or equivalent historical access is available
 
 ## Quick Start
 
@@ -30,8 +30,9 @@ Create `.env` file:
 POLYGON_API_KEY=your_key_here
 REDIS_HOST=localhost
 REDIS_PORT=6379
-HUB_REST_PORT=3001
-DATABASE_URL=postgres://...  # Optional: TimescaleDB
+HUB_PORT=3001
+HUB_API_KEY=dev_only_secret
+# DATABASE_URL=postgres://...  # Optional and currently unused in normal runtime
 ```
 
 ## Test the API
@@ -45,11 +46,22 @@ curl http://localhost:3001/bars/latest | jq
 
 # Subscriptions
 curl http://localhost:3001/admin/subscriptions | jq
+
+# Cached active contracts per product
+curl http://localhost:3001/contracts/active | jq
+
+# Front-month resolution
+curl http://localhost:3001/front-months | jq
 ```
 
 ## Documentation
 
-See [docs/README.md](./docs/README.md) for complete documentation.
+Start here:
+
+- [docs/README.md](./docs/README.md)
+- [docs/operations.md](./docs/operations.md)
+- [docs/api-reference.md](./docs/api-reference.md)
+- [docs/system-overview.md](./docs/system-overview.md)
 
 ## Troubleshooting
 
@@ -61,3 +73,4 @@ See [docs/README.md](./docs/README.md) for complete documentation.
 **No data flowing:**
 1. Verify market hours (Mon-Fri, not 5pm-6pm ET)
 2. Check subscriptions: `curl http://localhost:3001/admin/subscriptions`
+3. Inspect cached contract universe: `curl http://localhost:3001/contracts/active`

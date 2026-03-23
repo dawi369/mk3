@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "bun --watch src/server/index.ts",
     "start": "bun src/server/index.ts",
-    "run:server": "bun src/server/index.ts"
+    "run:server": "bun src/server/index.ts",
+    "test": "bun test",
+    "test:unit": "bun test src/tests/logger.test.ts src/tests/front_month_resolver.test.ts src/tests/refresh_subscriptions.test.ts",
+    "test:redis": "bun test src/tests/redis_store.test.ts src/tests/redis_store_contracts.test.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.3"

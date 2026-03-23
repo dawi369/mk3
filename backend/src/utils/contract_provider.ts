@@ -4,6 +4,7 @@ import {
   MAX_PAGES_PER_TICKER,
   MAX_UNIQUE_CONTRACTS,
 } from "@/utils/consts.js";
+import type { ActiveContract } from "@/types/contract.types.js";
 import { appendFileSync, existsSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -12,15 +13,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const INVALID_TICKERS_FILE = join(__dirname, "invalid_tickers.txt");
 
-interface Contract {
-  ticker: string;
-  product_code: string;
-  last_trade_date: string;
-  active: boolean;
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface CachedContracts {
+  fetchedAt: number;
+  contracts: ActiveContract[];
 }
 
 export class ContractProvider {
   private apiKey: string;
+  private cache = new Map<string, CachedContracts>();
 
   constructor(apiKey: string = POLYGON_API_KEY) {
     this.apiKey = apiKey;
@@ -52,8 +54,13 @@ export class ContractProvider {
    * @param root The product code (e.g. "ES")
    * @returns List of contract tickers (e.g. ["ESZ5", "ESH6"]) sorted by expiration.
    */
-  async fetchActiveContracts(root: string): Promise<string[]> {
-    const contractsMap = new Map<string, Contract>();
+  async fetchActiveContractsDetailed(root: string): Promise<ActiveContract[]> {
+    const cached = this.cache.get(root);
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      return cached.contracts;
+    }
+
+    const contractsMap = new Map<string, ActiveContract>();
     let nextUrl:
       | string
       | null = `${POLYGON_CONTRACTS_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
@@ -102,8 +109,8 @@ export class ContractProvider {
             if (!contractsMap.has(item.ticker)) {
               contractsMap.set(item.ticker, {
                 ticker: item.ticker,
-                product_code: item.product_code,
-                last_trade_date: item.last_trade_date,
+                productCode: item.product_code,
+                lastTradeDate: item.last_trade_date,
                 active: item.active,
               });
 
@@ -126,10 +133,20 @@ export class ContractProvider {
     // Sort by expiration date
     const contracts = Array.from(contractsMap.values());
     contracts.sort((a, b) => {
-      return new Date(a.last_trade_date).getTime() - new Date(b.last_trade_date).getTime();
+      return new Date(a.lastTradeDate).getTime() - new Date(b.lastTradeDate).getTime();
     });
 
-    return contracts.map((c) => c.ticker);
+    this.cache.set(root, {
+      fetchedAt: Date.now(),
+      contracts,
+    });
+
+    return contracts;
+  }
+
+  async fetchActiveContracts(root: string): Promise<string[]> {
+    const contracts = await this.fetchActiveContractsDetailed(root);
+    return contracts.map((contract) => contract.ticker);
   }
 }
 

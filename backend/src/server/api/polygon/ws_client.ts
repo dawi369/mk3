@@ -146,6 +146,8 @@ export class PolygonWSClient {
 
         // Check for subscription confirmation
         if (m.status === "success" && m.message?.includes("subscribed to:")) {
+          this.state = ConnectionState.SUBSCRIBED;
+          this.health.connected = true;
           // Resolve the subscribe promise
           if (this.subscribeResolver) {
             this.subscribeResolver();
@@ -348,6 +350,10 @@ export class PolygonWSClient {
 
   getSubscriptions(): PolygonWsRequest[] {
     return [...this.subscriptions];
+  }
+
+  isConnected(): boolean {
+    return this.health.connected;
   }
 
   disconnect(): void {

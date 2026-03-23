@@ -178,6 +178,7 @@ async function handleRequest(
     // Check database connections
     let redisOk = false;
     let timescaleOk = false;
+    const timescaleEnabled = timescaleStore.isEnabled;
 
     try {
       const pong = await redisStore.ping();
@@ -186,10 +187,12 @@ async function handleRequest(
       redisOk = false;
     }
 
-    try {
-      timescaleOk = await timescaleStore.ping();
-    } catch {
-      timescaleOk = false;
+    if (timescaleEnabled) {
+      try {
+        timescaleOk = await timescaleStore.ping();
+      } catch {
+        timescaleOk = false;
+      }
     }
 
     // Get stats and job statuses
@@ -199,10 +202,11 @@ async function handleRequest(
     const refreshJobStatus = monthlySubscriptionJob.getStatus();
 
     // Check WebSocket connection
-    const wsConnected = polygonClient !== null;
+    const wsConnected = polygonClient?.isConnected() || false;
 
     // Determine overall status
-    const allHealthy = redisOk && timescaleOk && wsConnected;
+    const allHealthy =
+      redisOk && wsConnected && (!timescaleEnabled || timescaleOk);
     const status = allHealthy ? "ok" : "degraded";
 
     return jsonResponse({
@@ -210,7 +214,11 @@ async function handleRequest(
       timestamp: Date.now(),
       services: {
         redis: redisOk ? "connected" : "disconnected",
-        timescaledb: timescaleOk ? "connected" : "disconnected",
+        timescaledb: timescaleEnabled
+          ? timescaleOk
+            ? "connected"
+            : "disconnected"
+          : "disabled",
         polygonWs: wsConnected ? "connected" : "disconnected",
       },
       symbols: symbols,
@@ -298,6 +306,27 @@ async function handleRequest(
       });
     }
     return jsonResponse(cache);
+  }
+
+  if (method === "GET" && path === "/contracts/active") {
+    const contracts = await redisStore.getAllActiveContracts();
+    return jsonResponse({
+      products: contracts,
+      count: Object.keys(contracts).length,
+    });
+  }
+
+  const activeContractsMatch = path.match(/^\/contracts\/active\/([^\/]+)$/);
+  if (method === "GET" && activeContractsMatch) {
+    const productCode = activeContractsMatch[1];
+    if (!productCode) return errorResponse("Invalid product code", 400);
+
+    const contracts = await redisStore.getActiveContracts(productCode);
+    if (!contracts) {
+      return errorResponse("Contracts not found", 404);
+    }
+
+    return jsonResponse(contracts);
   }
 
   // Session data endpoint (public - no auth required)

@@ -1,6 +1,7 @@
 import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
 import type { Bar, SessionData, SnapshotData, IndicatorBucket } from "@/types/common.types.js";
+import type { ActiveContract, StoredActiveContracts } from "@/types/contract.types.js";
 import { Redis } from "ioredis";
 
 // Redis Key Constants
@@ -10,8 +11,10 @@ const KEYS = {
   PUBSUB_CHANNEL: "bars", // PUB/SUB: legacy support
   META_DATE: "meta:trading_date",
   META_COUNT: "meta:bar_count",
+  SUBSCRIBED_SYMBOLS: "meta:subscribed_symbols",
   SESSION_PREFIX: "session:", // HASH per symbol: session:{symbol}
   SNAPSHOT_PREFIX: "snapshot:", // HASH per symbol: snapshot:{symbol}
+  ACTIVE_CONTRACTS_PREFIX: "contracts:active:", // STRING per product
 } as const;
 
 const TS_FIELDS = ["open", "high", "low", "close", "volume", "trades"] as const;
@@ -67,7 +70,7 @@ function buildTsKey(tf: Timeframe, symbol: string, field: TimeSeriesField): stri
 
 function extractRootSymbol(symbol: string): string {
   const match = symbol.match(/^([A-Z]+)[FGHJKMNQUVXZ]\d{1,2}$/);
-  return match ? match[1] : symbol;
+  return match?.[1] || symbol;
 }
 
 function normalizeTimestampMs(value: number): number {
@@ -120,6 +123,7 @@ class RedisStore {
       host: REDIS_HOST,
       port: REDIS_PORT,
       password: REDIS_PASSWORD,
+      lazyConnect: true,
       retryStrategy: (times) => {
         // Exponential backoff with max delay of 2 seconds
         const delay = Math.min(times * 50, 2000);
@@ -140,8 +144,6 @@ class RedisStore {
           "❌ Redis connection refused. Is the 'redis' container running? (docker compose up -d redis)",
         );
       }
-      console.error("Fatal: Redis connection failed. Exiting...");
-      process.exit(1);
     });
   }
 
@@ -625,6 +627,80 @@ class RedisStore {
     await this.redis.hset(key, snapshot as unknown as Record<string, string>);
   }
 
+  async setSubscribedSymbols(symbols: string[]): Promise<void> {
+    const uniqueSymbols = Array.from(new Set(symbols)).sort();
+    await this.redis.set(KEYS.SUBSCRIBED_SYMBOLS, JSON.stringify(uniqueSymbols));
+  }
+
+  async getSubscribedSymbols(): Promise<string[]> {
+    const raw = await this.redis.get(KEYS.SUBSCRIBED_SYMBOLS);
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter((symbol): symbol is string => typeof symbol === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async writeActiveContracts(
+    productCode: string,
+    contracts: ActiveContract[],
+  ): Promise<void> {
+    const payload: StoredActiveContracts = {
+      productCode,
+      updatedAt: Date.now(),
+      contracts,
+    };
+
+    await this.redis.set(
+      `${KEYS.ACTIVE_CONTRACTS_PREFIX}${productCode}`,
+      JSON.stringify(payload),
+    );
+  }
+
+  async getActiveContracts(productCode: string): Promise<StoredActiveContracts | null> {
+    const raw = await this.redis.get(`${KEYS.ACTIVE_CONTRACTS_PREFIX}${productCode}`);
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw) as StoredActiveContracts;
+    } catch {
+      return null;
+    }
+  }
+
+  async getAllActiveContracts(): Promise<Record<string, StoredActiveContracts>> {
+    const keys = await this.scanKeys(`${KEYS.ACTIVE_CONTRACTS_PREFIX}*`);
+    const result: Record<string, StoredActiveContracts> = {};
+
+    for (const key of keys) {
+      const productCode = key.replace(KEYS.ACTIVE_CONTRACTS_PREFIX, "");
+      const stored = await this.getActiveContracts(productCode);
+      if (stored) {
+        result[productCode] = stored;
+      }
+    }
+
+    return result;
+  }
+
+  async getCachedActiveContractSymbols(): Promise<string[]> {
+    const allContracts = await this.getAllActiveContracts();
+    const symbols = new Set<string>();
+
+    for (const stored of Object.values(allContracts)) {
+      for (const contract of stored.contracts) {
+        symbols.add(contract.ticker);
+      }
+    }
+
+    return Array.from(symbols).sort();
+  }
+
   async getStats(): Promise<{
     date: string;
     barCount: number;
@@ -706,6 +782,12 @@ class RedisStore {
     const sessionKeys = await this.scanKeys(`${KEYS.SESSION_PREFIX}*`);
     if (sessionKeys.length > 0) {
       clearedCount += await this.deleteInBatches(sessionKeys);
+    }
+
+    // Clear symbol snapshots
+    const snapshotKeys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    if (snapshotKeys.length > 0) {
+      clearedCount += await this.deleteInBatches(snapshotKeys);
     }
 
     // Update metadata

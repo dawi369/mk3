@@ -1,323 +1,124 @@
-# Redis Architecture
+# Redis Reference
 
-Redis serves as the **hot data layer** for real-time market data distribution and storage. The frontend reads directly from Redis via backend REST endpoints.
+Redis is the hot-path system of record for the active backend runtime.
 
----
+## Purpose
 
-## Key Structure Overview
+Redis stores:
 
-### Real-Time Bar Data (TimeSeries + Stream)
+- latest bars
+- recent time-series history
+- broadcast stream payloads
+- session metrics
+- snapshot cache entries
+- active-contract cache entries
+- lightweight job and runtime metadata
 
-| Key Pattern | Type | Description | TTL |
-|-------------|------|-------------|-----|
-| `bar:latest` | **HASH** | Symbol → Bar JSON (all latest bars in one hash) | Cleared daily |
-| `ts:bar:{tf}:{symbol}:{field}` | **TIMESERIES** | 1s bars + downsampled timeframes | 7 days (retention) |
-| `market_data` | **STREAM** | Real-time event bus (~10M max) | Cleared daily |
-| `bars` | **PUB/SUB** | Legacy channel (maintained for compatibility) | N/A |
+## Keyspace
 
-**Timeframes:** `1s`, `15s`, `30s`, `1m`, `5m`, `15m`, `30m`, `1h`, `2h`, `4h`, `1d`
+### Market Data
 
-**Fields:** `open`, `high`, `low`, `close`, `volume`, `trades`
+| Key | Type | Purpose |
+|-----|------|---------|
+| `bar:latest` | HASH | Latest normalized bar by symbol |
+| `ts:bar:{tf}:{symbol}:{field}` | TIMESERIES | Redis time series per field and timeframe |
+| `market_data` | STREAM | Real-time event stream for connected consumers |
+| `bars` | PUB/SUB | Legacy compatibility channel |
 
-### Contract Snapshots
+### Session And Snapshot Data
 
-| Key Pattern | Type | Description | Source |
-|-------------|------|-------------|--------|
-| `snapshot:{symbol}` | **HASH** | Full contract snapshot from exchange | Polygon Snapshot API |
-| `session:{symbol}` | **HASH** | Intraday rolling calculations (VWAP, CVOL) | Computed from bars |
+| Key | Type | Purpose |
+|-----|------|---------|
+| `session:{symbol}` | HASH | Intraday session metrics for one symbol |
+| `snapshot:{symbol}` | HASH | Exchange/session snapshot for one symbol |
 
-### Metadata & Jobs
+### Contract And Runtime Metadata
 
-| Key Pattern | Type | Description |
-|-------------|------|-------------|
-| `meta:trading_date` | **STRING** | Last trading date (YYYY-MM-DD) |
-| `meta:bar_count` | **STRING** | Total bars processed today |
-| `job:clear:status` | **STRING (JSON)** | Daily clear job status |
-| `job:refresh:status` | **STRING (JSON)** | Monthly subscription refresh job status |
-| `job:front-months:status` | **STRING (JSON)** | Front month detection job status |
-| `job:snapshot:status` | **STRING (JSON)** | Snapshot fetch job status |
-| `cache:front-months` | **STRING (JSON)** | Front month contract cache |
+| Key | Type | Purpose |
+|-----|------|---------|
+| `contracts:active:{productCode}` | STRING(JSON) | Cached active contracts for a product root |
+| `cache:front-months` | STRING(JSON) | Front-month resolution cache |
+| `meta:subscribed_symbols` | STRING(JSON) | Persisted currently subscribed symbols |
+| `meta:trading_date` | STRING | Last clear date |
+| `meta:bar_count` | STRING | Bars processed since last clear |
 
----
+### Job Status
 
-## Snapshot Keyspace
+| Key | Type | Purpose |
+|-----|------|---------|
+| `job:clear:status` | STRING(JSON) | Daily clear job status |
+| `job:refresh:status` | STRING(JSON) | Subscription refresh job status |
+| `job:front-months:status` | STRING(JSON) | Front-month job status |
+| `job:snapshot:status` | STRING(JSON) | Snapshot job status |
 
-> [!CAUTION]
-> **Polygon Futures Beta Limitations:**
-> - Depth of book data is NOT available
-> - Options on futures are NOT included
-> - Do not implement features requiring these until out of beta
+## Retention
 
-### Source: Polygon Snapshot API
+- `bar:latest`: cleared by daily reset
+- `market_data`: cleared by daily reset
+- `session:*`: cleared by daily reset
+- `snapshot:*`: cleared by daily reset
+- `ts:bar:*`: retained for 7 days
+- `contracts:active:*`: retained until overwritten by newer metadata
 
-We only use `details` and `session` from the snapshot response. Real-time fields (`last_minute`, `last_trade`, `last_quote`) are already handled by our WebSocket stream.
+## Session Metrics
 
-```json
-{
-  "details": {
-    "ticker": "ESH6",
-    "product_code": "ES",
-    "settlement_date": "2026-03-20"
-  },
-  "session": {
-    "open": 7004.25,
-    "high": 7027.25,
-    "low": 7002.5,
-    "close": 7012.25,
-    "volume": 109330,
-    "settlement_price": 7012.25,
-    "previous_settlement": 7002.5,
-    "change": 9.75,
-    "change_percent": 0.139
-  }
-}
-```
+Each `session:{symbol}` hash maintains:
 
-### Refresh Strategy
+- `dayOpen`
+- `dayHigh`
+- `dayLow`
+- `vwap`
+- `cvol`
+- `tradeCount`
+- `volNow`
+- `volMin`
+- `volMax`
+- `volPos`
+- `volBucket`
+- `vwapMin`
+- `vwapMax`
+- `vwapPos`
+- `vwapBucket`
+- `cumPriceVolume`
+- `cumVolume`
+- `timestamp`
 
-> [!NOTE]
-> Snapshots are fetched at 2:05 AM ET via `snapshot_job.ts` (after daily clear at 2 AM).  
-> Future: Needs per-product session handling. See `TODO.md`.
+These metrics are computed incrementally from incoming bars.
 
-### `snapshot:{symbol}` Hash
+## Front-Month Support
 
-Populated from Polygon Snapshot API at session open.
+Redis stores two separate pieces of front-month support data:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `productCode` | string | Root symbol (e.g., "ES") |
-| `settlementDate` | string | Contract expiry (YYYY-MM-DD) |
-| `sessionOpen` | number | Session open price |
-| `sessionHigh` | number | Session high |
-| `sessionLow` | number | Session low |
-| `sessionClose` | number | Session close (prev session) |
-| `settlementPrice` | number | Official settlement price |
-| `prevSettlement` | number | Previous session settlement |
-| `change` | number | Price change ($) |
-| `changePct` | number | Price change (%) |
-| `openInterest` | number \| null | Open interest (if available) |
-| `timestamp` | number | Snapshot timestamp (epoch ms) |
+- `contracts:active:{productCode}`: candidate contract universe
+- `cache:front-months`: resolved leader per product root
 
-### `session:{symbol}` Hash
+This separation matters operationally:
 
-Rolling intraday calculations computed from incoming bars.
+- contract discovery can succeed while front-month ranking is weak
+- front-month ranking can be inspected independently of live subscriptions
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `vwap` | number | Volume-weighted average price |
-| `cvol` | number | Cumulative volume (session) |
-| `tradeCount` | number | Total trades (session) |
-| `dayHigh` | number | Session high (rolling) |
-| `dayLow` | number | Session low (rolling) |
-| `dayOpen` | number | First bar open of session |
-| `volNow` | number | Latest bar volume (current) |
-| `volMin` | number | Minimum bar volume seen this session |
-| `volMax` | number | Maximum bar volume seen this session |
-| `volPos` | number | Current volume position (0-1) |
-| `volBucket` | string | `low` / `mid` / `high` |
-| `vwapMin` | number | Minimum VWAP seen this session |
-| `vwapMax` | number | Maximum VWAP seen this session |
-| `vwapPos` | number | Current VWAP position (0-1) |
-| `vwapBucket` | string | `low` / `mid` / `high` |
-| `cumPriceVolume` | number | Running total for VWAP calc |
-| `cumVolume` | number | Running total for VWAP calc |
-| `timestamp` | number | Last update (epoch ms) |
+## Daily Reset Behavior
 
-### Calculation Logic
+The daily clear job currently removes:
 
-**VWAP Formula:**
-```
-VWAP = Σ(price × volume) / Σ(volume)
-```
+- `bar:latest`
+- `market_data`
+- `session:*`
+- `snapshot:*`
 
-On each bar:
-```typescript
-cumPriceVolume += bar.close * bar.volume;
-cumVolume += bar.volume;
-vwap = cumPriceVolume / cumVolume;
-```
+It does not remove:
 
-**Indicator Position (session scope):**
-```
-pos = (value - min) / (max - min)
-bucket = low   if pos <= 0.33
-bucket = mid   if pos <= 0.66
-bucket = high  otherwise
-```
+- Redis time-series history
+- active-contract metadata
+- front-month cache
 
-- `volNow` uses the latest bar volume.
-- `volMin/volMax` track the min/max bar volume seen this session.
-- `vwapMin/vwapMax` track the min/max VWAP seen this session.
-
----
-
-## Data Flow
-
-### Current (Bars)
-```
-Polygon WS → ws_client.ts → Redis
-                              ├── HSET bar:latest
-                              ├── TS.MADD ts:bar:1s:{symbol}:{field}
-                              ├── TS.CREATERULE (downsample to 15s/30s/1m/5m/15m/30m/1h/2h/4h/1d)
-                              ├── XADD market_data
-                              └── PUBLISH bars
-```
-
-### With Snapshots
-
-```
-Polygon Snapshot API → snapshot_job.ts → Redis
-                                          └── HSET snapshot:{symbol}
-
-bar:latest updates → redis_store.updateSession() → Redis
-                                        └── HSET session:{symbol}
-```
-
----
-
-## Session Time Handling
-
-> [!WARNING]
-> Session times vary by exchange and product. Implementation TBD.
-
-| Exchange | Products | Session Notes |
-|----------|----------|---------------|
-| CME Globex | ES, NQ, etc. | Nearly 24h (Sun 5pm - Fri 4pm CT, 1h break) |
-| CBOT | ZC, ZW, etc. | Split sessions with breaks |
-| COMEX | GC, SI | Follows CME Globex schedule |
-| NYMEX | CL, NG | Follows CME Globex schedule |
-| ICE | KC, CT, etc. | Different schedule |
-
-**Current Approach:** Single daily reset at 2 AM ET for all products.
-
-**Future:** Per-product session handling based on exchange calendars.
-
----
-
-## Bar Schema
-
-```typescript
-interface Bar {
-  symbol: string;      // e.g. "ESH6"
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  trades: number;
-  dollarVolume: number;
-  startTime: number;   // epoch ms
-  endTime: number;     // epoch ms
-}
-```
-
----
-
-## Redis CLI Examples
+## Operator Checks
 
 ```bash
-# Real-time bars
-HGET bar:latest ESH6
-HGETALL bar:latest
-
-# TimeSeries range (1m)
-TS.MRANGE - + FILTER symbol=ESH6 tf=1m
-
-# Snapshots (planned)
-HGETALL snapshot:ESH6
-HGET snapshot:ESH6 settlementPrice
-
-# Session data
-HGETALL session:ESH6
-HGET session:ESH6 vwap
-
-# Stats
-GET meta:trading_date
-GET meta:bar_count
+curl http://localhost:3001/contracts/active | jq
+curl http://localhost:3001/front-months | jq
+curl http://localhost:3001/snapshots | jq
+curl http://localhost:3001/sessions | jq
 ```
 
----
-
-## Backend API (`redisStore`)
-
-```typescript
-import { redisStore } from "@/server/data/redis_store.js";
-
-// Single symbol
-const bar = await redisStore.getLatest("ESH6");
-
-// All symbols as map
-const all = await redisStore.getAllLatest();  // { ESH6: Bar, ... }
-
-// All symbols as array
-const bars = await redisStore.getAllLatestArray();
-
-// List of symbols
-const symbols = await redisStore.getSymbols();
-
-// Today's history
-const history = await redisStore.getTodayBars("ESH6");
-
-// Stats
-const stats = await redisStore.getStats();  // { date, barCount, symbolCount }
-```
-
-// Snapshot data
-const snap = await redisStore.getSnapshot("ESH6");
-const allSnaps = await redisStore.getAllSnapshots();
-
-// Session calculations
-const session = await redisStore.getSession("ESH6");
-const allSessions = await redisStore.getAllSessions();
-
-// Write snapshot (used by snapshot_job)
-await redisStore.writeSnapshot("ESH6", snapshotData);
-```
-
-### REST Endpoints
-
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/bars/range/:symbol` | GET | No | TimeSeries range query (tf/start/end) |
-| `/bars/week/:symbol` | GET | No | 7-day range (tf optional) |
-| `/bars/today/:symbol` | GET | No | Today range (tf optional) |
-| `/session/:symbol` | GET | No | Session data (VWAP, CVOL, etc.) |
-| `/sessions` | GET | No | All session data |
-| `/snapshot/:symbol` | GET | No | Snapshot for symbol |
-| `/snapshots` | GET | No | All snapshots |
-| `/admin/refresh-snapshots` | POST | Yes | Trigger snapshot refresh |
-
----
-
-## Daily Reset (2 AM ET)
-
-The `clearTodayData()` function:
-- Deletes `bar:latest` hash
-- Deletes `market_data` stream
-- Deletes all `session:*` hashes
-- Resets `meta:bar_count` to 0
-- Updates `meta:trading_date`
-- Does NOT delete TimeSeries data (retention handles history)
-
----
-
-## Configuration
-
-| Env Variable | Default | Description |
-|--------------|---------|-------------|
-| `REDIS_HOST` | `localhost` | Redis host |
-| `REDIS_PORT` | `6379` | Redis port |
-| `REDIS_PASSWORD` | - | Optional password |
-
-## Docker
-
-```yaml
-redis:
-  image: redis/redis-stack-server:latest
-  container_name: mk3-redis
-  ports:
-    - "6379:6379"
-  volumes:
-    - redis-data:/data
-  command: redis-stack-server --appendonly yes
-```
+For open design gaps around sessions and provider quality, see [concerns/README.md](./concerns/README.md).

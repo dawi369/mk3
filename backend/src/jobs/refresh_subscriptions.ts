@@ -39,6 +39,10 @@ class MonthlySubscriptionJob {
     }
   }
 
+  attachClient(wsClient: PolygonWSClient): void {
+    this.wsClient = wsClient;
+  }
+
   private findSubscriptionByAssetClass(
     subscriptions: PolygonWsRequest[],
     assetClass: PolygonAssetClass,
@@ -165,6 +169,13 @@ class MonthlySubscriptionJob {
       this.status.lastError = null;
       this.status.lastSuccess = true;
       console.log("✓ Refresh completed successfully");
+    }
+
+    if (this.wsClient) {
+      const nextSymbols = this.wsClient
+        .getSubscriptions()
+        .flatMap((subscription) => subscription.symbols);
+      await redisStore.setSubscribedSymbols(nextSymbols);
     }
 
     await this.saveStatus();
