@@ -1,10 +1,11 @@
-import { POLYGON_API_KEY } from "@/config/env.js";
+import { MASSIVE_API_KEY } from "@/config/env.js";
 import {
-  POLYGON_CONTRACTS_URL,
+  MASSIVE_CONTRACTS_URL,
   MAX_PAGES_PER_TICKER,
   MAX_UNIQUE_CONTRACTS,
 } from "@/utils/consts.js";
 import type { ActiveContract } from "@/types/contract.types.js";
+import { isOutrightTickerForRoot } from "@/utils/contracts_calendar.js";
 import { appendFileSync, existsSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -14,6 +15,7 @@ const __dirname = dirname(__filename);
 const INVALID_TICKERS_FILE = join(__dirname, "invalid_tickers.txt");
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
+const CONTRACT_PAGE_SIZE = 5000;
 
 interface CachedContracts {
   fetchedAt: number;
@@ -24,7 +26,7 @@ export class ContractProvider {
   private apiKey: string;
   private cache = new Map<string, CachedContracts>();
 
-  constructor(apiKey: string = POLYGON_API_KEY) {
+  constructor(apiKey: string = MASSIVE_API_KEY) {
     this.apiKey = apiKey;
   }
 
@@ -39,7 +41,7 @@ export class ContractProvider {
       if (!existsSync(INVALID_TICKERS_FILE)) {
         writeFileSync(
           INVALID_TICKERS_FILE,
-          "# Invalid Tickers Log\n# Tickers that returned empty JSON from Polygon API\n\n"
+          "# Invalid Tickers Log\n# Tickers that returned empty JSON from Massive API\n\n"
         );
       }
       appendFileSync(INVALID_TICKERS_FILE, entry);
@@ -63,7 +65,7 @@ export class ContractProvider {
     const contractsMap = new Map<string, ActiveContract>();
     let nextUrl:
       | string
-      | null = `${POLYGON_CONTRACTS_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
+      | null = `${MASSIVE_CONTRACTS_URL}?product_code=${root}&active=true&limit=${CONTRACT_PAGE_SIZE}&apiKey=${this.apiKey}`;
     let pageCount = 0;
     const now = new Date();
 
@@ -102,20 +104,47 @@ export class ContractProvider {
         }
 
         for (const item of results) {
-          if (item.active !== false && item.type === "single") {
-            const lastTradeDate = new Date(item.last_trade_date);
-            if (lastTradeDate < now) continue; // Skip expired
+          if (item.active === false) continue;
 
-            if (!contractsMap.has(item.ticker)) {
-              contractsMap.set(item.ticker, {
-                ticker: item.ticker,
-                productCode: item.product_code,
-                lastTradeDate: item.last_trade_date,
-                active: item.active,
-              });
+          const ticker =
+            typeof item.ticker === "string" ? item.ticker.trim() : "";
+          if (!ticker || !isOutrightTickerForRoot(root, ticker)) {
+            continue;
+          }
 
-              if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) break;
-            }
+          const type =
+            typeof item.type === "string" ? item.type.trim().toLowerCase() : "";
+          if (type && type !== "single") {
+            continue;
+          }
+
+          const lastTradeDateValue =
+            typeof item.last_trade_date === "string" &&
+            item.last_trade_date.length > 0
+              ? item.last_trade_date
+              : typeof item.settlement_date === "string" &&
+                  item.settlement_date.length > 0
+                ? item.settlement_date
+                : null;
+
+          if (!lastTradeDateValue) {
+            continue;
+          }
+
+          const lastTradeDate = new Date(lastTradeDateValue);
+          if (isNaN(lastTradeDate.getTime()) || lastTradeDate < now) {
+            continue;
+          }
+
+          if (!contractsMap.has(ticker)) {
+            contractsMap.set(ticker, {
+              ticker,
+              productCode: item.product_code || root,
+              lastTradeDate: lastTradeDateValue,
+              active: item.active !== false,
+            });
+
+            if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) break;
           }
         }
 

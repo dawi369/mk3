@@ -5,11 +5,16 @@ import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
 import { snapshotJob } from "@/jobs/snapshot_job.js";
-import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
+import type { MassiveWSClient } from "@/server/api/massive/ws_client.js";
 import type { Server, ServerWebSocket } from "bun";
 import { logger } from "@/utils/logger.js";
+import { recoveryService } from "@/services/recovery_service.js";
 
-let polygonClient: PolygonWSClient | null = null;
+let massiveClient: MassiveWSClient | null = null;
+
+export function setMassiveClientForTesting(client: MassiveWSClient | null): void {
+  massiveClient = client;
+}
 
 // Helper for CORS headers
 const corsHeaders = {
@@ -68,8 +73,8 @@ function isAuthorized(req: Request): boolean {
   return false;
 }
 
-export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
-  polygonClient = client;
+export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
+  massiveClient = client;
 
   const server = Bun.serve({
     port: HUB_PORT,
@@ -166,7 +171,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
 /**
  * Handle incoming HTTP requests
  */
-async function handleRequest(
+export async function handleRequest(
   method: string,
   path: string,
   req: Request,
@@ -198,11 +203,12 @@ async function handleRequest(
     // Get stats and job statuses
     const redisStats = await redisStore.getStats();
     const symbols = await redisStore.getSymbols();
+    const recoveryCheckpoints = await redisStore.getAllRecoveryCheckpoints();
     const clearJobStatus = dailyClearJob.getStatus();
     const refreshJobStatus = monthlySubscriptionJob.getStatus();
 
     // Check WebSocket connection
-    const wsConnected = polygonClient?.isConnected() || false;
+    const wsConnected = massiveClient?.isConnected() || false;
 
     // Determine overall status
     const allHealthy =
@@ -219,11 +225,14 @@ async function handleRequest(
             ? "connected"
             : "disconnected"
           : "disabled",
-        polygonWs: wsConnected ? "connected" : "disconnected",
+        massiveWs: wsConnected ? "connected" : "disconnected",
       },
       symbols: symbols,
       symbolCount: redisStats.symbolCount,
       redis: redisStats,
+      recovery: {
+        checkpointCount: Object.keys(recoveryCheckpoints).length,
+      },
       dailyClearJob: clearJobStatus,
       subscriptionRefreshJob: refreshJobStatus,
     });
@@ -316,6 +325,14 @@ async function handleRequest(
     });
   }
 
+  if (method === "GET" && path === "/recovery/checkpoints") {
+    const checkpoints = await redisStore.getAllRecoveryCheckpoints();
+    return jsonResponse({
+      checkpoints,
+      count: Object.keys(checkpoints).length,
+    });
+  }
+
   const activeContractsMatch = path.match(/^\/contracts\/active\/([^\/]+)$/);
   if (method === "GET" && activeContractsMatch) {
     const productCode = activeContractsMatch[1];
@@ -402,11 +419,11 @@ async function handleRequest(
     }
 
     if (method === "GET" && path === "/admin/subscriptions") {
-      if (!polygonClient) {
-        return errorResponse("Polygon client not initialized", 503);
+      if (!massiveClient) {
+        return errorResponse("Massive client not initialized", 503);
       }
 
-      const subscriptions = polygonClient.getSubscriptions();
+      const subscriptions = massiveClient.getSubscriptions();
       return jsonResponse({
         subscriptions,
         count: subscriptions.length,
@@ -439,6 +456,21 @@ async function handleRequest(
       return jsonResponse({
         message: "Snapshot refresh started (running in background)",
         status: snapshotJob.getStatus(),
+      });
+    }
+
+    if (method === "POST" && path === "/admin/recovery/backfill") {
+      const symbols = await redisStore.getSubscribedSymbols();
+      const results = await recoveryService.backfillSymbolsFromProvider(symbols, {
+        source: "manual",
+        excludeCurrentMinute: true,
+      });
+
+      return jsonResponse({
+        message: "Manual recovery backfill completed",
+        symbols,
+        results,
+        providerBars: results.reduce((sum, result) => sum + result.providerBars, 0),
       });
     }
   }

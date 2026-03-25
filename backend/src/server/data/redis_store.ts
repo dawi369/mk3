@@ -2,6 +2,11 @@ import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { LIMITS } from "@/config/limits.js";
 import type { Bar, SessionData, SnapshotData, IndicatorBucket } from "@/types/common.types.js";
 import type { ActiveContract, StoredActiveContracts } from "@/types/contract.types.js";
+import type {
+  RecoveryCheckpoint,
+  RecoveryTimeframe,
+} from "@/types/recovery.types.js";
+import { RECOVERY_TIMEFRAME } from "@/types/recovery.types.js";
 import { Redis } from "ioredis";
 
 // Redis Key Constants
@@ -12,6 +17,7 @@ const KEYS = {
   META_DATE: "meta:trading_date",
   META_COUNT: "meta:bar_count",
   SUBSCRIBED_SYMBOLS: "meta:subscribed_symbols",
+  RECOVERY_CHECKPOINT_PREFIX: "recovery:checkpoint:",
   SESSION_PREFIX: "session:", // HASH per symbol: session:{symbol}
   SNAPSHOT_PREFIX: "snapshot:", // HASH per symbol: snapshot:{symbol}
   ACTIVE_CONTRACTS_PREFIX: "contracts:active:", // STRING per product
@@ -76,6 +82,19 @@ function extractRootSymbol(symbol: string): string {
 function normalizeTimestampMs(value: number): number {
   if (!Number.isFinite(value)) return value;
   return value < 1e12 ? value * 1000 : value;
+}
+
+function getUtcStartOfDayMs(timestamp: number): number {
+  const date = new Date(timestamp);
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0,
+    0,
+    0,
+    0,
+  );
 }
 
 function parseNumber(value: string | number | undefined, fallback: number): number {
@@ -151,6 +170,13 @@ class RedisStore {
     return await this.redis.ping();
   }
 
+  private getRecoveryCheckpointKey(
+    symbol: string,
+    timeframe: RecoveryTimeframe = RECOVERY_TIMEFRAME,
+  ): string {
+    return `${KEYS.RECOVERY_CHECKPOINT_PREFIX}${timeframe}:${symbol}`;
+  }
+
   /**
    * Write a bar to all storage locations:
    * - HSET bar:latest {symbol} (latest bar per symbol in single hash)
@@ -158,7 +184,22 @@ class RedisStore {
    * - XADD market_data (real-time stream)
    * - PUBLISH bars (legacy pub/sub)
    */
-  async writeBar(bar: Bar): Promise<void> {
+  async writeBar(
+    bar: Bar,
+    options?: {
+      emitStream?: boolean;
+      incrementCount?: boolean;
+      updateSession?: boolean;
+      publishLegacy?: boolean;
+    },
+  ): Promise<void> {
+    const resolvedOptions = {
+      emitStream: options?.emitStream ?? true,
+      incrementCount: options?.incrementCount ?? true,
+      updateSession: options?.updateSession ?? true,
+      publishLegacy: options?.publishLegacy ?? true,
+    };
+
     const barJson = JSON.stringify(bar);
     await this.ensureTimeSeriesForSymbol(bar.symbol);
     await this.writeTimeSeries(bar);
@@ -169,26 +210,58 @@ class RedisStore {
     multi.hset(KEYS.LATEST_HASH, bar.symbol, barJson);
 
     // Metadata
-    multi.incr(KEYS.META_COUNT);
+    if (resolvedOptions.incrementCount) {
+      multi.incr(KEYS.META_COUNT);
+    }
 
     // Stream for real-time consumers
-    multi.xadd(
-      KEYS.STREAM,
-      "MAXLEN",
-      "~",
-      LIMITS.maxStreamLength.toString(),
-      "*",
-      "data",
-      barJson,
-    );
+    if (resolvedOptions.emitStream) {
+      multi.xadd(
+        KEYS.STREAM,
+        "MAXLEN",
+        "~",
+        LIMITS.maxStreamLength.toString(),
+        "*",
+        "data",
+        barJson,
+      );
+    }
 
     await multi.exec();
 
     // Update session calculations (VWAP, CVOL, High/Low)
-    await this.updateSession(bar);
+    if (resolvedOptions.updateSession) {
+      await this.updateSession(bar);
+    }
 
     // Legacy pub/sub for Edge servers
-    await this.redis.publish(KEYS.PUBSUB_CHANNEL, barJson);
+    if (resolvedOptions.publishLegacy) {
+      await this.redis.publish(KEYS.PUBSUB_CHANNEL, barJson);
+    }
+  }
+
+  async writeBarsForRecovery(bars: Bar[]): Promise<void> {
+    const sorted = [...bars].sort((left, right) => left.startTime - right.startTime);
+    for (const bar of sorted) {
+      await this.writeRecoveredBar(bar, RECOVERY_TIMEFRAME);
+    }
+  }
+
+  async writeRecoveredBar(
+    bar: Bar,
+    timeframe: RecoveryTimeframe = RECOVERY_TIMEFRAME,
+  ): Promise<void> {
+    await this.ensureTimeSeriesForSymbol(bar.symbol);
+    await this.writeTimeSeriesAtTimeframe(bar, timeframe as Timeframe);
+
+    const latest = await this.getLatest(bar.symbol);
+    if (!latest || bar.startTime >= latest.startTime) {
+      await this.redis.hset(KEYS.LATEST_HASH, bar.symbol, JSON.stringify(bar));
+    }
+
+    if (bar.startTime >= getUtcStartOfDayMs(Date.now())) {
+      await this.updateSession(bar);
+    }
   }
 
   /**
@@ -388,11 +461,18 @@ class RedisStore {
   }
 
   private async writeTimeSeries(bar: Bar): Promise<void> {
+    await this.writeTimeSeriesAtTimeframe(bar, "1s");
+  }
+
+  private async writeTimeSeriesAtTimeframe(
+    bar: Bar,
+    timeframe: Timeframe,
+  ): Promise<void> {
     const timestamp = normalizeTimestampMs(bar.startTime);
     const args: Array<string> = [];
 
     for (const field of TS_FIELDS) {
-      const key = buildTsKey("1s", bar.symbol, field);
+      const key = buildTsKey(timeframe, bar.symbol, field);
       const value = (bar as Record<TimeSeriesField, number>)[field] ?? 0;
       args.push(key, timestamp.toString(), value.toString());
     }
@@ -581,7 +661,7 @@ class RedisStore {
   }
 
   /**
-   * Get snapshot data for a symbol (from Polygon REST API)
+   * Get snapshot data for a symbol (from Massive REST API)
    */
   async getSnapshot(symbol: string): Promise<SnapshotData | null> {
     const data = await this.redis.hgetall(`${KEYS.SNAPSHOT_PREFIX}${symbol}`);
@@ -644,6 +724,46 @@ class RedisStore {
     } catch {
       return [];
     }
+  }
+
+  async setRecoveryCheckpoint(checkpoint: RecoveryCheckpoint): Promise<void> {
+    await this.redis.set(
+      this.getRecoveryCheckpointKey(checkpoint.symbol, checkpoint.timeframe),
+      JSON.stringify(checkpoint),
+    );
+  }
+
+  async getRecoveryCheckpoint(
+    symbol: string,
+    timeframe: RecoveryTimeframe = RECOVERY_TIMEFRAME,
+  ): Promise<RecoveryCheckpoint | null> {
+    const raw = await this.redis.get(this.getRecoveryCheckpointKey(symbol, timeframe));
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw) as RecoveryCheckpoint;
+    } catch {
+      return null;
+    }
+  }
+
+  async getAllRecoveryCheckpoints(): Promise<Record<string, RecoveryCheckpoint>> {
+    const keys = await this.scanKeys(`${KEYS.RECOVERY_CHECKPOINT_PREFIX}*`);
+    const result: Record<string, RecoveryCheckpoint> = {};
+
+    for (const key of keys) {
+      const raw = await this.redis.get(key);
+      if (!raw) continue;
+
+      try {
+        const checkpoint = JSON.parse(raw) as RecoveryCheckpoint;
+        result[`${checkpoint.timeframe}:${checkpoint.symbol}`] = checkpoint;
+      } catch {
+        // Ignore malformed checkpoint payloads.
+      }
+    }
+
+    return result;
   }
 
   async writeActiveContracts(

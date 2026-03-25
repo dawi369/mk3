@@ -6,13 +6,43 @@ import type {
 } from "@/types/front_month.types.js";
 import { getAllConfiguredProducts } from "@/utils/futures_universe.js";
 import { contractProvider } from "@/utils/contract_provider.js";
-import { fetchTickerSnapshotContract } from "@/utils/polygon_snapshots.js";
+import { fetchTickerSnapshotContract } from "@/utils/massive_snapshots.js";
 import { resolveFrontMonth } from "@/utils/front_month_resolver.js";
+import { buildGeneratedContracts } from "@/utils/contracts_calendar.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
+import type { ActiveContract } from "@/types/contract.types.js";
 
 const REDIS_CACHE_KEY = "cache:front-months";
 const REDIS_STATUS_KEY = "job:front-months:status";
 
-class FrontMonthJob {
+const FRONT_MONTH_CANDIDATE_LIMITS: Record<MassiveAssetClass, number> = {
+  us_indices: 4,
+  metals: 6,
+  currencies: 4,
+  grains: 6,
+  softs: 6,
+  volatiles: 6,
+};
+
+function mergeContracts(
+  providerContracts: ActiveContract[],
+  generatedContracts: ActiveContract[],
+): ActiveContract[] {
+  const merged = new Map<string, ActiveContract>();
+
+  for (const contract of [...providerContracts, ...generatedContracts]) {
+    if (!merged.has(contract.ticker)) {
+      merged.set(contract.ticker, contract);
+    }
+  }
+
+  return Array.from(merged.values()).sort(
+    (a, b) =>
+      new Date(a.lastTradeDate).getTime() - new Date(b.lastTradeDate).getTime(),
+  );
+}
+
+export class FrontMonthJob {
   private status: FrontMonthJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -83,7 +113,13 @@ class FrontMonthJob {
       };
 
       for (const { code, assetClass } of products) {
-        const contracts = await contractProvider.fetchActiveContractsDetailed(code);
+        const providerContracts =
+          await contractProvider.fetchActiveContractsDetailed(code);
+        const generatedContracts = buildGeneratedContracts(
+          code,
+          FRONT_MONTH_CANDIDATE_LIMITS[assetClass],
+        );
+        const contracts = mergeContracts(providerContracts, generatedContracts);
         await redisStore.writeActiveContracts(code, contracts);
 
         const snapshots = await Promise.all(

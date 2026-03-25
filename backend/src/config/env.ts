@@ -39,8 +39,8 @@ function getRedisConfig(): { host: string; port: number; password?: string } {
 
 const redisConfig = getRedisConfig();
 
-export const POLYGON_API_KEY = getEnvVar("POLYGON_API_KEY");
-export const POLYGON_API_URL = getEnvVar("POLYGON_API_URL");
+export const MASSIVE_API_KEY = getEnvVar("MASSIVE_API_KEY");
+export const MASSIVE_API_URL = getEnvVar("MASSIVE_API_URL");
 export const HUB_PORT = getEnvVarAsInt("HUB_PORT");
 export const REDIS_HOST = redisConfig.host;
 export const REDIS_PORT = redisConfig.port;

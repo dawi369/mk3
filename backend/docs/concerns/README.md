@@ -13,4 +13,4 @@ These are intentionally separated from the production docs so the main documenta
 - [session-model.md](./session-model.md)
   Current limitations in session handling and exchange calendars.
 - [provider-limitations.md](./provider-limitations.md)
-  Massive/Polygon futures coverage and beta-related uncertainty.
+  Massive futures coverage and beta-related uncertainty.

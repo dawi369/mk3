@@ -2,7 +2,7 @@
  * Types for front month detection and caching
  */
 
-import type { PolygonAssetClass } from "./polygon.types.js";
+import type { MassiveAssetClass } from "./massive.types.js";
 
 /**
  * Information about a single product's front month
@@ -13,7 +13,7 @@ export interface FrontMonthInfo {
   /** Product code (e.g., "ES") */
   productCode: string;
   /** Asset class this product belongs to */
-  assetClass: PolygonAssetClass;
+  assetClass: MassiveAssetClass;
   /** Daily volume of the front month contract */
   volume: number;
   /** Days until expiration of the front month */
@@ -54,9 +54,9 @@ export interface FrontMonthJobStatus {
 }
 
 /**
- * Polygon snapshot API response types
+ * Massive snapshot API response types
  */
-export interface PolygonSnapshotContract {
+export interface MassiveSnapshotContract {
   details: {
     ticker: string;
     product_code: string;
@@ -81,8 +81,8 @@ export interface PolygonSnapshotContract {
   };
 }
 
-export interface PolygonSnapshotResponse {
+export interface MassiveSnapshotResponse {
   status: string;
   request_id: string;
-  results: PolygonSnapshotContract[];
+  results: MassiveSnapshotContract[];
 }

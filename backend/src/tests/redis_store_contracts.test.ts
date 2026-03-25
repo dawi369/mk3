@@ -3,6 +3,8 @@ import { redisStore } from "@/server/data/redis_store.js";
 import type { ActiveContract } from "@/types/contract.types.js";
 import type { Bar } from "@/types/common.types.js";
 
+const runRedisTests = Bun.env.RUN_REDIS_TESTS === "1";
+
 describe("RedisStore contract and subscription metadata", () => {
   const productCode = "TESTROOT";
   const contractKey = `contracts:active:${productCode}`;
@@ -10,6 +12,9 @@ describe("RedisStore contract and subscription metadata", () => {
   const symbolB = "TESTB";
 
   beforeAll(async () => {
+    if (!runRedisTests) {
+      return;
+    }
     const pong = await redisStore.ping();
     if (pong !== "PONG") {
       throw new Error("Redis not available");
@@ -17,6 +22,9 @@ describe("RedisStore contract and subscription metadata", () => {
   });
 
   afterAll(async () => {
+    if (!runRedisTests) {
+      return;
+    }
     await redisStore.redis.del(
       contractKey,
       "meta:subscribed_symbols",
@@ -27,14 +35,14 @@ describe("RedisStore contract and subscription metadata", () => {
     );
   });
 
-  test("stores subscribed symbols as a sorted unique list", async () => {
+  test.skipIf(!runRedisTests)("stores subscribed symbols as a sorted unique list", async () => {
     await redisStore.setSubscribedSymbols([symbolB, symbolA, symbolB]);
 
     const symbols = await redisStore.getSubscribedSymbols();
     expect(symbols).toEqual([symbolA, symbolB]);
   });
 
-  test("stores and reads active contracts per product", async () => {
+  test.skipIf(!runRedisTests)("stores and reads active contracts per product", async () => {
     const contracts: ActiveContract[] = [
       {
         ticker: "TESTM6",
@@ -65,7 +73,7 @@ describe("RedisStore contract and subscription metadata", () => {
     expect(symbols).toContain("TESTU6");
   });
 
-  test("clearTodayData also removes snapshots while keeping active-contract metadata", async () => {
+  test.skipIf(!runRedisTests)("clearTodayData also removes snapshots while keeping active-contract metadata", async () => {
     const bar: Bar = {
       symbol: symbolA,
       open: 10,

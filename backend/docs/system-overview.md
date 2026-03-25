@@ -3,7 +3,7 @@
 ## Architecture
 
 ```
-Massive/Polygon WS -> Bun hub -> Redis hot data + REST/WebSocket API
+Massive WS -> Bun hub -> Redis hot data + REST/WebSocket API
                            |
                            -> contract discovery + front-month resolution jobs
 ```
@@ -13,8 +13,8 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
 ## Main Runtime
 
 - `src/server/index.ts`
-  Boots the Massive/Polygon futures WebSocket client, builds subscriptions, persists the subscribed symbol set, loads job state, and starts the Bun REST/WebSocket API.
-- `src/server/api/polygon/ws_client.ts`
+  Boots the Massive futures WebSocket client, builds subscriptions, persists the subscribed symbol set, loads job state, and starts the Bun REST/WebSocket API.
+- `src/server/api/massive/ws_client.ts`
   Handles the upstream market-data stream, reconnects on disconnects, and writes normalized bars into Redis.
 - `src/server/api/rest_client.ts`
   Exposes health, bars, sessions, snapshots, front months, and active-contract cache inspection endpoints.

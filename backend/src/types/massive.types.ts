@@ -1,6 +1,6 @@
-// Types for Polygon realtime messages and normalized shapes for a futures dashboard
+// Types for Massive realtime messages and normalized shapes for a futures dashboard
 
-// Polygon WebSocket protocol types
+// Massive WebSocket protocol types
 
 // Health status type
 export interface WSHealth {
@@ -18,30 +18,30 @@ export enum ConnectionState {
   RECONNECTING = "reconnecting",
 }
 
-export type PolygonMarketType = "futures";
+export type MassiveMarketType = "futures";
 
-export type PolygonAssetClass = "us_indices" | "metals" | "currencies" | "grains" | "softs" | "volatiles";
+export type MassiveAssetClass = "us_indices" | "metals" | "currencies" | "grains" | "softs" | "volatiles";
 
 export type MarketStatus = "open" | "closed" | "pre" | "post" | "halted";
 
-export interface PolygonWsRequest {
+export interface MassiveWsRequest {
   ev: "AM" | "A";
   symbols: string[];
-  assetClass?: PolygonAssetClass;
+  assetClass?: MassiveAssetClass;
 }
 
-export interface PolygonSubscribeMessage {
+export interface MassiveSubscribeMessage {
   action: "subscribe";
   params: string; // e.g. "A.ESZ5,Q.ESZ5"
 }
 
-export interface PolygonStatusMessage {
+export interface MassiveStatusMessage {
   ev: "status";
   status: "connected" | "auth_success" | "auth_failed" | string;
   message?: string;
 }
 
-export interface PolygonAggregateEvent {
+export interface MassiveAggregateEvent {
   ev: "A";
   sym: string; // e.g. ESZ5
   v: number; // volume
@@ -55,7 +55,7 @@ export interface PolygonAggregateEvent {
   e: number; // end timestamp (ms)
 }
 
-export interface PolygonQuoteEvent {
+export interface MassiveQuoteEvent {
   ev: "Q";
   sym: string;
   bp: number; // best bid price
@@ -65,7 +65,7 @@ export interface PolygonQuoteEvent {
   t: number; // timestamp (ms)
 }
 
-export interface PolygonTradeEvent {
+export interface MassiveTradeEvent {
   ev: "T";
   sym: string;
   p: number; // price
@@ -73,4 +73,4 @@ export interface PolygonTradeEvent {
   t: number; // timestamp (ms)
 }
 
-export type PolygonRealtimeMessage = PolygonStatusMessage | PolygonAggregateEvent | PolygonQuoteEvent | PolygonTradeEvent;
+export type MassiveRealtimeMessage = MassiveStatusMessage | MassiveAggregateEvent | MassiveQuoteEvent | MassiveTradeEvent;

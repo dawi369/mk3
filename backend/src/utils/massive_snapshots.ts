@@ -1,11 +1,11 @@
-import { POLYGON_API_KEY } from "@/config/env.js";
+import { MASSIVE_API_KEY } from "@/config/env.js";
 import type {
-  PolygonSnapshotContract,
-  PolygonSnapshotResponse,
+  MassiveSnapshotContract,
+  MassiveSnapshotResponse,
 } from "@/types/front_month.types.js";
 import type { SnapshotData } from "@/types/common.types.js";
 
-const POLYGON_SNAPSHOT_URL = "https://api.polygon.io/futures/vX/snapshot";
+const MASSIVE_SNAPSHOT_URL = "https://api.massive.com/futures/vX/snapshot";
 
 export function parseSettlementDate(rawDate: string | number | null | undefined): string {
   if (typeof rawDate === "string") {
@@ -25,8 +25,8 @@ export function parseSettlementDate(rawDate: string | number | null | undefined)
 
 export async function fetchTickerSnapshotContract(
   ticker: string,
-): Promise<PolygonSnapshotContract | null> {
-  const url = `${POLYGON_SNAPSHOT_URL}?ticker=${ticker}&apiKey=${POLYGON_API_KEY}`;
+): Promise<MassiveSnapshotContract | null> {
+  const url = `${MASSIVE_SNAPSHOT_URL}?ticker=${ticker}&apiKey=${MASSIVE_API_KEY}`;
 
   try {
     const response = await fetch(url);
@@ -34,7 +34,7 @@ export async function fetchTickerSnapshotContract(
       return null;
     }
 
-    const data = (await response.json()) as PolygonSnapshotResponse;
+    const data = (await response.json()) as MassiveSnapshotResponse;
     if (data.status !== "OK" || !data.results || data.results.length === 0) {
       return null;
     }
@@ -46,7 +46,7 @@ export async function fetchTickerSnapshotContract(
 }
 
 export function snapshotContractToSnapshotData(
-  contract: PolygonSnapshotContract,
+  contract: MassiveSnapshotContract,
 ): SnapshotData {
   const session = contract.session || {};
 

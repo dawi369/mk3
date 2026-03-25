@@ -1,13 +1,15 @@
 import { describe, test, expect, beforeAll } from "bun:test";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
 
+const runLiveTests = Bun.env.RUN_LIVE_TESTS === "1";
+
 /**
  * Front Month Job Tests
  *
  * Run with: bun test src/tests/front_month_job.test.ts
  *
- * NOTE: These tests make real API calls to Polygon.
- * They require POLYGON_API_KEY to be set and network access.
+ * NOTE: These tests make real API calls to Massive.
+ * They require MASSIVE_API_KEY to be set and network access.
  */
 
 describe("FrontMonthJob", () => {
@@ -35,10 +37,10 @@ describe("FrontMonthJob", () => {
 
   // Integration test - makes real API calls
   describe("runRefresh (integration)", () => {
-    test("fetches and caches front month data", async () => {
+    test.skipIf(!runLiveTests)("fetches and caches front month data", async () => {
       // This test makes real API calls - skip if no API key
-      if (!process.env.POLYGON_API_KEY) {
-        console.log("Skipping: POLYGON_API_KEY not set");
+      if (!process.env.MASSIVE_API_KEY) {
+        console.log("Skipping: MASSIVE_API_KEY not set");
         return;
       }
 
@@ -54,6 +56,6 @@ describe("FrontMonthJob", () => {
         expect(cache.lastUpdated).toBeGreaterThan(0);
         expect(Object.keys(cache.products).length).toBeGreaterThan(0);
       }
-    }, 30000); // 30s timeout for API calls
+    }, 90000); // live provider sweep can take longer when snapshot coverage is wide
   });
 });

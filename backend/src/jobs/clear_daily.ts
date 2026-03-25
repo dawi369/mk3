@@ -9,7 +9,7 @@ interface ClearJobStatus {
   totalRuns: number;
 }
 
-class DailyClearJob {
+export class DailyClearJob {
   private status: ClearJobStatus = {
     lastRunTime: null,
     lastSuccess: false,

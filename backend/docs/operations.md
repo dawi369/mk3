@@ -7,14 +7,14 @@ This document is the operator runbook for the backend as it exists today.
 - Runtime: Bun
 - Primary data store: Redis
 - Historical store: TimescaleDB remains in code but is paused
-- Upstream provider: Massive/Polygon futures APIs
+- Upstream provider: Massive futures APIs
 - API surface: Bun HTTP + WebSocket server on `HUB_PORT`
 
 ## Required Environment
 
 ```bash
-POLYGON_API_KEY=...
-POLYGON_API_URL=https://api.massive.com
+MASSIVE_API_KEY=...
+MASSIVE_API_URL=https://api.massive.com
 REDIS_HOST=localhost
 REDIS_PORT=6379
 HUB_PORT=3001
@@ -54,7 +54,7 @@ Healthy state means:
 Important fields:
 
 - `services.redis`
-- `services.polygonWs`
+- `services.massiveWs`
 - `services.timescaledb`
 - `subscriptionRefreshJob`
 - `dailyClearJob`

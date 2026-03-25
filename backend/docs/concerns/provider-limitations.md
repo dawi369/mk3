@@ -2,7 +2,7 @@
 
 ## Current State
 
-The backend depends on Massive/Polygon futures APIs that are still evolving.
+The backend depends on Massive futures APIs that are still evolving.
 
 This affects:
 

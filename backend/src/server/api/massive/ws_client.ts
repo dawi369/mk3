@@ -1,10 +1,10 @@
-import { POLYGON_API_KEY } from "@/config/env.js";
-import { POLYGON_WS_URL } from "@/utils/consts.js";
+import { MASSIVE_API_KEY } from "@/config/env.js";
+import { MASSIVE_WS_URL } from "@/utils/consts.js";
 import type {
-  PolygonWsRequest,
-  PolygonMarketType,
-  PolygonStatusMessage,
-} from "@/types/polygon.types.js";
+  MassiveWsRequest,
+  MassiveMarketType,
+  MassiveStatusMessage,
+} from "@/types/massive.types.js";
 import {
   buildSubscribeParams,
   isAggregateEvent,
@@ -12,14 +12,16 @@ import {
   isQuoteEvent,
   isTradeEvent,
   aggregateToBar,
-} from "@/utils/polygon.utils.js";
+} from "@/utils/massive.utils.js";
 import { flowStore } from "@/server/data/flow_store.js";
 import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
-import { PolygonAggregateEventSchema } from "@/schemas/events.js";
-import { ConnectionState } from "@/types/polygon.types.js";
-import type { WSHealth } from "@/types/polygon.types.js";
-import { isMarketHours } from "@/utils/polygon.utils.js";
+import { MassiveAggregateEventSchema } from "@/schemas/events.js";
+import { ConnectionState } from "@/types/massive.types.js";
+import type { WSHealth } from "@/types/massive.types.js";
+import { isMarketHours } from "@/utils/massive.utils.js";
+import { recoveryService } from "@/services/recovery_service.js";
+import type { Bar } from "@/types/common.types.js";
 
 // Timeout configuration (ms)
 const WS_TIMEOUT = {
@@ -47,7 +49,7 @@ function withTimeout<T>(
   ]);
 }
 
-export class PolygonWSClient {
+export class MassiveWSClient {
   private ws: WebSocket | null = null;
   private health: WSHealth = {
     connected: false,
@@ -60,17 +62,20 @@ export class PolygonWSClient {
   private reconnectAttempts = 0;
   private reconnectTimer: Timer | null = null;
   private heartbeatTimer: Timer | null = null;
-  private market: PolygonMarketType | null = null;
-  private subscriptions: PolygonWsRequest[] = [];
+  private market: MassiveMarketType | null = null;
+  private subscriptions: MassiveWsRequest[] = [];
+  private lastDisconnectAt: number | null = null;
+  private recoveryPhase: "idle" | "buffering" | "flushing" = "idle";
+  private recoveryBuffer: Bar[] = [];
   private authResolver: (() => void) | null = null;
   private subscribeResolver: (() => void) | null = null;
   private unsubscribeResolver: (() => void) | null = null;
 
-  async connect(marketType: PolygonMarketType): Promise<void> {
+  async connect(marketType: MassiveMarketType): Promise<void> {
     this.market = marketType;
     this.state = ConnectionState.CONNECTING;
 
-    console.log(`Connecting to Polygon ${marketType}...`);
+    console.log(`Connecting to Massive ${marketType}...`);
 
     const marketStatus = isMarketHours();
     if (!marketStatus.isOpen) {
@@ -80,7 +85,7 @@ export class PolygonWSClient {
     }
 
     // Build the WebSocket URL with market type path
-    const wsUrl = `${POLYGON_WS_URL}/${marketType}`;
+    const wsUrl = `${MASSIVE_WS_URL}/${marketType}`;
     this.ws = new WebSocket(wsUrl);
 
     // Create a promise that resolves when authenticated
@@ -91,7 +96,7 @@ export class PolygonWSClient {
     this.ws.onopen = () => {
       // Send auth message immediately after connection opens
       this.ws?.send(
-        JSON.stringify({ action: "auth", params: POLYGON_API_KEY }),
+        JSON.stringify({ action: "auth", params: MASSIVE_API_KEY }),
       );
     };
 
@@ -109,23 +114,29 @@ export class PolygonWSClient {
     };
 
     this.ws.onclose = (event: CloseEvent) => {
+      const wasLive =
+        this.state === ConnectionState.SUBSCRIBED ||
+        this.state === ConnectionState.CONNECTED;
       console.log(`Connection closed: ${event.code} ${event.reason}`);
       this.health.connected = false;
       this.state = ConnectionState.DISCONNECTED;
+      if (wasLive) {
+        this.lastDisconnectAt = Date.now();
+      }
       this.scheduleReconnect();
     };
 
     // Wait for authentication before returning (with timeout)
-    await withTimeout(authPromise, WS_TIMEOUT.AUTH, "Polygon authentication");
+    await withTimeout(authPromise, WS_TIMEOUT.AUTH, "Massive authentication");
   }
 
-  private handleMessage(msg: MessageEvent): PolygonStatusMessage | void {
+  private handleMessage(msg: MessageEvent): MassiveStatusMessage | void {
     this.health.lastMessageTime = Date.now();
 
     const data = JSON.parse(msg.data as string);
     const messages = Array.isArray(data) ? data : [data];
 
-    let statusMessage: PolygonStatusMessage | undefined;
+    let statusMessage: MassiveStatusMessage | undefined;
 
     messages.forEach((m) => {
       // Handle status messages
@@ -171,7 +182,7 @@ export class PolygonWSClient {
       // Handle aggregate events (bars)
       if (isAggregateEvent(m)) {
         // Validate with Zod
-        const validation = PolygonAggregateEventSchema.safeParse(m);
+        const validation = MassiveAggregateEventSchema.safeParse(m);
         if (!validation.success) {
           console.error("Invalid aggregate event:", validation.error);
           return;
@@ -180,15 +191,7 @@ export class PolygonWSClient {
         const bar = aggregateToBar(m);
         flowStore.setBar(bar.symbol, bar);
 
-        // Write to Redis (non-blocking, errors logged)
-        redisStore.writeBar(bar).catch((err) => {
-          console.error("Redis write failed:", err);
-        });
-
-        // Write to TimescaleDB (non-blocking)
-        timescaleStore.insertBar(bar).catch((err) => {
-          console.error("TimescaleDB write failed:", err);
-        });
+        this.handleAggregateBar(bar);
 
         return;
       }
@@ -214,7 +217,7 @@ export class PolygonWSClient {
     return statusMessage;
   }
 
-  async subscribe(request: PolygonWsRequest): Promise<void> {
+  async subscribe(request: MassiveWsRequest): Promise<void> {
     // Save subscription for reconnects (deduplicate)
     if (
       !this.subscriptions.find(
@@ -251,7 +254,7 @@ export class PolygonWSClient {
     );
   }
 
-  async unsubscribe(request: PolygonWsRequest): Promise<void> {
+  async unsubscribe(request: MassiveWsRequest): Promise<void> {
     if (!this.ws || this.state === ConnectionState.DISCONNECTED) {
       console.log("Cannot unsubscribe: not connected");
       // Still remove from local tracking
@@ -304,8 +307,8 @@ export class PolygonWSClient {
   }
 
   async updateSubscription(
-    old: PolygonWsRequest,
-    newRequest: PolygonWsRequest,
+    old: MassiveWsRequest,
+    newRequest: MassiveWsRequest,
   ): Promise<void> {
     const oldSymbols = old.symbols.sort().join(",");
     const newSymbols = newRequest.symbols.sort().join(",");
@@ -348,8 +351,14 @@ export class PolygonWSClient {
     }
   }
 
-  getSubscriptions(): PolygonWsRequest[] {
+  getSubscriptions(): MassiveWsRequest[] {
     return [...this.subscriptions];
+  }
+
+  getSubscribedSymbols(): string[] {
+    return Array.from(
+      new Set(this.subscriptions.flatMap((subscription) => subscription.symbols)),
+    );
   }
 
   isConnected(): boolean {
@@ -387,7 +396,7 @@ export class PolygonWSClient {
       const start = Date.now();
 
       const response = await fetch(
-        `https://api.polygon.io/v3/reference/tickers?active=true&limit=1&apiKey=${POLYGON_API_KEY}`,
+        `https://api.massive.com/v3/reference/tickers?active=true&limit=1&apiKey=${MASSIVE_API_KEY}`,
       );
 
       if (response.ok) {
@@ -437,6 +446,8 @@ export class PolygonWSClient {
     }
 
     console.log("Attempting reconnect...");
+    this.recoveryPhase = "buffering";
+    this.recoveryBuffer = [];
 
     // Clean up old connection before creating new one
     if (this.ws) {
@@ -451,5 +462,94 @@ export class PolygonWSClient {
     for (const sub of this.subscriptions) {
       await this.subscribe(sub);
     }
+
+    try {
+      const recoveryResults = await recoveryService.backfillSymbolsFromProvider(
+        this.getSubscribedSymbols(),
+        {
+          source: "reconnect",
+          disconnectedAt: this.lastDisconnectAt,
+          excludeCurrentMinute: true,
+        },
+      );
+      const recoveredBars = recoveryResults.reduce(
+        (sum, result) => sum + result.providerBars,
+        0,
+      );
+      const flushedBars = await this.flushBufferedBars();
+      console.log(
+        `[Recovery] Reconnect gap-fill applied ${recoveredBars} provider bars and flushed ${flushedBars} buffered live bars`,
+      );
+    } catch (error) {
+      console.error("[Recovery] Reconnect gap-fill failed:", error);
+      const flushedBars = await this.flushBufferedBars();
+      console.log(
+        `[Recovery] Flushed ${flushedBars} buffered live bars after recovery failure`,
+      );
+    } finally {
+      this.lastDisconnectAt = null;
+    }
+  }
+
+  private handleAggregateBar(bar: Bar): void {
+    if (this.recoveryPhase !== "idle") {
+      this.recoveryBuffer.push(bar);
+      return;
+    }
+
+    void this.persistAggregateBar(bar);
+  }
+
+  private async persistAggregateBar(bar: Bar): Promise<void> {
+    const operations = await Promise.allSettled([
+      redisStore.writeBar(bar),
+      recoveryService.persistLiveBar(bar),
+      timescaleStore.insertBar(bar),
+    ]);
+
+    if (operations[0]?.status === "rejected") {
+      console.error("Redis write failed:", operations[0].reason);
+    }
+    if (operations[1]?.status === "rejected") {
+      console.error("Recovery store write failed:", operations[1].reason);
+    }
+    if (operations[2]?.status === "rejected") {
+      console.error("TimescaleDB write failed:", operations[2].reason);
+    }
+  }
+
+  private async flushBufferedBars(): Promise<number> {
+    let flushedCount = 0;
+    this.recoveryPhase = "flushing";
+
+    while (this.recoveryBuffer.length > 0) {
+      const batch = this.normalizeBufferedBars(this.recoveryBuffer);
+      this.recoveryBuffer = [];
+
+      for (const bar of batch) {
+        await this.persistAggregateBar(bar);
+        flushedCount++;
+      }
+
+      await Bun.sleep(0);
+    }
+
+    this.recoveryPhase = "idle";
+    return flushedCount;
+  }
+
+  private normalizeBufferedBars(bars: Bar[]): Bar[] {
+    const uniqueBars = new Map<string, Bar>();
+
+    for (const bar of bars) {
+      uniqueBars.set(`${bar.symbol}:${bar.startTime}`, bar);
+    }
+
+    return Array.from(uniqueBars.values()).sort((left, right) => {
+      if (left.startTime !== right.startTime) {
+        return left.startTime - right.startTime;
+      }
+      return left.symbol.localeCompare(right.symbol);
+    });
   }
 }

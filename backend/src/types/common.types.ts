@@ -1,4 +1,4 @@
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
 
 export interface Bar {
   symbol: string;
@@ -14,7 +14,7 @@ export interface Bar {
 }
 
 export interface RefreshDetails {
-  assetClass: PolygonAssetClass;
+  assetClass: MassiveAssetClass;
   eventType: "A" | "AM";
   oldSymbols: string[];
   newSymbols: string[];
@@ -60,7 +60,7 @@ export interface SessionData {
 }
 
 /**
- * Exchange session snapshot from Polygon REST API
+ * Exchange session snapshot from Massive REST API
  * Stored in Redis at snapshot:{symbol}
  */
 export interface SnapshotData {

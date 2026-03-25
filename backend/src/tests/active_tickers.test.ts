@@ -1,10 +1,10 @@
 import { describe, test, expect } from "bun:test";
-import { POLYGON_API_KEY } from "@/config/env.js";
+import { MASSIVE_API_KEY } from "@/config/env.js";
 import activeMonthsData from "../../tickers/active_months.json" with { type: "json" };
 
 /**
  * Verifies that the tickers configured in active_months.json are valid 
- * and have active contracts on Polygon.
+ * and have active contracts on Massive.
  * 
  * Run with: bun test src/tests/active_tickers.test.ts
  */
@@ -12,6 +12,7 @@ import activeMonthsData from "../../tickers/active_months.json" with { type: "js
 const MONTHS = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"];
 // Dynamically get current year suffix (e.g. "6" for 2026)
 const YEAR = String(new Date().getFullYear() % 10);
+const runLiveTests = Bun.env.RUN_LIVE_TESTS === "1";
 
 describe("Active Tickers Configuration", () => {
   // Flatten tickers from the configuration
@@ -34,7 +35,7 @@ describe("Active Tickers Configuration", () => {
   // This test makes network requests, so we skip it by default unless explicitly asking for it
   // or we can run it but warn it might be slow. 
   // For CI/CD, we might want to mock this or separate it.
-  test("tickers fetch successfully from Polygon", async () => {
+  test.skipIf(!runLiveTests)("tickers fetch successfully from Massive", async () => {
     // Only test a subset to avoid rate limits/slow tests, or test all if needed
     // Testing just the first ticker of each category as a sanity check
     const categoriesProcessed = new Set<string>();
@@ -48,7 +49,7 @@ describe("Active Tickers Configuration", () => {
       // A better check is finding the *next* valid contract.
       
       // Simple check: just verifying the root ticker active active contracts
-      const url = `https://api.polygon.io/futures/vX/contracts?product_code=${ticker}&active=true&apiKey=${POLYGON_API_KEY}&limit=1`;
+      const url = `https://api.massive.com/futures/vX/contracts?product_code=${ticker}&active=true&apiKey=${MASSIVE_API_KEY}&limit=1`;
       
       try {
         const response = await fetch(url);

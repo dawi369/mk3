@@ -1,12 +1,12 @@
 import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
-import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
-import type { PolygonAssetClass, PolygonWsRequest } from "@/types/polygon.types.js";
+import type { MassiveWSClient } from "@/server/api/massive/ws_client.js";
+import type { MassiveAssetClass, MassiveWsRequest } from "@/types/massive.types.js";
 import type { RefreshJobStatus, RefreshDetails } from "@/types/common.types.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
 class MonthlySubscriptionJob {
-  private wsClient: PolygonWSClient | null = null;
+  private wsClient: MassiveWSClient | null = null;
   private status: RefreshJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -39,20 +39,20 @@ class MonthlySubscriptionJob {
     }
   }
 
-  attachClient(wsClient: PolygonWSClient): void {
+  attachClient(wsClient: MassiveWSClient): void {
     this.wsClient = wsClient;
   }
 
   private findSubscriptionByAssetClass(
-    subscriptions: PolygonWsRequest[],
-    assetClass: PolygonAssetClass,
+    subscriptions: MassiveWsRequest[],
+    assetClass: MassiveAssetClass,
     eventType: "A" | "AM"
-  ): PolygonWsRequest | undefined {
+  ): MassiveWsRequest | undefined {
     return subscriptions.find((sub) => sub.assetClass === assetClass && sub.ev === eventType);
   }
 
   private async refreshAssetClass(
-    assetClass: PolygonAssetClass,
+    assetClass: MassiveAssetClass,
     eventType: "A" | "AM"
   ): Promise<RefreshDetails> {
     const details: RefreshDetails = {
@@ -130,7 +130,7 @@ class MonthlySubscriptionJob {
     this.status.lastRefreshDetails = [];
 
     const refreshTasks: Promise<RefreshDetails>[] = [];
-    const assetClasses: PolygonAssetClass[] = [
+    const assetClasses: MassiveAssetClass[] = [
       "us_indices",
       "metals",
       "currencies",
@@ -192,7 +192,7 @@ class MonthlySubscriptionJob {
     return { ...this.status };
   }
 
-  schedule(wsClient: PolygonWSClient): void {
+  schedule(wsClient: MassiveWSClient): void {
     this.wsClient = wsClient;
 
     // Run at 00:05 ET on the 1st of every month

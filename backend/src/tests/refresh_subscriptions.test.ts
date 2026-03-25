@@ -2,9 +2,9 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 import { redisStore } from "@/server/data/redis_store.js";
-import type { PolygonAssetClass, PolygonWsRequest } from "@/types/polygon.types.js";
+import type { MassiveAssetClass, MassiveWsRequest } from "@/types/massive.types.js";
 
-const ALL_ASSET_CLASSES: PolygonAssetClass[] = [
+const ALL_ASSET_CLASSES: MassiveAssetClass[] = [
   "us_indices",
   "metals",
   "currencies",
@@ -19,13 +19,13 @@ describe("MonthlySubscriptionJob", () => {
   });
 
   test("updates an existing asset-class subscription when symbols change", async () => {
-    const existing: PolygonWsRequest = {
+    const existing: MassiveWsRequest = {
       ev: "A",
       assetClass: "us_indices",
       symbols: ["ESH6"],
     };
 
-    const next: PolygonWsRequest = {
+    const next: MassiveWsRequest = {
       ev: "A",
       assetClass: "us_indices",
       symbols: ["ESM6"],
@@ -75,7 +75,7 @@ describe("MonthlySubscriptionJob", () => {
   });
 
   test("subscribes when no current subscription exists for the asset class", async () => {
-    const next: PolygonWsRequest = {
+    const next: MassiveWsRequest = {
       ev: "A",
       assetClass: "metals",
       symbols: ["GCM6", "GCQ6"],

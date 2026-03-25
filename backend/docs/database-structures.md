@@ -88,7 +88,7 @@ interface StoredActiveContracts {
 interface FrontMonthInfo {
   frontMonth: string;
   productCode: string;
-  assetClass: PolygonAssetClass;
+  assetClass: MassiveAssetClass;
   volume: number;
   daysToExpiry: number;
   nearestExpiry: string;

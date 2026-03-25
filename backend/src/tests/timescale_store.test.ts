@@ -2,6 +2,8 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import type { Bar } from "@/types/common.types.js";
 
+const runTimescaleTests = Bun.env.RUN_TIMESCALE_TESTS === "1";
+
 /**
  * TimescaleDB Store Tests
  *
@@ -15,6 +17,9 @@ describe("TimescaleStore", () => {
   let initialized = false;
 
   beforeAll(async () => {
+    if (!runTimescaleTests) {
+      return;
+    }
     await timescaleStore.init();
     initialized = timescaleStore.isConnected;
     if (!initialized) {
@@ -23,15 +28,18 @@ describe("TimescaleStore", () => {
   });
 
   afterAll(async () => {
+    if (!runTimescaleTests) {
+      return;
+    }
     await timescaleStore.close();
   });
 
   describe("connection", () => {
-    test("isConnected returns boolean", () => {
+    test.skipIf(!runTimescaleTests)("isConnected returns boolean", () => {
       expect(typeof timescaleStore.isConnected).toBe("boolean");
     });
 
-    test("ping returns true when connected", async () => {
+    test.skipIf(!runTimescaleTests)("ping returns true when connected", async () => {
       if (!initialized) return;
       const result = await timescaleStore.ping();
       expect(result).toBe(true);
@@ -39,7 +47,7 @@ describe("TimescaleStore", () => {
   });
 
   describe("insertBar", () => {
-    test("inserts bar without error", async () => {
+    test.skipIf(!runTimescaleTests)("inserts bar without error", async () => {
       if (!initialized) return;
 
       const bar: Bar = {
@@ -61,7 +69,7 @@ describe("TimescaleStore", () => {
   });
 
   describe("insertBatch", () => {
-    test("inserts multiple bars without error", async () => {
+    test.skipIf(!runTimescaleTests)("inserts multiple bars without error", async () => {
       if (!initialized) return;
 
       const bars: Bar[] = [
@@ -96,7 +104,7 @@ describe("TimescaleStore", () => {
   });
 
   describe("getHistory", () => {
-    test("returns array of bars", async () => {
+    test.skipIf(!runTimescaleTests)("returns array of bars", async () => {
       if (!initialized) return;
 
       // Query for a wide time range

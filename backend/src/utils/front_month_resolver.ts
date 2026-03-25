@@ -1,12 +1,12 @@
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
 import type { FrontMonthInfo } from "@/types/front_month.types.js";
 import type { ActiveContract } from "@/types/contract.types.js";
-import { parseSettlementDate } from "@/utils/polygon_snapshots.js";
-import type { PolygonSnapshotContract } from "@/types/front_month.types.js";
+import { parseSettlementDate } from "@/utils/massive_snapshots.js";
+import type { MassiveSnapshotContract } from "@/types/front_month.types.js";
 
 export interface FrontMonthCandidate {
   contract: ActiveContract;
-  snapshot: PolygonSnapshotContract | null;
+  snapshot: MassiveSnapshotContract | null;
 }
 
 interface RankedCandidate {
@@ -16,6 +16,7 @@ interface RankedCandidate {
   daysToExpiry: number;
   lastPrice: number | null;
   expiryDate: string;
+  hasSnapshot: boolean;
 }
 
 function toRankedCandidate(candidate: FrontMonthCandidate): RankedCandidate | null {
@@ -42,13 +43,14 @@ function toRankedCandidate(candidate: FrontMonthCandidate): RankedCandidate | nu
       candidate.snapshot?.session?.close ||
       null,
     expiryDate,
+    hasSnapshot: candidate.snapshot !== null,
   };
 }
 
 export function resolveFrontMonth(
   candidates: FrontMonthCandidate[],
   productCode: string,
-  assetClass: PolygonAssetClass,
+  assetClass: MassiveAssetClass,
 ): FrontMonthInfo | null {
   const ranked = candidates
     .map(toRankedCandidate)
@@ -58,7 +60,11 @@ export function resolveFrontMonth(
     return null;
   }
 
-  const nearestExpiry = [...ranked].sort(
+  const rankedPool = ranked.some((candidate) => candidate.hasSnapshot)
+    ? ranked.filter((candidate) => candidate.hasSnapshot)
+    : ranked;
+
+  const nearestExpiry = [...rankedPool].sort(
     (a, b) => a.daysToExpiry - b.daysToExpiry,
   )[0];
 
@@ -66,7 +72,7 @@ export function resolveFrontMonth(
     return null;
   }
 
-  const volumeRanked = [...ranked].sort((a, b) => {
+  const volumeRanked = [...rankedPool].sort((a, b) => {
     if (b.volume !== a.volume) return b.volume - a.volume;
     if (b.openInterest !== a.openInterest) return b.openInterest - a.openInterest;
     return a.daysToExpiry - b.daysToExpiry;
@@ -80,6 +86,8 @@ export function resolveFrontMonth(
     confidence =
       !runnerUp || liquidityLeader.volume > runnerUp.volume ? "high" : "medium";
   } else if (liquidityLeader.openInterest > 0) {
+    confidence = "medium";
+  } else if (liquidityLeader.hasSnapshot) {
     confidence = "medium";
   }
 

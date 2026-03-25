@@ -1,26 +1,26 @@
-import type { PolygonWsRequest, PolygonAggregateEvent, PolygonQuoteEvent, PolygonTradeEvent, PolygonStatusMessage } from "@/types/polygon.types.js";
+import type { MassiveWsRequest, MassiveAggregateEvent, MassiveQuoteEvent, MassiveTradeEvent, MassiveStatusMessage } from "@/types/massive.types.js";
 
 import type { Bar } from "@/types/common.types.js";
 
-// Type guards for Polygon WebSocket messages
-export function isStatusMessage(m: unknown): m is PolygonStatusMessage {
+// Type guards for Massive WebSocket messages
+export function isStatusMessage(m: unknown): m is MassiveStatusMessage {
   return !!m && typeof m === "object" && (m as any).ev === "status";
 }
 
-export function isAggregateEvent(m: unknown): m is PolygonAggregateEvent {
+export function isAggregateEvent(m: unknown): m is MassiveAggregateEvent {
   return !!m && typeof m === "object" && (m as any).ev === "A";
 }
 
-export function isQuoteEvent(m: unknown): m is PolygonQuoteEvent {
+export function isQuoteEvent(m: unknown): m is MassiveQuoteEvent {
   return !!m && typeof m === "object" && (m as any).ev === "Q";
 }
 
-export function isTradeEvent(m: unknown): m is PolygonTradeEvent {
+export function isTradeEvent(m: unknown): m is MassiveTradeEvent {
   return !!m && typeof m === "object" && (m as any).ev === "T";
 }
 
 // Data transformations
-export function aggregateToBar(a: PolygonAggregateEvent): Bar {
+export function aggregateToBar(a: MassiveAggregateEvent): Bar {
   return {
     symbol: a.sym,
     open: a.o,
@@ -41,7 +41,7 @@ export function toDate(epochMs: number): Date {
 
 // WebSocket subscription helpers
 // Returns comma-separated params like "A.ESZ5,A.NQZ5"
-export function buildSubscribeParams(req: PolygonWsRequest): string {
+export function buildSubscribeParams(req: MassiveWsRequest): string {
   return req.symbols.map((s) => `${req.ev}.${s}`).join(",");
 }
 

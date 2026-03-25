@@ -1,8 +1,8 @@
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
 import { Tickers } from "@/utils/tickers.js";
 import activeMonthsData from "../../tickers/active_months.json" with { type: "json" };
 
-const CATEGORY_TO_ASSET_CLASS: Record<string, PolygonAssetClass> = {
+const CATEGORY_TO_ASSET_CLASS: Record<string, MassiveAssetClass> = {
   INTEREST_RATES: "currencies",
   GRAINS: "grains",
   METALS: "metals",
@@ -13,6 +13,10 @@ const CATEGORY_TO_ASSET_CLASS: Record<string, PolygonAssetClass> = {
 
 let tickersPromise: Promise<Tickers> | null = null;
 
+export function resetFuturesUniverseCacheForTesting(): void {
+  tickersPromise = null;
+}
+
 async function getTickers(): Promise<Tickers> {
   if (!tickersPromise) {
     tickersPromise = Tickers.create();
@@ -20,8 +24,8 @@ async function getTickers(): Promise<Tickers> {
   return tickersPromise;
 }
 
-function getActiveMonthRoots(): Record<PolygonAssetClass, Set<string>> {
-  const roots: Record<PolygonAssetClass, Set<string>> = {
+function getActiveMonthRoots(): Record<MassiveAssetClass, Set<string>> {
+  const roots: Record<MassiveAssetClass, Set<string>> = {
     currencies: new Set<string>(),
     grains: new Set<string>(),
     metals: new Set<string>(),
@@ -45,7 +49,7 @@ function getActiveMonthRoots(): Record<PolygonAssetClass, Set<string>> {
 }
 
 export async function getProductRoots(
-  assetClass: PolygonAssetClass,
+  assetClass: MassiveAssetClass,
 ): Promise<string[]> {
   const activeMonthRoots = getActiveMonthRoots();
   const tickers = await getTickers();
@@ -58,9 +62,9 @@ export async function getProductRoots(
 }
 
 export async function getAllConfiguredProducts(): Promise<
-  Array<{ code: string; assetClass: PolygonAssetClass }>
+  Array<{ code: string; assetClass: MassiveAssetClass }>
 > {
-  const assetClasses: PolygonAssetClass[] = [
+  const assetClasses: MassiveAssetClass[] = [
     "us_indices",
     "metals",
     "currencies",
@@ -69,7 +73,7 @@ export async function getAllConfiguredProducts(): Promise<
     "volatiles",
   ];
 
-  const products: Array<{ code: string; assetClass: PolygonAssetClass }> = [];
+  const products: Array<{ code: string; assetClass: MassiveAssetClass }> = [];
 
   for (const assetClass of assetClasses) {
     const roots = await getProductRoots(assetClass);

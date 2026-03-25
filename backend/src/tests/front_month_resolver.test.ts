@@ -86,4 +86,44 @@ describe("resolveFrontMonth", () => {
     expect(resolved?.confidence).toBe("low");
     expect(resolved?.candidateCount).toBe(2);
   });
+
+  test("ignores snapshotless near contracts when later candidates have live snapshots", () => {
+    const candidates: FrontMonthCandidate[] = [
+      {
+        contract: {
+          ticker: "RTYH6",
+          productCode: "RTY",
+          lastTradeDate: "2026-03-31",
+          active: true,
+        },
+        snapshot: null,
+      },
+      {
+        contract: {
+          ticker: "RTYM6",
+          productCode: "RTY",
+          lastTradeDate: "2026-06-18",
+          active: true,
+        },
+        snapshot: {
+          details: {
+            ticker: "RTYM6",
+            product_code: "RTY",
+            settlement_date: "2026-06-18",
+          },
+          session: {
+            volume: 150000,
+            close: 2200,
+          },
+        },
+      },
+    ];
+
+    const resolved = resolveFrontMonth(candidates, "RTY", "us_indices");
+
+    expect(resolved).not.toBeNull();
+    expect(resolved?.frontMonth).toBe("RTYM6");
+    expect(resolved?.nearestExpiry).toBe("RTYM6");
+    expect(resolved?.confidence).toBe("high");
+  });
 });

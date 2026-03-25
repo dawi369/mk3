@@ -1,12 +1,12 @@
 # MK3 Backend (Bun)
 
-Real-time futures data backend using Massive/Polygon futures APIs.
+Real-time futures data backend using Massive futures APIs.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh) v1.3.3+
 - Redis (Docker or local)
-- Valid Massive/Polygon API key
+- Valid Massive API key
 - TimescaleDB is paused until futures flat-file or equivalent historical access is available
 
 ## Quick Start
@@ -27,7 +27,7 @@ bun run start
 Create `.env` file:
 
 ```bash
-POLYGON_API_KEY=your_key_here
+MASSIVE_API_KEY=your_key_here
 REDIS_HOST=localhost
 REDIS_PORT=6379
 HUB_PORT=3001
@@ -67,7 +67,7 @@ Start here:
 
 **Server won't start:**
 1. Check Redis: `docker ps`
-2. Verify `.env` file with `POLYGON_API_KEY`
+2. Verify `.env` file with `MASSIVE_API_KEY`
 3. Check Bun version: `bun --version`
 
 **No data flowing:**

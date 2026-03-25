@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-// Polygon Aggregate Event (A)
-export const PolygonAggregateEventSchema = z.object({
+// Massive Aggregate Event (A)
+export const MassiveAggregateEventSchema = z.object({
   ev: z.literal("A"),
   sym: z.string(),
   v: z.number(),
@@ -15,7 +15,7 @@ export const PolygonAggregateEventSchema = z.object({
   e: z.number(),
 });
 
-export type PolygonAggregateEvent = z.infer<typeof PolygonAggregateEventSchema>;
+export type MassiveAggregateEvent = z.infer<typeof MassiveAggregateEventSchema>;
 
 // Normalized Bar Schema (for validation)
 // NOTE: For the Bar type, use @/types/common.types.ts

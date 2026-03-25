@@ -3,7 +3,7 @@ import { redisStore } from "@/server/data/redis_store.js";
 import {
   fetchTickerSnapshotContract,
   snapshotContractToSnapshotData,
-} from "@/utils/polygon_snapshots.js";
+} from "@/utils/massive_snapshots.js";
 const REDIS_STATUS_KEY = "job:snapshot:status";
 
 interface SnapshotJobStatus {
@@ -14,7 +14,7 @@ interface SnapshotJobStatus {
   totalRuns: number;
 }
 
-class SnapshotJob {
+export class SnapshotJob {
   private status: SnapshotJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
