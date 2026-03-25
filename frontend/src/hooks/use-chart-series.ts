@@ -229,9 +229,9 @@ export function useChartSeries({
   }, [primarySymbol, resolvedSeriesBySymbol, entities, snapshots, sessions]);
 
   // Session levels: show session high/low/last on the chart.
-  // Priority: 1) SnapshotData (exchange-session-scoped from Polygon)
-  //           2) SessionData (accumulates from 2AM ET reset, less precise)
-  //           3) bar fallback (last 24h of chart data)
+  // Priority: 1) SnapshotData from Massive
+  //           2) SessionData from the backend session model
+  //           3) recent bar fallback
   const sessionLevels = useMemo(() => {
     if (!isOpen || !showSessionLevels || !primarySymbol || displaySpread || displayCompare) return undefined;
 
@@ -244,7 +244,7 @@ export function useChartSeries({
     const validPrice = (v: unknown): number | null =>
       typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
 
-    // 1) Snapshot data from Polygon (exchange-session-scoped)
+    // 1) Snapshot data from Massive
     if (snapshot) {
       const high = validPrice(snapshot.sessionHigh);
       const low = validPrice(snapshot.sessionLow);
@@ -253,7 +253,7 @@ export function useChartSeries({
       }
     }
 
-    // 2) Real-time session data (polled every 60s, resets at 2AM ET)
+    // 2) Session data from the backend's trading-session buckets
     if (session) {
       const high = validPrice(session.dayHigh);
       const low = validPrice(session.dayLow);

@@ -1,100 +1,72 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { useConnection } from "./connection-provider";
 import { Bar } from "@/types/common.types";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
 import { getAllProductCodes } from "@/lib/ticker-mapping";
-import type { SnapshotData, SessionData } from "@/types/redis.types";
-
-interface MarketData {
-  [symbol: string]: Bar[];
-}
-
-interface DataContextType {
-  marketData: MarketData;
-  isLoading: boolean;
-  getLatestBar: (symbol: string) => Bar | undefined;
-}
-
-const DataContext = createContext<DataContextType | null>(null);
+import { loadHubBootstrap, loadHubSessions, loadHubSnapshots } from "@/lib/hub/bootstrap";
+import type { HubMessage } from "@/types/hub.types";
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const { subscribe, status } = useConnection();
-  const registerSymbols = useTickerStore((state) => state.registerSymbols);
-  const upsertBar = useTickerStore((state) => state.upsertBar);
+  const { subscribe } = useConnection();
+  const applyMarketBootstrap = useTickerStore((state) => state.applyMarketBootstrap);
+  const ingestBars = useTickerStore((state) => state.ingestBars);
   const setSnapshots = useTickerStore((state) => state.setSnapshots);
   const setSessions = useTickerStore((state) => state.setSessions);
-  const [isLoading, setIsLoading] = useState(true);
   const pendingBarsRef = useRef<Bar[]>([]);
   const flushHandleRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
 
-    const loadSymbols = async () => {
-      try {
-        registerSymbols("curve", getAllProductCodes());
-        const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/symbols`);
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!mounted) return;
-        const symbols = Array.isArray(data) ? data : data?.symbols;
-        if (!Array.isArray(symbols)) return;
-        registerSymbols("front", symbols);
-      } catch (err) {
-        console.warn("[DataProvider] Failed to load symbols", err);
-      }
-    };
+    void loadHubBootstrap({
+      baseUrl: NEXT_PUBLIC_HUB_URL,
+      curveSymbols: getAllProductCodes(),
+      signal: controller.signal,
+    }).then((payload) => {
+      applyMarketBootstrap(payload);
+    });
 
-    loadSymbols();
     return () => {
-      mounted = false;
+      controller.abort();
     };
-  }, [registerSymbols]);
+  }, [applyMarketBootstrap]);
 
   useEffect(() => {
-    let mounted = true;
-    let sessionsInterval: number | null = null;
+    let active = true;
 
-    const loadSnapshots = async () => {
-      try {
-        const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/snapshots`);
-        if (!response.ok) return;
-        const payload = await response.json();
-        const snapshots = payload?.snapshots as Record<string, SnapshotData> | undefined;
-        if (!mounted || !snapshots) return;
-        setSnapshots(snapshots);
-      } catch (err) {
-        console.warn("[DataProvider] Failed to load snapshots", err);
-      }
+    const refreshMetadata = async () => {
+      const [snapshots, sessions] = await Promise.all([
+        loadHubSnapshots(NEXT_PUBLIC_HUB_URL),
+        loadHubSessions(NEXT_PUBLIC_HUB_URL),
+      ]);
+
+      if (!active) return;
+      setSnapshots(snapshots);
+      setSessions(sessions);
     };
 
-    const loadSessions = async () => {
-      try {
-        const response = await fetch(`${NEXT_PUBLIC_HUB_URL}/sessions`);
-        if (!response.ok) return;
-        const payload = await response.json();
-        const sessions = payload?.sessions as Record<string, SessionData> | undefined;
-        if (!mounted || !sessions) return;
-        setSessions(sessions);
-      } catch (err) {
-        console.warn("[DataProvider] Failed to load sessions", err);
-      }
-    };
+    void refreshMetadata();
 
-    loadSnapshots();
-    loadSessions();
+    const sessionsInterval = window.setInterval(() => {
+      void loadHubSessions(NEXT_PUBLIC_HUB_URL).then((sessions) => {
+        if (active) setSessions(sessions);
+      });
+    }, 60_000);
 
-    sessionsInterval = window.setInterval(loadSessions, 60_000);
+    const snapshotsInterval = window.setInterval(() => {
+      void loadHubSnapshots(NEXT_PUBLIC_HUB_URL).then((snapshots) => {
+        if (active) setSnapshots(snapshots);
+      });
+    }, 5 * 60_000);
 
     return () => {
-      mounted = false;
-      if (sessionsInterval !== null) {
-        window.clearInterval(sessionsInterval);
-      }
+      active = false;
+      window.clearInterval(sessionsInterval);
+      window.clearInterval(snapshotsInterval);
     };
   }, [setSnapshots, setSessions]);
 
@@ -104,13 +76,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const queued = pendingBarsRef.current;
       if (queued.length === 0) return;
       pendingBarsRef.current = [];
-      for (const bar of queued) {
-        upsertBar("front", bar);
-      }
-      if (!hasLoadedRef.current) {
-        hasLoadedRef.current = true;
-        setIsLoading(false);
-      }
+      ingestBars("front", queued);
+      hasLoadedRef.current = true;
     };
 
     const scheduleFlush = () => {
@@ -118,7 +85,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       flushHandleRef.current = window.requestAnimationFrame(flush);
     };
 
-    const unsubscribe = subscribe((message: any) => {
+    const unsubscribe = subscribe((message: HubMessage) => {
       if (message.type === "info") {
         return;
       }
@@ -144,29 +111,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
       unsubscribe();
     };
-  }, [subscribe, upsertBar]);
+  }, [ingestBars, subscribe]);
 
-  const getLatestBar = (symbol: string) => {
-    return useTickerStore.getState().entitiesByMode.front[symbol]?.latestBar;
-  };
-
-  return (
-    <DataContext.Provider
-      value={{
-        marketData: useTickerStore.getState().seriesByMode.front,
-        isLoading: isLoading && status !== "connected",
-        getLatestBar,
-      }}
-    >
-      {children}
-    </DataContext.Provider>
-  );
+  return <>{children}</>;
 }
-
-export const useData = () => {
-  const context = useContext(DataContext);
-  if (!context) {
-    throw new Error("useData must be used within a DataProvider");
-  }
-  return context;
-};

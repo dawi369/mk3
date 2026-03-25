@@ -4,7 +4,6 @@ import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import { recoveryService } from "@/services/recovery_service.js";
 import type { Bar } from "@/types/common.types.js";
-import { flowStore } from "@/server/data/flow_store.js";
 
 function createBar(symbol: string, startTime: number): Bar {
   return {
@@ -41,7 +40,7 @@ describe("MassiveWSClient", () => {
     expect(subscribeResolver).toHaveBeenCalled();
   });
 
-  test("routes aggregate messages through flow store and persistence path", () => {
+  test("routes aggregate messages through aggregate persistence path", () => {
     const client = new MassiveWSClient();
     const persistSpy = spyOn(client as any, "handleAggregateBar").mockImplementation(
       () => undefined,
@@ -66,7 +65,14 @@ describe("MassiveWSClient", () => {
     });
 
     expect(persistSpy).toHaveBeenCalledTimes(1);
-    expect(flowStore.getLatest("ESH9")?.close).toBe(10.5);
+    expect(persistSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        symbol: "ESH9",
+        close: 10.5,
+        startTime: 1000,
+        endTime: 2000,
+      }),
+    );
   });
 
   test("buffers aggregate bars while recovery is in progress", () => {

@@ -13,7 +13,6 @@ import {
   isTradeEvent,
   aggregateToBar,
 } from "@/utils/massive.utils.js";
-import { flowStore } from "@/server/data/flow_store.js";
 import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import { MassiveAggregateEventSchema } from "@/schemas/events.js";
@@ -188,10 +187,7 @@ export class MassiveWSClient {
           return;
         }
 
-        const bar = aggregateToBar(m);
-        flowStore.setBar(bar.symbol, bar);
-
-        this.handleAggregateBar(bar);
+        this.handleAggregateBar(aggregateToBar(m));
 
         return;
       }

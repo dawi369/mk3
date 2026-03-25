@@ -1,6 +1,11 @@
 export type IndicatorBucket = "low" | "mid" | "high";
 
 export interface SessionData {
+  sessionId?: string;
+  sessionStartTime?: number;
+  sessionEndTime?: number;
+  rootSymbol?: string;
+  timezone?: string;
   dayOpen: number;
   dayHigh: number;
   dayLow: number;

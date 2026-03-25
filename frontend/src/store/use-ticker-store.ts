@@ -16,6 +16,7 @@ import {
   getTickerDetails,
 } from "@/lib/ticker-mapping";
 import { extractRoot } from "@/lib/month-utils";
+import type { HubBootstrapData } from "@/types/hub.types";
 
 const MAX_BARS_DEFAULT = 86400;
 const MAX_BARS_TRACKED = 86400;
@@ -23,7 +24,9 @@ const MAX_COMPARISONS = 4;
 
 function getStoredBoolean(key: string, fallback: boolean): boolean {
   if (typeof window === "undefined") return fallback;
-  const stored = localStorage.getItem(key);
+  const storage = window.localStorage;
+  if (!storage || typeof storage.getItem !== "function") return fallback;
+  const stored = storage.getItem(key);
   if (stored === "true") return true;
   if (stored === "false") return false;
   return fallback;
@@ -97,19 +100,6 @@ function normalizeLegs(legs: SpreadLeg[], primary: string | null): SpreadLeg[] {
   return normalized;
 }
 
-function buildDefaultLegs(selected: string[], primary: string | null): SpreadLeg[] {
-  const legs: SpreadLeg[] = [];
-  if (primary) {
-    legs.push({ symbol: primary, weight: 1 });
-  }
-  for (const symbol of selected) {
-    if (symbol === primary) continue;
-    if (legs.length >= MAX_SPREAD_LEGS) break;
-    legs.push({ symbol, weight: -1 });
-  }
-  return legs;
-}
-
 const PRESET_WEIGHTS: Record<SpreadPresetId, number[]> = {
   calendar: [1, -1],
   butterfly: [1, -2, 1],
@@ -122,7 +112,7 @@ function applyPresetWeights(
   preset: SpreadPresetId,
   primary: string | null,
 ): { legs: SpreadLeg[]; preset: SpreadPresetId } {
-  let weights = PRESET_WEIGHTS[preset];
+  const weights = PRESET_WEIGHTS[preset];
   // If not enough symbols, we still return the requested preset but with partial legs
   // The UI will handle showing the "Add X tickers" message
   const legs = weights.map((weight, idx) => ({
@@ -158,6 +148,8 @@ interface TickerStoreState {
   setTrackedSymbols: (symbols: string[]) => void;
   setSnapshots: (snapshots: Record<string, SnapshotData>) => void;
   setSessions: (sessions: Record<string, SessionData>) => void;
+  applyMarketBootstrap: (payload: HubBootstrapData) => void;
+  ingestBars: (mode: TickerMode, bars: Bar[]) => void;
 
   openPrimary: (symbol: string) => void;
   toggleSelectShift: (symbol: string) => void;
@@ -288,6 +280,82 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
     set(() => ({
       sessionsBySymbol: sessions,
     })),
+
+  applyMarketBootstrap: ({ frontSymbols, curveSymbols, snapshots, sessions }) =>
+    set((state) => {
+      const nextEntitiesByMode = { ...state.entitiesByMode };
+      const nextIndexByMode = { ...state.byAssetClassByMode };
+
+      const register = (mode: TickerMode, symbols: string[]) => {
+        const entities = { ...nextEntitiesByMode[mode] };
+        const index = { ...nextIndexByMode[mode] };
+
+        for (const symbol of symbols) {
+          if (entities[symbol]) continue;
+          const entity = buildEntity(mode, symbol);
+          entities[symbol] = entity;
+
+          if (entity.assetClass !== "unknown") {
+            const list = index[entity.assetClass] || [];
+            if (!list.includes(symbol)) {
+              index[entity.assetClass] = [...list, symbol];
+            }
+          }
+        }
+
+        nextEntitiesByMode[mode] = entities;
+        nextIndexByMode[mode] = index;
+      };
+
+      register("front", frontSymbols);
+      register("curve", curveSymbols);
+
+      return {
+        entitiesByMode: nextEntitiesByMode,
+        byAssetClassByMode: nextIndexByMode,
+        snapshotsBySymbol: snapshots,
+        sessionsBySymbol: sessions,
+      };
+    }),
+
+  ingestBars: (mode, bars) =>
+    set((state) => {
+      if (bars.length === 0) return {};
+
+      const entities = { ...state.entitiesByMode[mode] };
+      const series = { ...state.seriesByMode[mode] };
+      const index = { ...state.byAssetClassByMode[mode] };
+      const tracked = state.trackedSymbolsByMode[mode];
+
+      for (const bar of bars) {
+        if (!entities[bar.symbol]) {
+          const entity = buildEntity(mode, bar.symbol);
+          entities[bar.symbol] = entity;
+
+          if (entity.assetClass !== "unknown") {
+            const list = index[entity.assetClass] || [];
+            if (!list.includes(bar.symbol)) {
+              index[entity.assetClass] = [...list, bar.symbol];
+            }
+          }
+        }
+
+        entities[bar.symbol] = {
+          ...entities[bar.symbol],
+          latestBar: bar,
+          lastUpdated: Date.now(),
+        };
+
+        const limit = tracked[bar.symbol] ? MAX_BARS_TRACKED : MAX_BARS_DEFAULT;
+        series[bar.symbol] = upsertSeries(series[bar.symbol], bar, limit);
+      }
+
+      return {
+        entitiesByMode: { ...state.entitiesByMode, [mode]: entities },
+        seriesByMode: { ...state.seriesByMode, [mode]: series },
+        byAssetClassByMode: { ...state.byAssetClassByMode, [mode]: index },
+      };
+    }),
 
   openPrimary: (symbol) =>
     set((state) => {
