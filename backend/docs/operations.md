@@ -78,6 +78,7 @@ curl http://localhost:3001/front-months | jq
 curl http://localhost:3001/contracts/active | jq
 curl http://localhost:3001/bars/latest | jq
 curl http://localhost:3001/sessions | jq
+curl http://localhost:3001/sessions/week/ESM6 | jq
 curl http://localhost:3001/snapshots | jq
 ```
 
@@ -118,6 +119,7 @@ bunx tsc --noEmit
 
 - TimescaleDB is not part of the required runtime path.
 - Front-month resolution depends on upstream active-contract and snapshot coverage.
-- Session calculations currently use a global reset strategy, not product-specific exchange calendars.
+- Session history is retained in Redis for the rolling hot window only.
+- Session rules currently default to a Chicago futures template with venue/root override hooks for later refinement.
 
 See [concerns/README.md](./concerns/README.md) for tracked gaps.

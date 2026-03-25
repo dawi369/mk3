@@ -29,7 +29,7 @@ Redis stores:
 
 | Key | Type | Purpose |
 |-----|------|---------|
-| `session:{symbol}` | HASH | Intraday session metrics for one symbol |
+| `session:{symbol}:{sessionId}` | HASH | Session metrics for one symbol and one trading session |
 | `snapshot:{symbol}` | HASH | Exchange/session snapshot for one symbol |
 
 ### Contract And Runtime Metadata
@@ -53,17 +53,22 @@ Redis stores:
 
 ## Retention
 
-- `bar:latest`: cleared by daily reset
-- `market_data`: cleared by daily reset
-- `session:*`: cleared by daily reset
-- `snapshot:*`: cleared by daily reset
+- `bar:latest`: cleared by manual forced reset
+- `market_data`: cleared by manual forced reset
+- `session:*`: retained across the hot window and pruned by maintenance
+- `snapshot:*`: retained briefly and pruned by maintenance
 - `ts:bar:*`: retained for 7 days
 - `contracts:active:*`: retained until overwritten by newer metadata
 
 ## Session Metrics
 
-Each `session:{symbol}` hash maintains:
+Each `session:{symbol}:{sessionId}` hash maintains:
 
+- `sessionId`
+- `sessionStartTime`
+- `sessionEndTime`
+- `rootSymbol`
+- `timezone`
 - `dayOpen`
 - `dayHigh`
 - `dayLow`
@@ -83,7 +88,7 @@ Each `session:{symbol}` hash maintains:
 - `cumVolume`
 - `timestamp`
 
-These metrics are computed incrementally from incoming bars.
+These metrics are computed incrementally from incoming bars and replayed recovery bars.
 
 ## Front-Month Support
 
@@ -97,9 +102,10 @@ This separation matters operationally:
 - contract discovery can succeed while front-month ranking is weak
 - front-month ranking can be inspected independently of live subscriptions
 
-## Daily Reset Behavior
+## Maintenance Behavior
 
-The daily clear job currently removes:
+Automatic daily maintenance prunes stale session and snapshot hashes.
+Manual forced clear still removes:
 
 - `bar:latest`
 - `market_data`

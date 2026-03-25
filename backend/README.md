@@ -52,6 +52,12 @@ curl http://localhost:3001/contracts/active | jq
 
 # Front-month resolution
 curl http://localhost:3001/front-months | jq
+
+# Current trading-session bars
+curl http://localhost:3001/bars/session/ESM6 | jq
+
+# Retained session history
+curl http://localhost:3001/sessions/week/ESM6 | jq
 ```
 
 ## Documentation

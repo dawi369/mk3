@@ -298,6 +298,17 @@ export async function handleRequest(
     return jsonResponse({ symbol, tf, bars, count: bars.length });
   }
 
+  const sessionBarsMatch = path.match(/^\/bars\/session\/([^\/]+)$/);
+  if (method === "GET" && sessionBarsMatch) {
+    const symbol = sessionBarsMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1s");
+    const ts = parseMsParam(url.searchParams.get("ts")) ?? Date.now();
+    const bars = await redisStore.getSessionBars(symbol, ts, tf as any);
+    return jsonResponse({ symbol, tf, bars, count: bars.length });
+  }
+
   if (method === "GET" && path === "/symbols") {
     const symbols = await redisStore.getSymbols();
     return jsonResponse({ symbols, count: symbols.length });
@@ -352,13 +363,25 @@ export async function handleRequest(
     return jsonResponse({ sessions, count: Object.keys(sessions).length });
   }
 
+  const sessionHistoryMatch = path.match(/^\/sessions\/week\/([^\/]+)$/);
+  if (method === "GET" && sessionHistoryMatch) {
+    const symbol = sessionHistoryMatch[1];
+    if (!symbol) return errorResponse("Invalid symbol", 400);
+
+    const end = parseMsParam(url.searchParams.get("end")) ?? Date.now();
+    const start = parseMsParam(url.searchParams.get("start")) ?? end - ONE_WEEK_MS;
+    const sessions = await redisStore.getSessionHistory(symbol, start, end);
+    return jsonResponse({ symbol, start, end, sessions, count: sessions.length });
+  }
+
   // Match /session/:symbol
   const sessionMatch = path.match(/^\/session\/([^\/]+)$/);
   if (method === "GET" && sessionMatch) {
     const symbol = sessionMatch[1];
     if (!symbol) return errorResponse("Invalid symbol", 400);
 
-    const session = await redisStore.getSession(symbol);
+    const ts = parseMsParam(url.searchParams.get("ts")) ?? Date.now();
+    const session = await redisStore.getSession(symbol, ts);
     if (!session) {
       return errorResponse("Session not found", 404);
     }

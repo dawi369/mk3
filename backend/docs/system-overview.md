@@ -23,10 +23,11 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
   - `bar:latest`
   - `ts:bar:*`
   - `market_data`
-  - `session:*`
+  - `session:{symbol}:{sessionId}`
   - `snapshot:*`
   - `contracts:active:*`
   - `meta:subscribed_symbols`
+  - current-session reads are projected from retained session buckets
 
 ## Contract Resolution
 
@@ -46,7 +47,7 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
 
 | Job | File | Purpose |
 |-----|------|---------|
-| Daily Clear | `src/jobs/clear_daily.ts` | Clears hot intraday Redis state |
+| Daily Clear | `src/jobs/clear_daily.ts` | Runs hot-store maintenance and supports manual forced clears |
 | Subscription Refresh | `src/jobs/refresh_subscriptions.ts` | Rebuilds WS subscriptions from current active contracts |
 | Front Month Detection | `src/jobs/front_month_job.ts` | Resolves front months from active contracts + snapshots |
 | Snapshot Refresh | `src/jobs/snapshot_job.ts` | Refreshes per-contract session snapshots for subscribed/cached contracts |
@@ -56,8 +57,11 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
 - Redis is the source of truth for the hot path.
 - Historical storage is paused.
 - Front-month logic is based on active-contract metadata plus snapshot ranking, not just calendar inference.
+- Session math is trading-session-based for supported products and retained across the Redis hot window.
 - Operational visibility comes from:
   - `/health`
   - `/front-months`
   - `/contracts/active`
+  - `/bars/session/:symbol`
+  - `/sessions/week/:symbol`
   - `/admin/subscriptions`

@@ -145,6 +145,42 @@ describe("REST request handler", () => {
     expect(snapshot.status).toBe(404);
   });
 
+  test("returns current-session bars and week session history", async () => {
+    spyOn(redisStore, "getSessionBars").mockResolvedValue([
+      {
+        symbol: "ESH9",
+        close: 10.5,
+      },
+    ] as any);
+    spyOn(redisStore, "getSessionHistory").mockResolvedValue([
+      {
+        sessionId: "2026-03-25",
+        dayOpen: 10,
+      },
+      {
+        sessionId: "2026-03-26",
+        dayOpen: 11,
+      },
+    ] as any);
+
+    const barsResponse = await handleRequest(
+      "GET",
+      "/bars/session/ESH9",
+      createRequest("/bars/session/ESH9?tf=1m&ts=123"),
+    );
+    const historyResponse = await handleRequest(
+      "GET",
+      "/sessions/week/ESH9",
+      createRequest("/sessions/week/ESH9?start=1&end=2"),
+    );
+    const barsPayload = (await barsResponse.json()) as any;
+    const historyPayload = (await historyResponse.json()) as any;
+
+    expect(barsPayload.count).toBe(1);
+    expect(historyPayload.count).toBe(2);
+    expect(historyPayload.sessions[0].sessionId).toBe("2026-03-25");
+  });
+
   test("returns empty front-month bootstrap payload when cache is missing", async () => {
     spyOn(frontMonthJob, "getCache").mockReturnValue(null);
 

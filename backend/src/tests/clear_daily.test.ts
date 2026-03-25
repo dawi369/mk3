@@ -19,7 +19,7 @@ describe("DailyClearJob", () => {
 
   test("records failure state when clear fails", async () => {
     const job = new DailyClearJob();
-    spyOn(redisStore, "clearTodayData").mockRejectedValue(
+    spyOn(redisStore, "runDailyMaintenance").mockRejectedValue(
       new Error("clear failed"),
     );
     spyOn(redisStore.redis, "set").mockResolvedValue("OK" as any);

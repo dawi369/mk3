@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, mock } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll, mock, spyOn } from "bun:test";
 import { redisStore } from "@/server/data/redis_store.js";
 import type { Bar } from "@/types/common.types.js";
 
@@ -11,7 +11,7 @@ const runRedisTests = Bun.env.RUN_REDIS_TESTS === "1";
  */
 
 describe("RedisStore", () => {
-  const testSymbol = "TEST_ESZ25";
+  const testSymbol = "ESZ8";
 
   beforeAll(async () => {
     if (!runRedisTests) {
@@ -186,6 +186,57 @@ describe("RedisStore", () => {
       expect(session!.dayLow).toBeLessThanOrEqual(bar.low);
       expect(session!.cvol).toBeGreaterThan(0);
       expect(session!.vwap).toBeGreaterThan(0);
+      expect(session!.sessionId.length).toBeGreaterThan(0);
+      expect(session!.rootSymbol).toBe("ES");
+      expect(session!.timezone).toBe("America/Chicago");
+    });
+
+    test.skipIf(!runRedisTests)("resets session state when a new Chicago session starts", async () => {
+      const rolloverSymbol = "ESH7";
+      await redisStore.redis.hdel("bar:latest", rolloverSymbol);
+      await redisStore.redis.del(`session:${rolloverSymbol}`);
+
+      const firstNow = Date.UTC(2026, 2, 25, 20, 30, 0, 0);
+      const nowSpy = spyOn(Date, "now").mockReturnValue(firstNow);
+
+      await redisStore.writeBar({
+        symbol: rolloverSymbol,
+        open: 5100,
+        high: 5110,
+        low: 5090,
+        close: 5105,
+        volume: 500,
+        trades: 25,
+        startTime: Date.UTC(2026, 2, 24, 23, 0, 0, 0),
+        endTime: Date.UTC(2026, 2, 24, 23, 1, 0, 0),
+      });
+
+      const firstSession = await redisStore.getSession(rolloverSymbol);
+      expect(firstSession?.sessionId).toBe("2026-03-25");
+      expect(firstSession?.cvol).toBe(500);
+
+      const secondNow = Date.UTC(2026, 2, 25, 23, 30, 0, 0);
+      nowSpy.mockReturnValue(secondNow);
+
+      await redisStore.writeBar({
+        symbol: rolloverSymbol,
+        open: 5200,
+        high: 5210,
+        low: 5190,
+        close: 5205,
+        volume: 250,
+        trades: 10,
+        startTime: Date.UTC(2026, 2, 25, 23, 10, 0, 0),
+        endTime: Date.UTC(2026, 2, 25, 23, 11, 0, 0),
+      });
+
+      const secondSession = await redisStore.getSession(rolloverSymbol);
+      expect(secondSession?.sessionId).toBe("2026-03-26");
+      expect(secondSession?.dayOpen).toBe(5200);
+      expect(secondSession?.cvol).toBe(250);
+
+      await redisStore.redis.hdel("bar:latest", rolloverSymbol);
+      await redisStore.redis.del(`session:${rolloverSymbol}`);
     });
 
     test.skipIf(!runRedisTests)("getAllSessions returns object of sessions", async () => {
@@ -195,6 +246,57 @@ describe("RedisStore", () => {
       if (testSymbol in sessions) {
         expect(sessions[testSymbol]!.dayOpen).toBeGreaterThan(0);
       }
+    });
+
+    test.skipIf(!runRedisTests)("stores and retrieves multiple sessions across the retained window", async () => {
+      const historySymbol = "NQM7";
+      await redisStore.redis.hdel("bar:latest", historySymbol);
+      const historyKeys = await redisStore.redis.keys(`session:${historySymbol}:*`);
+      if (historyKeys.length > 0) {
+        await redisStore.redis.del(...historyKeys);
+      }
+
+      await redisStore.writeRecoveredBar({
+        symbol: historySymbol,
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100.5,
+        volume: 50,
+        trades: 5,
+        startTime: Date.UTC(2026, 2, 24, 23, 0, 0, 0),
+        endTime: Date.UTC(2026, 2, 24, 23, 1, 0, 0),
+      });
+
+      await redisStore.writeRecoveredBar({
+        symbol: historySymbol,
+        open: 102,
+        high: 103,
+        low: 101,
+        close: 102.5,
+        volume: 75,
+        trades: 6,
+        startTime: Date.UTC(2026, 2, 25, 23, 10, 0, 0),
+        endTime: Date.UTC(2026, 2, 25, 23, 11, 0, 0),
+      });
+
+      const sessions = await redisStore.getSessionHistory(
+        historySymbol,
+        Date.UTC(2026, 2, 24, 0, 0, 0, 0),
+        Date.UTC(2026, 2, 27, 0, 0, 0, 0),
+      );
+
+      expect(sessions).toHaveLength(2);
+      expect(sessions.map((session) => session.sessionId)).toEqual([
+        "2026-03-25",
+        "2026-03-26",
+      ]);
+
+      const cleanupKeys = await redisStore.redis.keys(`session:${historySymbol}:*`);
+      if (cleanupKeys.length > 0) {
+        await redisStore.redis.del(...cleanupKeys);
+      }
+      await redisStore.redis.hdel("bar:latest", historySymbol);
     });
   });
 

@@ -7,6 +7,11 @@ import type {
   RecoveryTimeframe,
 } from "@/types/recovery.types.js";
 import { RECOVERY_TIMEFRAME } from "@/types/recovery.types.js";
+import {
+  getCurrentSessionWindow,
+  getSessionWindowForTimestamp,
+  isCurrentSessionBar,
+} from "@/utils/market_session.js";
 import { Redis } from "ioredis";
 
 // Redis Key Constants
@@ -74,27 +79,18 @@ function buildTsKey(tf: Timeframe, symbol: string, field: TimeSeriesField): stri
   return `${TS_PREFIX}:${tf}:${symbol}:${field}`;
 }
 
+function buildSessionKey(symbol: string, sessionId: string): string {
+  return `${KEYS.SESSION_PREFIX}${symbol}:${sessionId}`;
+}
+
 function extractRootSymbol(symbol: string): string {
-  const match = symbol.match(/^([A-Z]+)[FGHJKMNQUVXZ]\d{1,2}$/);
+  const match = symbol.match(/^([A-Z0-9]+)[FGHJKMNQUVXZ]\d{1,2}$/);
   return match?.[1] || symbol;
 }
 
 function normalizeTimestampMs(value: number): number {
   if (!Number.isFinite(value)) return value;
   return value < 1e12 ? value * 1000 : value;
-}
-
-function getUtcStartOfDayMs(timestamp: number): number {
-  const date = new Date(timestamp);
-  return Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-    0,
-    0,
-    0,
-    0,
-  );
 }
 
 function parseNumber(value: string | number | undefined, fallback: number): number {
@@ -259,9 +255,7 @@ class RedisStore {
       await this.redis.hset(KEYS.LATEST_HASH, bar.symbol, JSON.stringify(bar));
     }
 
-    if (bar.startTime >= getUtcStartOfDayMs(Date.now())) {
-      await this.updateSession(bar);
-    }
+    await this.updateSession(bar);
   }
 
   /**
@@ -269,7 +263,12 @@ class RedisStore {
    * Called on every bar to maintain running VWAP, CVOL, High/Low
    */
   private async updateSession(bar: Bar): Promise<void> {
-    const key = `${KEYS.SESSION_PREFIX}${bar.symbol}`;
+    const sessionWindow = getSessionWindowForTimestamp(bar.symbol, bar.startTime);
+    if (!sessionWindow) {
+      return;
+    }
+
+    const key = buildSessionKey(bar.symbol, sessionWindow.sessionId);
 
     // Get current session data (may not exist yet)
     const existing = await this.redis.hgetall(key);
@@ -278,8 +277,9 @@ class RedisStore {
     const priceVolume = bar.close * bar.volume;
 
     const volNow = bar.volume;
+    const shouldReset = Object.keys(existing).length === 0;
 
-    if (Object.keys(existing).length === 0) {
+    if (shouldReset) {
       // First bar of session - initialize
       const vwapMin = bar.close;
       const vwapMax = bar.close;
@@ -289,6 +289,11 @@ class RedisStore {
       const volPos = calcIndicatorPos(volNow, volMin, volMax);
 
       const session: SessionData = {
+        sessionId: sessionWindow.sessionId,
+        sessionStartTime: sessionWindow.sessionStartTime,
+        sessionEndTime: sessionWindow.sessionEndTime,
+        rootSymbol: sessionWindow.rootSymbol,
+        timezone: sessionWindow.timezone,
         dayOpen: bar.open,
         dayHigh: bar.high,
         dayLow: bar.low,
@@ -602,27 +607,55 @@ class RedisStore {
    * Get today's bars for a specific symbol
    */
   async getTodayBars(symbol: string, timeframe: Timeframe = "1s"): Promise<Bar[]> {
-    const now = new Date();
-    const startOfDay = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      0,
-      0,
-      0,
-      0,
+    const sessionWindow = getCurrentSessionWindow(symbol);
+    if (!sessionWindow) {
+      return [];
+    }
+
+    return await this.getBarsRange(
+      symbol,
+      sessionWindow.sessionStartTime,
+      Math.min(Date.now(), sessionWindow.sessionEndTime),
+      timeframe,
     );
-    return await this.getBarsRange(symbol, startOfDay, Date.now(), timeframe);
+  }
+
+  async getSessionBars(
+    symbol: string,
+    timestamp = Date.now(),
+    timeframe: Timeframe = "1s",
+  ): Promise<Bar[]> {
+    const sessionWindow = getSessionWindowForTimestamp(symbol, timestamp);
+    if (!sessionWindow) {
+      return [];
+    }
+
+    return await this.getBarsRange(
+      symbol,
+      sessionWindow.sessionStartTime,
+      sessionWindow.sessionEndTime,
+      timeframe,
+    );
   }
 
   /**
    * Get session data for a symbol (VWAP, CVOL, High/Low)
    */
-  async getSession(symbol: string): Promise<SessionData | null> {
-    const data = await this.redis.hgetall(`${KEYS.SESSION_PREFIX}${symbol}`);
+  async getSession(symbol: string, timestamp = Date.now()): Promise<SessionData | null> {
+    const sessionWindow = getSessionWindowForTimestamp(symbol, timestamp);
+    if (!sessionWindow) {
+      return null;
+    }
+
+    const data = await this.redis.hgetall(buildSessionKey(symbol, sessionWindow.sessionId));
     if (Object.keys(data).length === 0) return null;
 
     return {
+      sessionId: data.sessionId || "",
+      sessionStartTime: parseInt(data.sessionStartTime || "0"),
+      sessionEndTime: parseInt(data.sessionEndTime || "0"),
+      rootSymbol: data.rootSymbol || extractRootSymbol(symbol),
+      timezone: data.timezone || "America/Chicago",
       dayOpen: parseFloat(data.dayOpen || "0"),
       dayHigh: parseFloat(data.dayHigh || "0"),
       dayLow: parseFloat(data.dayLow || "0"),
@@ -648,15 +681,63 @@ class RedisStore {
    * Get all sessions as a map
    */
   async getAllSessions(): Promise<Record<string, SessionData>> {
-    const keys = await this.scanKeys(`${KEYS.SESSION_PREFIX}*`);
     const result: Record<string, SessionData> = {};
 
-    for (const key of keys) {
-      const symbol = key.replace(KEYS.SESSION_PREFIX, "");
+    const symbols = await this.getSymbols();
+    for (const symbol of symbols) {
       const session = await this.getSession(symbol);
       if (session) result[symbol] = session;
     }
 
+    return result;
+  }
+
+  async getSessionHistory(
+    symbol: string,
+    startMs = Date.now() - LIMITS.redisTsRetentionMs,
+    endMs = Date.now(),
+  ): Promise<SessionData[]> {
+    const keys = await this.scanKeys(`${KEYS.SESSION_PREFIX}${symbol}:*`);
+    const result: SessionData[] = [];
+
+    for (const key of keys) {
+      const data = await this.redis.hgetall(key);
+      if (Object.keys(data).length === 0) continue;
+
+      const sessionEndTime = parseInt(data.sessionEndTime || "0");
+      const sessionStartTime = parseInt(data.sessionStartTime || "0");
+      if (sessionEndTime < startMs || sessionStartTime > endMs) {
+        continue;
+      }
+
+      result.push({
+        sessionId: data.sessionId || "",
+        sessionStartTime,
+        sessionEndTime,
+        rootSymbol: data.rootSymbol || extractRootSymbol(symbol),
+        timezone: data.timezone || "America/Chicago",
+        dayOpen: parseFloat(data.dayOpen || "0"),
+        dayHigh: parseFloat(data.dayHigh || "0"),
+        dayLow: parseFloat(data.dayLow || "0"),
+        vwap: parseFloat(data.vwap || "0"),
+        cvol: parseFloat(data.cvol || "0"),
+        tradeCount: parseInt(data.tradeCount || "0"),
+        volNow: parseFloat(data.volNow || "0"),
+        volMin: parseFloat(data.volMin || "0"),
+        volMax: parseFloat(data.volMax || "0"),
+        volPos: parseFloat(data.volPos || "0"),
+        volBucket: (data.volBucket as IndicatorBucket) || "mid",
+        vwapMin: parseFloat(data.vwapMin || "0"),
+        vwapMax: parseFloat(data.vwapMax || "0"),
+        vwapPos: parseFloat(data.vwapPos || "0"),
+        vwapBucket: (data.vwapBucket as IndicatorBucket) || "mid",
+        cumPriceVolume: parseFloat(data.cumPriceVolume || "0"),
+        cumVolume: parseFloat(data.cumVolume || "0"),
+        timestamp: parseInt(data.timestamp || "0"),
+      });
+    }
+
+    result.sort((left, right) => left.sessionStartTime - right.sessionStartTime);
     return result;
   }
 
@@ -915,6 +996,42 @@ class RedisStore {
     await this.redis.set(KEYS.META_COUNT, "0");
 
     console.log(`Cleared ${clearedCount} keys`);
+
+    return { cleared: clearedCount, newDate: today };
+  }
+
+  async runDailyMaintenance(): Promise<{ cleared: number; newDate: string }> {
+    const today = new Date().toISOString().split("T")[0]!;
+    const lastRun = (await this.redis.get(KEYS.META_DATE)) || "";
+
+    if (lastRun === today) {
+      console.log("Daily maintenance already ran today, skipping");
+      return { cleared: 0, newDate: today };
+    }
+
+    const now = Date.now();
+    let clearedCount = 0;
+
+    const sessionKeys = await this.scanKeys(`${KEYS.SESSION_PREFIX}*`);
+    for (const key of sessionKeys) {
+      const data = await this.redis.hgetall(key);
+      const sessionEndTime = parseInt(data.sessionEndTime || "0");
+      if (sessionEndTime > 0 && sessionEndTime < now - LIMITS.redisTsRetentionMs) {
+        clearedCount += await this.redis.del(key);
+      }
+    }
+
+    const snapshotKeys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    for (const key of snapshotKeys) {
+      const data = await this.redis.hgetall(key);
+      const timestamp = parseInt(data.timestamp || "0");
+      if (timestamp > 0 && timestamp < now - 36 * 60 * 60 * 1000) {
+        clearedCount += await this.redis.del(key);
+      }
+    }
+
+    await this.redis.set(KEYS.META_DATE, today);
+    await this.redis.set(KEYS.META_COUNT, "0");
 
     return { cleared: clearedCount, newDate: today };
   }
