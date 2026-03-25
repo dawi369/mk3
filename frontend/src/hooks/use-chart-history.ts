@@ -4,6 +4,7 @@ import type { Bar } from "@/types/common.types";
 import type { Timeframe, TickerMode } from "@/types/ticker.types";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { resampleBars } from "@/lib/bar-resample";
+import { fetchHubBarsRange } from "@/lib/hub/history";
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -89,22 +90,6 @@ function shouldFallback(count: number, expected: number): boolean {
   if (expected < 20) return false;
   const minBars = Math.max(5, Math.floor(expected * 0.2));
   return count < minBars;
-}
-
-async function fetchBarsRange(
-  symbol: string,
-  timeframe: HistoryTimeframe,
-  start: number,
-  end: number,
-  signal?: AbortSignal,
-): Promise<Bar[]> {
-  const response = await fetch(
-    `${NEXT_PUBLIC_HUB_URL}/bars/range/${symbol}?tf=${timeframe}&start=${start}&end=${end}`,
-    { signal },
-  );
-  if (!response.ok) return [];
-  const payload = await response.json();
-  return Array.isArray(payload?.bars) ? payload.bars : [];
 }
 
 interface UseChartHistoryOptions {
@@ -363,4 +348,21 @@ export function useChartHistory({
     seriesBySymbol,
     isReady,
   };
+}
+
+async function fetchBarsRange(
+  symbol: string,
+  timeframe: HistoryTimeframe,
+  start: number,
+  end: number,
+  signal?: AbortSignal,
+): Promise<Bar[]> {
+  return fetchHubBarsRange({
+    baseUrl: NEXT_PUBLIC_HUB_URL,
+    symbol,
+    timeframe,
+    start,
+    end,
+    signal,
+  });
 }

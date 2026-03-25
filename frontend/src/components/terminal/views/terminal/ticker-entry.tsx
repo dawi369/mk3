@@ -93,6 +93,30 @@ function IndicatorBadge({ bucket }: { bucket?: IndicatorBucket }) {
   );
 }
 
+function EmptyStateZone({ symbol }: { symbol: string }) {
+  const { root, expiry } = parseSymbol(symbol);
+  return (
+    <div className="flex h-full flex-col justify-between overflow-hidden px-2.5 py-2">
+      <div className="flex items-baseline gap-1 overflow-hidden">
+        <span className="text-lg font-bold leading-none tracking-tight text-foreground/75 shrink-0">
+          {root}
+        </span>
+        <span className="text-sm font-mono tracking-wide text-muted-foreground/40 shrink-0">
+          {expiry}
+        </span>
+      </div>
+      <div className="flex flex-1 items-center">
+        <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground/45">
+          Waiting for live data
+        </span>
+      </div>
+      <div className="text-[12px] font-mono uppercase tracking-wider text-muted-foreground/30">
+        No session snapshot
+      </div>
+    </div>
+  );
+}
+
 
 // ============================================================================
 // Sub-Components
@@ -318,25 +342,25 @@ export const TickerEntry = React.memo(({ symbol, className }: TickerEntryProps) 
       onClick={handleClick}
     >
       {/* Zone 1: Data Cluster */}
-      <DataZone
-        data={snapshotData}
-        volumeValue={volumeValue}
-        volumeBucket={session && session.volNow > 0 ? session.volBucket : undefined}
-        vwapValue={vwapValue}
-        vwapBucket={session && session.vwap > 0 ? session.vwapBucket : undefined}
-      />
+      {snapshotData.hasData ? (
+        <DataZone
+          data={snapshotData}
+          volumeValue={volumeValue}
+          volumeBucket={session && session.volNow > 0 ? session.volBucket : undefined}
+          vwapValue={vwapValue}
+          vwapBucket={session && session.vwap > 0 ? session.vwapBucket : undefined}
+        />
+      ) : (
+        <EmptyStateZone symbol={symbol} />
+      )}
 
       {/* Separator - 1px vertical line */}
       <div className="my-2 bg-white/6" />
 
       {/* Zone 2: Pulse Bar */}
-      <PulseBar data={snapshotData} />
+      {snapshotData.hasData ? <PulseBar data={snapshotData} /> : <div className="m-2 rounded-full bg-white/5" />}
     </Card>
   );
 });
 
 TickerEntry.displayName = "TickerEntry";
-
-// ============================================================================
-// Mock Data Generator (for development/testing)
-// ============================================================================

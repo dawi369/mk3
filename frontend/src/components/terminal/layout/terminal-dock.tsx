@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Terminal, Activity, Sparkles, LucideIcon, FlaskConical } from "lucide-react";
+import { Terminal, Sparkles, LucideIcon, FlaskConical } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Dock, DockIcon, DockItem, DockLabel } from "@/components/ui/dock";
 
-export type TerminalViewType = "terminal" | "ai-lab" | "backtesting" | "stream";
+export type TerminalViewType = "terminal" | "ai-lab" | "backtesting";
 
 interface TerminalDockProps {
   activeView: TerminalViewType;
@@ -32,11 +32,6 @@ const data: {
     title: "Backtest",
     id: "backtesting",
     icon: FlaskConical
-  },
-  {
-    title: "Stream",
-    id: "stream",
-    icon: Activity,
   },
 ];
 

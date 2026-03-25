@@ -9,7 +9,6 @@ import { TickerModal } from "@/components/terminal/ticker-modal/ticker-modal";
 import { HeaderProvider } from "@/components/terminal/layout/header-provider";
 import { TerminalHeader } from "@/components/terminal/layout/terminal-header";
 import { TerminalDock } from "@/components/terminal/layout/terminal-dock";
-import { FrontMonthProvider } from "@/providers/front-month-provider";
 import { TerminalViewProvider, useTerminalView } from "@/providers/terminal-view-provider";
 
 function TerminalLayoutContent({ children }: { children: React.ReactNode }) {
@@ -31,19 +30,17 @@ function TerminalLayoutContent({ children }: { children: React.ReactNode }) {
 export default function TerminalLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={<div className="h-screen bg-neutral-950" />}>
-      <FrontMonthProvider>
-        <TerminalViewProvider>
-          <HeaderProvider>
-            <SpotlightProvider>
-              <ProtectedRoute redirectTo="/login">
-                <SubscriptionGuard>
-                  <TerminalLayoutContent>{children}</TerminalLayoutContent>
-                </SubscriptionGuard>
-              </ProtectedRoute>
-            </SpotlightProvider>
-          </HeaderProvider>
-        </TerminalViewProvider>
-      </FrontMonthProvider>
+      <TerminalViewProvider>
+        <HeaderProvider>
+          <SpotlightProvider>
+            <ProtectedRoute redirectTo="/login">
+              <SubscriptionGuard>
+                <TerminalLayoutContent>{children}</TerminalLayoutContent>
+              </SubscriptionGuard>
+            </ProtectedRoute>
+          </SpotlightProvider>
+        </HeaderProvider>
+      </TerminalViewProvider>
     </Suspense>
   );
 }

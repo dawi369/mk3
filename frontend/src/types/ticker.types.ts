@@ -18,6 +18,7 @@ export interface TickerEntity {
 
 export interface TickerSnapshot {
   symbol: string;
+  hasData: boolean;
   last_price: number;
   session_open: number;
   session_high: number;

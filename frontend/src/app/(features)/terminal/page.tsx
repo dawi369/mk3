@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TerminalView } from "@/components/terminal/views/terminal";
 import { AiLabView } from "@/components/terminal/views/ai-lab";
-import { StreamView } from "@/components/terminal/views/stream";
 import { BacktestingView } from "@/components/terminal/views/backtesting";
 import { useTerminalView } from "@/providers/terminal-view-provider";
 import { ErrorBoundary } from "@/components/common/error-boundary";
@@ -35,11 +34,6 @@ function TerminalPageContent() {
           {activeView === "ai-lab" && (
             <ErrorBoundary name="AI Lab">
               <AiLabView />
-            </ErrorBoundary>
-          )}
-          {activeView === "stream" && (
-            <ErrorBoundary name="Data Stream">
-              <StreamView />
             </ErrorBoundary>
           )}
           {activeView === "backtesting" && (
