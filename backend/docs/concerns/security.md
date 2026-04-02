@@ -6,6 +6,7 @@
 - Admin endpoints are protected only by `HUB_API_KEY`.
 - Browser CORS is origin-allowlisted instead of wildcard.
 - Basic in-memory request rate limiting exists for both public and admin routes.
+- Admin browser access is denied by default unless `HUB_ADMIN_ALLOWED_ORIGINS` is explicitly set.
 - Redis is treated as trusted internal infrastructure.
 
 ## Risks

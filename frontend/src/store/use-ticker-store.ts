@@ -18,8 +18,8 @@ import {
 import { extractRoot } from "@/lib/month-utils";
 import type { HubBootstrapData } from "@/types/hub.types";
 
-const MAX_BARS_DEFAULT = 86400;
-const MAX_BARS_TRACKED = 86400;
+const MAX_BARS_DEFAULT = 3_600;
+const MAX_BARS_TRACKED = 21_600;
 const MAX_COMPARISONS = 4;
 
 function getStoredBoolean(key: string, fallback: boolean): boolean {
@@ -79,6 +79,13 @@ function upsertSeries(current: Bar[] | undefined, nextBar: Bar, limit: number): 
     return updated.slice(updated.length - limit);
   }
   return updated;
+}
+
+function trimSeries(current: Bar[] | undefined, limit: number): Bar[] {
+  if (!current || current.length <= limit) {
+    return current ?? [];
+  }
+  return current.slice(current.length - limit);
 }
 
 
@@ -263,7 +270,18 @@ export const useTickerStore = create<TickerStoreState>((set) => ({
         acc[symbol] = true;
         return acc;
       }, {} as Record<string, true>);
+      const nextSeries = { ...state.seriesByMode[mode] };
+
+      for (const [symbol, bars] of Object.entries(nextSeries)) {
+        const limit = nextTracked[symbol] ? MAX_BARS_TRACKED : MAX_BARS_DEFAULT;
+        nextSeries[symbol] = trimSeries(bars, limit);
+      }
+
       return {
+        seriesByMode: {
+          ...state.seriesByMode,
+          [mode]: nextSeries,
+        },
         trackedSymbolsByMode: {
           ...state.trackedSymbolsByMode,
           [mode]: nextTracked,

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
+import posthog from "posthog-js";
 import {
   getUserProfile,
   ensureUserProfile,
@@ -187,6 +188,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [supabase, fetchProfile]);
+
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+      return;
+    }
+
+    if (user) {
+      posthog.identify(user.id, {
+        email: user.email,
+        auth_provider: profile?.auth_provider ?? undefined,
+        display_name: profile?.display_name ?? undefined,
+      });
+      return;
+    }
+
+    posthog.reset();
+  }, [user, profile]);
 
   return (
     <AuthContext.Provider

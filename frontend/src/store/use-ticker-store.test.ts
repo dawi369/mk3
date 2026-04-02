@@ -85,4 +85,47 @@ describe("useTickerStore market data", () => {
     expect(state.entitiesByMode.front.ESH6?.latestBar?.close).toBe(102);
     expect(state.entitiesByMode.front.GCH6?.latestBar?.close).toBe(2050);
   });
+
+  test("caps untracked live series retention to the smaller default budget", () => {
+    const bars = Array.from({ length: 3700 }, (_, index) =>
+      makeBar({
+        symbol: "ESH6",
+        startTime: index * 1000,
+        endTime: index * 1000 + 1000,
+        close: 100 + index,
+      }),
+    );
+
+    useTickerStore.getState().ingestBars("front", bars);
+
+    const retained = useTickerStore.getState().seriesByMode.front.ESH6 ?? [];
+    expect(retained).toHaveLength(3600);
+    expect(retained[0]?.startTime).toBe(100 * 1000);
+    expect(retained.at(-1)?.startTime).toBe(3699 * 1000);
+  });
+
+  test("shrinks previously tracked series when tracked symbols are cleared", () => {
+    const bars = Array.from({ length: 22000 }, (_, index) =>
+      makeBar({
+        symbol: "ESH6",
+        startTime: index * 1000,
+        endTime: index * 1000 + 1000,
+        close: 100 + index,
+      }),
+    );
+
+    useTickerStore.getState().setTrackedSymbols(["ESH6"]);
+    useTickerStore.getState().ingestBars("front", bars);
+
+    let retained = useTickerStore.getState().seriesByMode.front.ESH6 ?? [];
+    expect(retained).toHaveLength(21600);
+    expect(retained[0]?.startTime).toBe(400 * 1000);
+
+    useTickerStore.getState().setTrackedSymbols([]);
+
+    retained = useTickerStore.getState().seriesByMode.front.ESH6 ?? [];
+    expect(retained).toHaveLength(3600);
+    expect(retained[0]?.startTime).toBe(18400 * 1000);
+    expect(retained.at(-1)?.startTime).toBe(21999 * 1000);
+  });
 });

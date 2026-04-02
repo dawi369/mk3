@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { RecoveryService } from "@/services/recovery_service.js";
 import type { Bar } from "@/types/common.types.js";
 import {
@@ -178,6 +178,8 @@ describe("RecoveryService", () => {
   });
 
   test("backfills provider bars into recovery store and redis", async () => {
+    const nowMs = Date.UTC(2026, 2, 25, 12, 0, 0, 0);
+    const dateNowSpy = spyOn(Date, "now").mockReturnValue(nowMs);
     const providerBars: Bar[] = [
       {
         symbol: "ESH6",
@@ -233,15 +235,19 @@ describe("RecoveryService", () => {
       },
     );
 
-    const results = await service.backfillSymbolsFromProvider(["ESH6"], {
-      source: "manual",
-      endMs: Date.UTC(2026, 2, 25, 12, 0, 0, 0),
-    });
+    try {
+      const results = await service.backfillSymbolsFromProvider(["ESH6"], {
+        source: "manual",
+        endMs: nowMs,
+      });
 
-    expect(results).toHaveLength(1);
-    expect(results[0]?.providerBars).toBe(1);
-    expect(persisted).toHaveLength(1);
-    expect(redisWrites).toHaveLength(1);
-    expect(checkpoints.at(-1)).toBe(providerBars[0]?.startTime);
+      expect(results).toHaveLength(1);
+      expect(results[0]?.providerBars).toBe(1);
+      expect(persisted).toHaveLength(1);
+      expect(redisWrites).toHaveLength(1);
+      expect(checkpoints.at(-1)).toBe(providerBars[0]?.startTime);
+    } finally {
+      dateNowSpy.mockRestore();
+    }
   });
 });

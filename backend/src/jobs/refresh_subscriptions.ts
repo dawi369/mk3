@@ -6,6 +6,7 @@ import type { RefreshJobStatus, RefreshDetails } from "@/types/common.types.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
 class MonthlySubscriptionJob {
+  private cronJob: CronJob | null = null;
   private wsClient: MassiveWSClient | null = null;
   private status: RefreshJobStatus = {
     lastRunTime: null,
@@ -195,8 +196,12 @@ class MonthlySubscriptionJob {
   schedule(wsClient: MassiveWSClient): void {
     this.wsClient = wsClient;
 
+    if (this.cronJob) {
+      return;
+    }
+
     // Run at 00:05 ET on the 1st of every month
-    new CronJob(
+    this.cronJob = new CronJob(
       "5 0 1 * *",
       async () => {
         await this.runRefresh();
@@ -207,6 +212,11 @@ class MonthlySubscriptionJob {
     );
 
     console.log("Monthly subscription refresh job scheduled (1st of month @ 00:05 ET)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 

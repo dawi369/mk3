@@ -33,13 +33,19 @@ REDIS_PORT=6379
 HUB_PORT=3001
 HUB_API_KEY=dev_only_secret
 # HUB_ALLOWED_ORIGINS=http://localhost:3010,https://app.example.com
+# HUB_ADMIN_ALLOWED_ORIGINS=https://ops.example.com
 # HUB_PUBLIC_RATE_LIMIT_WINDOW_MS=60000
 # HUB_PUBLIC_RATE_LIMIT_MAX=240
 # HUB_ADMIN_RATE_LIMIT_WINDOW_MS=60000
 # HUB_ADMIN_RATE_LIMIT_MAX=60
+# HUB_ENABLE_SCHEDULED_JOBS=true
+# HUB_BOOTSTRAP_SNAPSHOTS_ON_STARTUP=true
+# HUB_BOOTSTRAP_FRONT_MONTHS_ON_STARTUP=true
 # DATABASE_URL=postgres://...  # Optional, reserved for future historical storage
 # ENABLE_TIMESCALE=true        # Optional opt-in; disabled by default for now
 ```
+
+Scheduled jobs are enabled by default. On startup, the backend now bootstraps stale or missing snapshot and front-month caches before serving traffic.
 
 ## Test the API
 
@@ -47,17 +53,20 @@ HUB_API_KEY=dev_only_secret
 # Health check
 curl http://localhost:3001/health | jq
 
-# Latest bars
-curl http://localhost:3001/bars/latest | jq
+# Public health
+curl http://localhost:3001/health | jq
 
 # Subscriptions
-curl http://localhost:3001/admin/subscriptions | jq
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/subscriptions | jq
 
 # Cached active contracts per product
-curl http://localhost:3001/contracts/active | jq
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/contracts/active | jq
 
 # Front-month resolution
-curl http://localhost:3001/front-months | jq
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/front-months | jq
+
+# Latest bars
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/bars/latest | jq
 
 # Current trading-session bars
 curl http://localhost:3001/bars/session/ESM6 | jq
@@ -84,5 +93,5 @@ Start here:
 
 **No data flowing:**
 1. Verify market hours (Mon-Fri, not 5pm-6pm ET)
-2. Check subscriptions: `curl http://localhost:3001/admin/subscriptions`
-3. Inspect cached contract universe: `curl http://localhost:3001/contracts/active`
+2. Check subscriptions: `curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/subscriptions`
+3. Inspect cached contract universe: `curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/contracts/active`

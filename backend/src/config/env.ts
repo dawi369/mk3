@@ -22,6 +22,21 @@ function getOptionalEnvVarAsInt(key: string): number | undefined {
   return parsed;
 }
 
+function getOptionalEnvVarAsBoolean(key: string): boolean | undefined {
+  const value = getOptionalEnvVar(key);
+  if (value === undefined) return undefined;
+
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error(`Environment variable ${key} must be a valid boolean`);
+}
+
 function getEnvVarAsInt(key: string): number {
   const value = getEnvVar(key);
   const parsed = parseInt(value, 10);
@@ -59,6 +74,9 @@ export const REDIS_PASSWORD = redisConfig.password;
 export const DATABASE_URL = getOptionalEnvVar("DATABASE_URL");
 export const HUB_API_KEY = getEnvVar("HUB_API_KEY");
 export const HUB_ALLOWED_ORIGINS = getOptionalEnvVar("HUB_ALLOWED_ORIGINS");
+export const HUB_ADMIN_ALLOWED_ORIGINS = getOptionalEnvVar(
+  "HUB_ADMIN_ALLOWED_ORIGINS",
+);
 export const HUB_PUBLIC_RATE_LIMIT_WINDOW_MS =
   getOptionalEnvVarAsInt("HUB_PUBLIC_RATE_LIMIT_WINDOW_MS");
 export const HUB_PUBLIC_RATE_LIMIT_MAX =
@@ -67,3 +85,9 @@ export const HUB_ADMIN_RATE_LIMIT_WINDOW_MS =
   getOptionalEnvVarAsInt("HUB_ADMIN_RATE_LIMIT_WINDOW_MS");
 export const HUB_ADMIN_RATE_LIMIT_MAX =
   getOptionalEnvVarAsInt("HUB_ADMIN_RATE_LIMIT_MAX");
+export const HUB_ENABLE_SCHEDULED_JOBS =
+  getOptionalEnvVarAsBoolean("HUB_ENABLE_SCHEDULED_JOBS") ?? true;
+export const HUB_BOOTSTRAP_FRONT_MONTHS_ON_STARTUP =
+  getOptionalEnvVarAsBoolean("HUB_BOOTSTRAP_FRONT_MONTHS_ON_STARTUP") ?? true;
+export const HUB_BOOTSTRAP_SNAPSHOTS_ON_STARTUP =
+  getOptionalEnvVarAsBoolean("HUB_BOOTSTRAP_SNAPSHOTS_ON_STARTUP") ?? true;

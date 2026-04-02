@@ -3,16 +3,16 @@ import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import type { MassiveMarketType } from "@/types/massive.types.js";
 import { startHubRESTApi } from "@/server/api/rest_client.js";
-import { dailyClearJob } from "@/jobs/clear_daily.js";
-import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
-import { frontMonthJob } from "@/jobs/front_month_job.js";
-import { snapshotJob } from "@/jobs/snapshot_job.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 import { recoveryService } from "@/services/recovery_service.js";
+import { initializeJobRuntime, stopJobRuntime } from "@/server/job_runtime.js";
+import { flushSentry, initSentry, Sentry } from "@/utils/sentry.js";
 
 // Global reference for graceful shutdown
 let massiveClient: MassiveWSClient | null = null;
 let statsInterval: Timer | null = null;
+
+initSentry();
 
 /**
  * Main Hub server startup
@@ -53,7 +53,6 @@ async function startHubServer() {
     await massiveClient.subscribe(softsReq);
     await massiveClient.subscribe(volatilesReq);
 
-    monthlySubscriptionJob.attachClient(massiveClient);
     const subscribedSymbols = massiveClient.getSubscribedSymbols();
     await redisStore.setSubscribedSymbols(subscribedSymbols);
 
@@ -82,16 +81,7 @@ async function startHubServer() {
     // Brief pause before continuing
     await Bun.sleep(1000);
 
-    // Load persisted job statuses
-    await dailyClearJob.loadStatus();
-    await monthlySubscriptionJob.loadStatus();
-    await frontMonthJob.loadStatus();
-    await snapshotJob.loadStatus();
-
-    // TODO: Enable job scheduling in production
-    // dailyClearJob.schedule();
-    // monthlySubscriptionJob.schedule(massiveClient);
-    // snapshotJob.schedule();
+    await initializeJobRuntime(massiveClient);
 
     // Start Hub REST API (pass massive client for subscription management)
     await startHubRESTApi(massiveClient);
@@ -106,6 +96,7 @@ async function startHubServer() {
       );
     }, 5000);
   } catch (err) {
+    Sentry.captureException(err);
     console.error("Hub server startup failed:", err);
     const retrySeconds = 10;
     console.error(`Retrying in ${retrySeconds} seconds...`);
@@ -134,6 +125,9 @@ async function gracefulShutdown(signal: string) {
     massiveClient = null;
   }
 
+  console.log("Stopping scheduled jobs...");
+  stopJobRuntime();
+
   // Close TimescaleDB connections
   console.log("Closing TimescaleDB connections...");
   await timescaleStore.close();
@@ -143,6 +137,7 @@ async function gracefulShutdown(signal: string) {
   await redisStore.redis.quit();
 
   console.log("Shutdown complete.");
+  await flushSentry();
   process.exit(0);
 }
 

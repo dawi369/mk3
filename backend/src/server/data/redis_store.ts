@@ -22,6 +22,9 @@ const KEYS = {
   META_DATE: "meta:trading_date",
   META_COUNT: "meta:bar_count",
   SUBSCRIBED_SYMBOLS: "meta:subscribed_symbols",
+  SNAPSHOTS_INDEX: "meta:index:snapshots",
+  ACTIVE_CONTRACTS_INDEX: "meta:index:active_contracts",
+  RECOVERY_CHECKPOINTS_INDEX: "meta:index:recovery_checkpoints",
   RECOVERY_CHECKPOINT_PREFIX: "recovery:checkpoint:",
   SESSION_PREFIX: "session:", // HASH per symbol: session:{symbol}
   SNAPSHOT_PREFIX: "snapshot:", // HASH per symbol: snapshot:{symbol}
@@ -688,25 +691,21 @@ class RedisStore {
       return result;
     }
 
-    const keyedSymbols = symbols
-      .map((symbol) => {
+    const keyedSymbols: Array<{
+      symbol: string;
+      key: string;
+      sessionWindow: NonNullable<ReturnType<typeof getSessionWindowForTimestamp>>;
+    }> = symbols.flatMap((symbol) => {
         const sessionWindow = getSessionWindowForTimestamp(symbol, Date.now());
-        if (!sessionWindow) return null;
-        return {
-          symbol,
-          key: buildSessionKey(symbol, sessionWindow.sessionId),
-          sessionWindow,
-        };
-      })
-      .filter(
-        (
-          entry,
-        ): entry is {
-          symbol: string;
-          key: string;
-          sessionWindow: ReturnType<typeof getSessionWindowForTimestamp>;
-        } => entry !== null,
-      );
+        if (!sessionWindow) return [];
+        return [
+          {
+            symbol,
+            key: buildSessionKey(symbol, sessionWindow.sessionId),
+            sessionWindow,
+          },
+        ];
+      });
 
     if (keyedSymbols.length === 0) {
       return result;
@@ -723,15 +722,12 @@ class RedisStore {
       const data = response?.[1] as Record<string, string> | undefined;
       if (!data || Object.keys(data).length === 0) continue;
 
-      const sessionWindow = entry.sessionWindow;
-      if (!sessionWindow) continue;
-
       result[entry.symbol] = {
         sessionId: data.sessionId || "",
         sessionStartTime: parseInt(data.sessionStartTime || "0"),
         sessionEndTime: parseInt(data.sessionEndTime || "0"),
-        rootSymbol: data.rootSymbol || sessionWindow.rootSymbol,
-        timezone: data.timezone || sessionWindow.timezone,
+        rootSymbol: data.rootSymbol || entry.sessionWindow.rootSymbol,
+        timezone: data.timezone || entry.sessionWindow.timezone,
         dayOpen: parseFloat(data.dayOpen || "0"),
         dayHigh: parseFloat(data.dayHigh || "0"),
         dayLow: parseFloat(data.dayLow || "0"),
@@ -763,10 +759,19 @@ class RedisStore {
   ): Promise<SessionData[]> {
     const keys = await this.scanKeys(`${KEYS.SESSION_PREFIX}${symbol}:*`);
     const result: SessionData[] = [];
+    if (keys.length === 0) {
+      return result;
+    }
 
+    const pipeline = this.redis.pipeline();
     for (const key of keys) {
-      const data = await this.redis.hgetall(key);
-      if (Object.keys(data).length === 0) continue;
+      pipeline.hgetall(key);
+    }
+    const responses = await pipeline.exec();
+
+    for (const [index, key] of keys.entries()) {
+      const data = responses?.[index]?.[1] as Record<string, string> | undefined;
+      if (!data || Object.keys(data).length === 0) continue;
 
       const sessionEndTime = parseInt(data.sessionEndTime || "0");
       const sessionStartTime = parseInt(data.sessionStartTime || "0");
@@ -832,23 +837,22 @@ class RedisStore {
    * Get all snapshots as a map
    */
   async getAllSnapshots(): Promise<Record<string, SnapshotData>> {
-    const keys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    const symbols = await this.getIndexedSnapshotSymbols();
     const result: Record<string, SnapshotData> = {};
-    if (keys.length === 0) {
+    if (symbols.length === 0) {
       return result;
     }
 
     const pipeline = this.redis.pipeline();
-    for (const key of keys) {
-      pipeline.hgetall(key);
+    for (const symbol of symbols) {
+      pipeline.hgetall(`${KEYS.SNAPSHOT_PREFIX}${symbol}`);
     }
     const responses = await pipeline.exec();
 
-    for (const [index, key] of keys.entries()) {
+    for (const [index, symbol] of symbols.entries()) {
       const data = responses?.[index]?.[1] as Record<string, string> | undefined;
       if (!data || Object.keys(data).length === 0) continue;
 
-      const symbol = key.replace(KEYS.SNAPSHOT_PREFIX, "");
       result[symbol] = {
         productCode: data.productCode || "",
         settlementDate: data.settlementDate || "",
@@ -873,7 +877,10 @@ class RedisStore {
    */
   async writeSnapshot(symbol: string, snapshot: SnapshotData): Promise<void> {
     const key = `${KEYS.SNAPSHOT_PREFIX}${symbol}`;
-    await this.redis.hset(key, snapshot as unknown as Record<string, string>);
+    const multi = this.redis.multi();
+    multi.hset(key, snapshot as unknown as Record<string, string>);
+    multi.sadd(KEYS.SNAPSHOTS_INDEX, symbol);
+    await multi.exec();
   }
 
   async setSubscribedSymbols(symbols: string[]): Promise<void> {
@@ -896,10 +903,14 @@ class RedisStore {
   }
 
   async setRecoveryCheckpoint(checkpoint: RecoveryCheckpoint): Promise<void> {
-    await this.redis.set(
+    const checkpointId = `${checkpoint.timeframe}:${checkpoint.symbol}`;
+    const multi = this.redis.multi();
+    multi.set(
       this.getRecoveryCheckpointKey(checkpoint.symbol, checkpoint.timeframe),
       JSON.stringify(checkpoint),
     );
+    multi.sadd(KEYS.RECOVERY_CHECKPOINTS_INDEX, checkpointId);
+    await multi.exec();
   }
 
   async getRecoveryCheckpoint(
@@ -917,25 +928,27 @@ class RedisStore {
   }
 
   async getAllRecoveryCheckpoints(): Promise<Record<string, RecoveryCheckpoint>> {
-    const keys = await this.scanKeys(`${KEYS.RECOVERY_CHECKPOINT_PREFIX}*`);
+    const checkpointIds = await this.getIndexedRecoveryCheckpointIds();
     const result: Record<string, RecoveryCheckpoint> = {};
-    if (keys.length === 0) {
+    if (checkpointIds.length === 0) {
       return result;
     }
 
     const pipeline = this.redis.pipeline();
-    for (const key of keys) {
-      pipeline.get(key);
+    for (const checkpointId of checkpointIds) {
+      const [timeframe, symbol] = checkpointId.split(":");
+      if (!timeframe || !symbol) continue;
+      pipeline.get(this.getRecoveryCheckpointKey(symbol, timeframe as RecoveryTimeframe));
     }
     const responses = await pipeline.exec();
 
-    for (const [index, key] of keys.entries()) {
+    for (const [index, checkpointId] of checkpointIds.entries()) {
       const raw = responses?.[index]?.[1] as string | null | undefined;
       if (!raw) continue;
 
       try {
         const checkpoint = JSON.parse(raw) as RecoveryCheckpoint;
-        result[`${checkpoint.timeframe}:${checkpoint.symbol}`] = checkpoint;
+        result[checkpointId] = checkpoint;
       } catch {
         // Ignore malformed checkpoint payloads.
       }
@@ -954,10 +967,10 @@ class RedisStore {
       contracts,
     };
 
-    await this.redis.set(
-      `${KEYS.ACTIVE_CONTRACTS_PREFIX}${productCode}`,
-      JSON.stringify(payload),
-    );
+    const multi = this.redis.multi();
+    multi.set(`${KEYS.ACTIVE_CONTRACTS_PREFIX}${productCode}`, JSON.stringify(payload));
+    multi.sadd(KEYS.ACTIVE_CONTRACTS_INDEX, productCode);
+    await multi.exec();
   }
 
   async getActiveContracts(productCode: string): Promise<StoredActiveContracts | null> {
@@ -972,25 +985,24 @@ class RedisStore {
   }
 
   async getAllActiveContracts(): Promise<Record<string, StoredActiveContracts>> {
-    const keys = await this.scanKeys(`${KEYS.ACTIVE_CONTRACTS_PREFIX}*`);
+    const productCodes = await this.getIndexedActiveContractCodes();
     const result: Record<string, StoredActiveContracts> = {};
-    if (keys.length === 0) {
+    if (productCodes.length === 0) {
       return result;
     }
 
     const pipeline = this.redis.pipeline();
-    for (const key of keys) {
-      pipeline.get(key);
+    for (const productCode of productCodes) {
+      pipeline.get(`${KEYS.ACTIVE_CONTRACTS_PREFIX}${productCode}`);
     }
     const responses = await pipeline.exec();
 
-    for (const [index, key] of keys.entries()) {
+    for (const [index, productCode] of productCodes.entries()) {
       const raw = responses?.[index]?.[1] as string | null | undefined;
       if (!raw) continue;
 
       try {
         const stored = JSON.parse(raw) as StoredActiveContracts;
-        const productCode = key.replace(KEYS.ACTIVE_CONTRACTS_PREFIX, "");
         result[productCode] = stored;
       } catch {
         // Ignore malformed contract payloads.
@@ -1047,6 +1059,52 @@ class RedisStore {
     return keys;
   }
 
+  private async getIndexedSnapshotSymbols(): Promise<string[]> {
+    const indexedSymbols = await this.redis.smembers(KEYS.SNAPSHOTS_INDEX);
+    if (indexedSymbols.length > 0) {
+      return indexedSymbols;
+    }
+
+    const keys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    const symbols = keys.map((key) => key.replace(KEYS.SNAPSHOT_PREFIX, ""));
+    if (symbols.length > 0) {
+      await this.redis.sadd(KEYS.SNAPSHOTS_INDEX, ...symbols);
+    }
+    return symbols;
+  }
+
+  private async getIndexedActiveContractCodes(): Promise<string[]> {
+    const indexedProductCodes = await this.redis.smembers(KEYS.ACTIVE_CONTRACTS_INDEX);
+    if (indexedProductCodes.length > 0) {
+      return indexedProductCodes;
+    }
+
+    const keys = await this.scanKeys(`${KEYS.ACTIVE_CONTRACTS_PREFIX}*`);
+    const productCodes = keys.map((key) =>
+      key.replace(KEYS.ACTIVE_CONTRACTS_PREFIX, ""),
+    );
+    if (productCodes.length > 0) {
+      await this.redis.sadd(KEYS.ACTIVE_CONTRACTS_INDEX, ...productCodes);
+    }
+    return productCodes;
+  }
+
+  private async getIndexedRecoveryCheckpointIds(): Promise<string[]> {
+    const indexedCheckpointIds = await this.redis.smembers(KEYS.RECOVERY_CHECKPOINTS_INDEX);
+    if (indexedCheckpointIds.length > 0) {
+      return indexedCheckpointIds;
+    }
+
+    const keys = await this.scanKeys(`${KEYS.RECOVERY_CHECKPOINT_PREFIX}*`);
+    const checkpointIds = keys.map((key) =>
+      key.replace(KEYS.RECOVERY_CHECKPOINT_PREFIX, ""),
+    );
+    if (checkpointIds.length > 0) {
+      await this.redis.sadd(KEYS.RECOVERY_CHECKPOINTS_INDEX, ...checkpointIds);
+    }
+    return checkpointIds;
+  }
+
   private async deleteInBatches(
     keys: string[],
     batchSize = LIMITS.redisDeleteBatchSize,
@@ -1097,10 +1155,13 @@ class RedisStore {
     }
 
     // Clear symbol snapshots
-    const snapshotKeys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    const snapshotSymbols = await this.getIndexedSnapshotSymbols();
+    const snapshotKeys = snapshotSymbols.map((symbol) => `${KEYS.SNAPSHOT_PREFIX}${symbol}`);
     if (snapshotKeys.length > 0) {
       clearedCount += await this.deleteInBatches(snapshotKeys);
     }
+
+    await this.redis.del(KEYS.SNAPSHOTS_INDEX);
 
     // Update metadata
     await this.redis.set(KEYS.META_DATE, today);
@@ -1132,12 +1193,22 @@ class RedisStore {
       }
     }
 
-    const snapshotKeys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
+    const snapshotSymbols = await this.getIndexedSnapshotSymbols();
+    const snapshotKeys = snapshotSymbols.map((symbol) => `${KEYS.SNAPSHOT_PREFIX}${symbol}`);
+    const snapshotPipeline = this.redis.pipeline();
     for (const key of snapshotKeys) {
-      const data = await this.redis.hgetall(key);
+      snapshotPipeline.hgetall(key);
+    }
+    const snapshotResponses = await snapshotPipeline.exec();
+
+    for (const [index, key] of snapshotKeys.entries()) {
+      const data = snapshotResponses?.[index]?.[1] as Record<string, string> | undefined;
+      if (!data || Object.keys(data).length === 0) continue;
       const timestamp = parseInt(data.timestamp || "0");
       if (timestamp > 0 && timestamp < now - 36 * 60 * 60 * 1000) {
         clearedCount += await this.redis.del(key);
+        const symbol = key.replace(KEYS.SNAPSHOT_PREFIX, "");
+        await this.redis.srem(KEYS.SNAPSHOTS_INDEX, symbol);
       }
     }
 

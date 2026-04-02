@@ -15,6 +15,7 @@ interface SnapshotJobStatus {
 }
 
 export class SnapshotJob {
+  private cronJob: CronJob | null = null;
   private status: SnapshotJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -120,7 +121,11 @@ export class SnapshotJob {
    * Schedule job to run at 2:05 AM ET (after daily clear at 2:00 AM)
    */
   schedule(): void {
-    new CronJob(
+    if (this.cronJob) {
+      return;
+    }
+
+    this.cronJob = new CronJob(
       "5 2 * * *",
       async () => {
         await this.runRefresh();
@@ -131,6 +136,11 @@ export class SnapshotJob {
     );
 
     console.log("[SnapshotJob] Scheduled (2:05 AM ET daily)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 

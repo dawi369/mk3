@@ -10,6 +10,7 @@ interface ClearJobStatus {
 }
 
 export class DailyClearJob {
+  private cronJob: CronJob | null = null;
   private status: ClearJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -78,7 +79,11 @@ export class DailyClearJob {
   }
 
   schedule(): void {
-    new CronJob(
+    if (this.cronJob) {
+      return;
+    }
+
+    this.cronJob = new CronJob(
       "0 2 * * *",
       async () => {
         await this.runClear();
@@ -89,6 +94,11 @@ export class DailyClearJob {
     );
 
     console.log("Daily clear job scheduled (2 AM ET)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 

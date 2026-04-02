@@ -7,16 +7,16 @@ describe("resolveFrontMonth", () => {
     const candidates: FrontMonthCandidate[] = [
       {
         contract: {
-          ticker: "ESM6",
+          ticker: "ESM9",
           productCode: "ES",
-          lastTradeDate: "2026-06-19",
+          lastTradeDate: "2099-06-19",
           active: true,
         },
         snapshot: {
           details: {
-            ticker: "ESM6",
+            ticker: "ESM9",
             product_code: "ES",
-            settlement_date: "2026-06-19",
+            settlement_date: "2099-06-19",
           },
           session: {
             volume: 1000,
@@ -27,16 +27,16 @@ describe("resolveFrontMonth", () => {
       },
       {
         contract: {
-          ticker: "ESH6",
+          ticker: "ESH9",
           productCode: "ES",
-          lastTradeDate: "2026-03-31",
+          lastTradeDate: "2099-03-31",
           active: true,
         },
         snapshot: {
           details: {
-            ticker: "ESH6",
+            ticker: "ESH9",
             product_code: "ES",
-            settlement_date: "2026-03-31",
+            settlement_date: "2099-03-31",
           },
           session: {
             volume: 100,
@@ -50,8 +50,8 @@ describe("resolveFrontMonth", () => {
     const resolved = resolveFrontMonth(candidates, "ES", "us_indices");
 
     expect(resolved).not.toBeNull();
-    expect(resolved?.frontMonth).toBe("ESM6");
-    expect(resolved?.nearestExpiry).toBe("ESH6");
+    expect(resolved?.frontMonth).toBe("ESM9");
+    expect(resolved?.nearestExpiry).toBe("ESH9");
     expect(resolved?.isRolling).toBe(true);
     expect(resolved?.confidence).toBe("high");
   });
@@ -60,18 +60,18 @@ describe("resolveFrontMonth", () => {
     const candidates: FrontMonthCandidate[] = [
       {
         contract: {
-          ticker: "GCJ6",
+          ticker: "GCJ9",
           productCode: "GC",
-          lastTradeDate: "2026-04-28",
+          lastTradeDate: "2099-04-28",
           active: true,
         },
         snapshot: null,
       },
       {
         contract: {
-          ticker: "GCM6",
+          ticker: "GCM9",
           productCode: "GC",
-          lastTradeDate: "2026-06-26",
+          lastTradeDate: "2099-06-26",
           active: true,
         },
         snapshot: null,
@@ -81,8 +81,8 @@ describe("resolveFrontMonth", () => {
     const resolved = resolveFrontMonth(candidates, "GC", "metals");
 
     expect(resolved).not.toBeNull();
-    expect(resolved?.frontMonth).toBe("GCJ6");
-    expect(resolved?.nearestExpiry).toBe("GCJ6");
+    expect(resolved?.frontMonth).toBe("GCJ9");
+    expect(resolved?.nearestExpiry).toBe("GCJ9");
     expect(resolved?.confidence).toBe("low");
     expect(resolved?.candidateCount).toBe(2);
   });
@@ -91,25 +91,25 @@ describe("resolveFrontMonth", () => {
     const candidates: FrontMonthCandidate[] = [
       {
         contract: {
-          ticker: "RTYH6",
+          ticker: "RTYH9",
           productCode: "RTY",
-          lastTradeDate: "2026-03-31",
+          lastTradeDate: "2099-03-31",
           active: true,
         },
         snapshot: null,
       },
       {
         contract: {
-          ticker: "RTYM6",
+          ticker: "RTYM9",
           productCode: "RTY",
-          lastTradeDate: "2026-06-18",
+          lastTradeDate: "2099-06-18",
           active: true,
         },
         snapshot: {
           details: {
-            ticker: "RTYM6",
+            ticker: "RTYM9",
             product_code: "RTY",
-            settlement_date: "2026-06-18",
+            settlement_date: "2099-06-18",
           },
           session: {
             volume: 150000,
@@ -122,8 +122,8 @@ describe("resolveFrontMonth", () => {
     const resolved = resolveFrontMonth(candidates, "RTY", "us_indices");
 
     expect(resolved).not.toBeNull();
-    expect(resolved?.frontMonth).toBe("RTYM6");
-    expect(resolved?.nearestExpiry).toBe("RTYM6");
+    expect(resolved?.frontMonth).toBe("RTYM9");
+    expect(resolved?.nearestExpiry).toBe("RTYM9");
     expect(resolved?.confidence).toBe("high");
   });
 });

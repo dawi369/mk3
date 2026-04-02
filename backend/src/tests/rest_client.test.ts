@@ -28,7 +28,7 @@ describe("REST request handler", () => {
     resetRateLimitsForTesting();
   });
 
-  test("returns health status with recovery checkpoint counts", async () => {
+  test("returns minimal public health status", async () => {
     setMassiveClientForTesting({
       isConnected: () => true,
     } as any);
@@ -56,8 +56,43 @@ describe("REST request handler", () => {
 
     expect(response.status).toBe(200);
     expect(payload.status).toBe("ok");
-    expect(payload.recovery.checkpointCount).toBe(2);
     expect(payload.services.massiveWs).toBe("connected");
+    expect(payload.recovery).toBeUndefined();
+    expect(payload.symbols).toBeUndefined();
+  });
+
+  test("returns detailed admin health status when authorized", async () => {
+    setMassiveClientForTesting({
+      isConnected: () => true,
+    } as any);
+
+    spyOn(redisStore, "ping").mockResolvedValue("PONG");
+    spyOn(redisStore, "getStats").mockResolvedValue({
+      date: "2026-03-25",
+      barCount: 10,
+      symbolCount: 2,
+      streamLength: 0,
+    } as any);
+    spyOn(redisStore, "getSymbols").mockResolvedValue(["ESH6", "NQH6"]);
+    spyOn(timescaleStore, "ping").mockResolvedValue(true);
+    spyOn(redisStore, "getAllRecoveryCheckpoints").mockResolvedValue({
+      "1m:ESH6": { symbol: "ESH6" },
+      "1m:NQH6": { symbol: "NQH6" },
+    } as any);
+
+    const response = await handleRequest(
+      "GET",
+      "/admin/health",
+      createRequest("/admin/health", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
+    );
+    const payload = (await response.json()) as any;
+
+    expect(response.status).toBe(200);
+    expect(payload.status).toBe("ok");
+    expect(payload.recovery.checkpointCount).toBe(2);
+    expect(payload.symbols).toEqual(["ESH6", "NQH6"]);
   });
 
   test("returns recovery checkpoints when authorized", async () => {
@@ -159,13 +194,17 @@ describe("REST request handler", () => {
 
     const latestResponse = await handleRequest(
       "GET",
-      "/bars/latest",
-      createRequest("/bars/latest"),
+      "/admin/bars/latest",
+      createRequest("/admin/bars/latest", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
     );
     const symbolResponse = await handleRequest(
       "GET",
-      "/bars/latest/ESH9",
-      createRequest("/bars/latest/ESH9"),
+      "/admin/bars/latest/ESH9",
+      createRequest("/admin/bars/latest/ESH9", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
     );
     const latestPayload = (await latestResponse.json()) as any;
     const symbolPayload = (await symbolResponse.json()) as any;
@@ -181,8 +220,10 @@ describe("REST request handler", () => {
 
     const latest = await handleRequest(
       "GET",
-      "/bars/latest/NOPE",
-      createRequest("/bars/latest/NOPE"),
+      "/admin/bars/latest/NOPE",
+      createRequest("/admin/bars/latest/NOPE", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
     );
     const session = await handleRequest(
       "GET",
@@ -241,8 +282,10 @@ describe("REST request handler", () => {
 
     const response = await handleRequest(
       "GET",
-      "/front-months",
-      createRequest("/front-months"),
+      "/admin/front-months",
+      createRequest("/admin/front-months", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
     );
     const payload = (await response.json()) as any;
 
@@ -265,8 +308,10 @@ describe("REST request handler", () => {
 
     const contractsResponse = await handleRequest(
       "GET",
-      "/contracts/active/ES",
-      createRequest("/contracts/active/ES"),
+      "/admin/contracts/active/ES",
+      createRequest("/admin/contracts/active/ES", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
     );
     const adminResponse = await handleRequest(
       "GET",
@@ -280,6 +325,21 @@ describe("REST request handler", () => {
 
     expect(contractsPayload.productCode).toBe("ES");
     expect(adminPayload.totalSymbols).toBe(2);
+  });
+
+  test("rejects browser-origin admin requests unless explicitly allowed", async () => {
+    const response = await handleRequest(
+      "GET",
+      "/admin/subscriptions",
+      createRequest("/admin/subscriptions", {
+        headers: {
+          "X-API-Key": Bun.env.HUB_API_KEY ?? "",
+          Origin: "http://localhost:3010",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(403);
   });
 
   test("rejects unauthenticated admin recovery backfill requests", async () => {

@@ -6,6 +6,7 @@ import {
   HUB_PORT,
   HUB_API_KEY,
   HUB_ALLOWED_ORIGINS,
+  HUB_ADMIN_ALLOWED_ORIGINS,
   HUB_PUBLIC_RATE_LIMIT_WINDOW_MS,
   HUB_PUBLIC_RATE_LIMIT_MAX,
   HUB_ADMIN_RATE_LIMIT_WINDOW_MS,
@@ -47,6 +48,13 @@ const ALLOWED_ORIGINS = new Set(
       .filter(Boolean) ?? []),
     ...(Bun.env.NODE_ENV === "production" ? [] : DEV_ALLOWED_ORIGINS),
   ].map((origin) => origin.replace(/\/+$/, "")),
+);
+
+const ADMIN_ALLOWED_ORIGINS = new Set(
+  (HUB_ADMIN_ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? []
+  ).map((origin) => origin.replace(/\/+$/, "")),
 );
 
 const ALLOWED_TIMEFRAMES = new Set([
@@ -101,6 +109,11 @@ function parseMsParam(value: string | null): number | null {
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return true;
   return ALLOWED_ORIGINS.has(origin.replace(/\/+$/, ""));
+}
+
+function isAdminOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true;
+  return ADMIN_ALLOWED_ORIGINS.has(origin.replace(/\/+$/, ""));
 }
 
 function buildCorsHeaders(req?: Request): Record<string, string> {
@@ -249,6 +262,9 @@ export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
       if (origin && !isOriginAllowed(origin)) {
         return errorResponse("Origin not allowed", 403, req);
       }
+      if (path.startsWith("/admin") && origin && !isAdminOriginAllowed(origin)) {
+        return errorResponse("Admin browser origin not allowed", 403, req);
+      }
 
       // Handle WebSocket upgrade
       if (server.upgrade(req, { data: undefined })) {
@@ -356,13 +372,15 @@ export async function handleRequest(
   if (origin && !isOriginAllowed(origin)) {
     return fail("Origin not allowed", 403);
   }
+  if (path.startsWith("/admin") && origin && !isAdminOriginAllowed(origin)) {
+    return fail("Admin browser origin not allowed", 403);
+  }
   if (!rateLimit.allowed) {
     return fail("Too Many Requests", 429);
   }
   // --- Public Routes ---
 
   if (method === "GET" && path === "/health") {
-    // Check database connections
     let redisOk = false;
     let timescaleOk = false;
     const timescaleEnabled = timescaleStore.isEnabled;
@@ -382,17 +400,7 @@ export async function handleRequest(
       }
     }
 
-    // Get stats and job statuses
-    const redisStats = await redisStore.getStats();
-    const symbols = await redisStore.getSymbols();
-    const recoveryCheckpoints = await redisStore.getAllRecoveryCheckpoints();
-    const clearJobStatus = dailyClearJob.getStatus();
-    const refreshJobStatus = monthlySubscriptionJob.getStatus();
-
-    // Check WebSocket connection
     const wsConnected = massiveClient?.isConnected() || false;
-
-    // Determine overall status
     const allHealthy =
       redisOk && wsConnected && (!timescaleEnabled || timescaleOk);
     const status = allHealthy ? "ok" : "degraded";
@@ -409,20 +417,7 @@ export async function handleRequest(
           : "disabled",
         massiveWs: wsConnected ? "connected" : "disconnected",
       },
-      symbols: symbols,
-      symbolCount: redisStats.symbolCount,
-      redis: redisStats,
-      recovery: {
-        checkpointCount: Object.keys(recoveryCheckpoints).length,
-      },
-      dailyClearJob: clearJobStatus,
-      subscriptionRefreshJob: refreshJobStatus,
     });
-  }
-
-  if (method === "GET" && path === "/bars/latest") {
-    const bars = await redisStore.getAllLatestArray();
-    return respond({ bars, count: bars.length });
   }
 
   // Match /bars/range/:symbol
@@ -443,31 +438,6 @@ export async function handleRequest(
     return respond({ symbol, tf, start, end, bars, count: bars.length });
   }
 
-  // Match /bars/week/:symbol
-  const weekMatch = path.match(/^\/bars\/week\/([^\/]+)$/);
-  if (method === "GET" && weekMatch) {
-    const symbol = weekMatch[1];
-    if (!symbol) return fail("Invalid symbol", 400);
-
-    const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
-    const end = Date.now();
-    const start = end - ONE_WEEK_MS;
-    const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
-    return respond({ symbol, tf, start, end, bars, count: bars.length });
-  }
-
-  // Match /bars/latest/:symbol
-  const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
-  if (method === "GET" && latestMatch) {
-    const symbol = latestMatch[1];
-    if (!symbol) return fail("Invalid symbol", 400);
-
-    const bar = await redisStore.getLatest(symbol);
-    if (!bar) {
-      return fail("Symbol not found", 404);
-    }
-    return respond(bar);
-  }
 
   // Match /bars/today/:symbol
   const todayMatch = path.match(/^\/bars\/today\/([^\/]+)$/);
@@ -494,41 +464,6 @@ export async function handleRequest(
   if (method === "GET" && path === "/symbols") {
     const symbols = await redisStore.getSymbols();
     return respond({ symbols, count: symbols.length });
-  }
-
-  // Front months endpoint (public - no auth required)
-  if (method === "GET" && path === "/front-months") {
-    const cache = frontMonthJob.getCache();
-    if (!cache) {
-      return respond({
-        lastUpdated: null,
-        products: {},
-        message:
-          "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
-      });
-    }
-    return respond(cache);
-  }
-
-  if (method === "GET" && path === "/contracts/active") {
-    const contracts = await redisStore.getAllActiveContracts();
-    return respond({
-      products: contracts,
-      count: Object.keys(contracts).length,
-    });
-  }
-
-  const activeContractsMatch = path.match(/^\/contracts\/active\/([^\/]+)$/);
-  if (method === "GET" && activeContractsMatch) {
-    const productCode = activeContractsMatch[1];
-    if (!productCode) return fail("Invalid product code", 400);
-
-    const contracts = await redisStore.getActiveContracts(productCode);
-    if (!contracts) {
-      return fail("Contracts not found", 404);
-    }
-
-    return respond(contracts);
   }
 
   // Session data endpoint (public - no auth required)
@@ -595,6 +530,122 @@ export async function handleRequest(
         checkpoints,
         count: Object.keys(checkpoints).length,
       });
+    }
+
+    if (method === "GET" && path === "/admin/health") {
+      let redisOk = false;
+      let timescaleOk = false;
+      const timescaleEnabled = timescaleStore.isEnabled;
+
+      try {
+        const pong = await redisStore.ping();
+        redisOk = pong === "PONG";
+      } catch {
+        redisOk = false;
+      }
+
+      if (timescaleEnabled) {
+        try {
+          timescaleOk = await timescaleStore.ping();
+        } catch {
+          timescaleOk = false;
+        }
+      }
+
+      const redisStats = await redisStore.getStats();
+      const symbols = await redisStore.getSymbols();
+      const recoveryCheckpoints = await redisStore.getAllRecoveryCheckpoints();
+      const clearJobStatus = dailyClearJob.getStatus();
+      const refreshJobStatus = monthlySubscriptionJob.getStatus();
+      const wsConnected = massiveClient?.isConnected() || false;
+      const allHealthy =
+        redisOk && wsConnected && (!timescaleEnabled || timescaleOk);
+      const status = allHealthy ? "ok" : "degraded";
+
+      return respond({
+        status,
+        timestamp: Date.now(),
+        services: {
+          redis: redisOk ? "connected" : "disconnected",
+          timescaledb: timescaleEnabled
+            ? timescaleOk
+              ? "connected"
+              : "disconnected"
+            : "disabled",
+          massiveWs: wsConnected ? "connected" : "disconnected",
+        },
+        symbols,
+        symbolCount: redisStats.symbolCount,
+        redis: redisStats,
+        recovery: {
+          checkpointCount: Object.keys(recoveryCheckpoints).length,
+        },
+        dailyClearJob: clearJobStatus,
+        subscriptionRefreshJob: refreshJobStatus,
+      });
+    }
+
+    if (method === "GET" && path === "/admin/front-months") {
+      const cache = frontMonthJob.getCache();
+      if (!cache) {
+        return respond({
+          lastUpdated: null,
+          products: {},
+          message:
+            "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
+        });
+      }
+      return respond(cache);
+    }
+
+    if (method === "GET" && path === "/admin/contracts/active") {
+      const contracts = await redisStore.getAllActiveContracts();
+      return respond({
+        products: contracts,
+        count: Object.keys(contracts).length,
+      });
+    }
+
+    if (method === "GET" && path === "/admin/bars/latest") {
+      const bars = await redisStore.getAllLatestArray();
+      return respond({ bars, count: bars.length });
+    }
+
+    const latestMatch = path.match(/^\/admin\/bars\/latest\/([^\/]+)$/);
+    if (method === "GET" && latestMatch) {
+      const symbol = latestMatch[1];
+      if (!symbol) return fail("Invalid symbol", 400);
+
+      const bar = await redisStore.getLatest(symbol);
+      if (!bar) {
+        return fail("Symbol not found", 404);
+      }
+      return respond(bar);
+    }
+
+    const weekMatch = path.match(/^\/admin\/bars\/week\/([^\/]+)$/);
+    if (method === "GET" && weekMatch) {
+      const symbol = weekMatch[1];
+      if (!symbol) return fail("Invalid symbol", 400);
+
+      const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
+      const end = Date.now();
+      const start = end - ONE_WEEK_MS;
+      const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
+      return respond({ symbol, tf, start, end, bars, count: bars.length });
+    }
+
+    const activeContractsMatch = path.match(/^\/admin\/contracts\/active\/([^\/]+)$/);
+    if (method === "GET" && activeContractsMatch) {
+      const productCode = activeContractsMatch[1];
+      if (!productCode) return fail("Invalid product code", 400);
+
+      const contracts = await redisStore.getActiveContracts(productCode);
+      if (!contracts) {
+        return fail("Contracts not found", 404);
+      }
+
+      return respond(contracts);
     }
 
     if (method === "POST" && path === "/admin/clear-redis") {

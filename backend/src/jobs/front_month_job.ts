@@ -43,6 +43,7 @@ function mergeContracts(
 }
 
 export class FrontMonthJob {
+  private cronJob: CronJob | null = null;
   private status: FrontMonthJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -172,8 +173,12 @@ export class FrontMonthJob {
   }
 
   schedule(): void {
+    if (this.cronJob) {
+      return;
+    }
+
     // Run at 3 AM ET daily (after the 2 AM clear job)
-    new CronJob(
+    this.cronJob = new CronJob(
       "0 3 * * *",
       async () => {
         await this.runRefresh();
@@ -184,6 +189,11 @@ export class FrontMonthJob {
     );
 
     console.log("[FrontMonthJob] Scheduled (3 AM ET daily)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 

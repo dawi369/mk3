@@ -13,7 +13,9 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
 ## Main Runtime
 
 - `src/server/index.ts`
-  Boots the Massive futures WebSocket client, builds subscriptions, persists the subscribed symbol set, loads job state, and starts the Bun REST/WebSocket API.
+  Boots the Massive futures WebSocket client, builds subscriptions, persists the subscribed symbol set, runs recovery, restores job state, bootstraps stale caches, and starts the Bun REST/WebSocket API.
+- `src/server/job_runtime.ts`
+  Coordinates startup cache freshness and recurring job scheduling.
 - `src/server/api/massive/ws_client.ts`
   Handles the upstream market-data stream, reconnects on disconnects, and writes normalized bars into Redis.
 - `src/server/api/rest_client.ts`
@@ -62,8 +64,8 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
 - Session math is trading-session-based for supported products and retained across the Redis hot window.
 - Operational visibility comes from:
   - `/health`
-  - `/front-months`
-  - `/contracts/active`
+  - `/admin/front-months`
+  - `/admin/contracts/active`
   - `/bars/session/:symbol`
   - `/sessions/week/:symbol`
   - `/admin/subscriptions`

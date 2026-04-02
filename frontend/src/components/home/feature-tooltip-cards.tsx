@@ -4,7 +4,6 @@ import React from "react";
 import { TrendingUp, Brain, FlaskConical, History, BarChart3, Zap } from "lucide-react";
 import Image from "next/image";
 
-import { NEXT_PUBLIC_MASSIVE_API_KEY } from "@/config/env";
 import { useEffect, useState } from "react";
 
 // Hook to preload market status
@@ -14,13 +13,11 @@ export const useMarketStatus = () => {
   useEffect(() => {
     const fetchMarketStatus = async () => {
       try {
-        const response = await fetch(
-          `https://api.massive.com/futures/vX/market-status?product_code=ES&limit=10&apiKey=${NEXT_PUBLIC_MASSIVE_API_KEY}`
-        );
+        const response = await fetch("/api/market-status");
         const data = await response.json();
         
-        if (data.results && data.results.length > 0 && data.results[0].market_event) {
-          setMarketStatus(data.results[0].market_event);
+        if (typeof data.marketStatus === "string") {
+          setMarketStatus(data.marketStatus);
         } else {
           setMarketStatus("open");
         }
