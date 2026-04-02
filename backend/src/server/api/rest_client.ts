@@ -2,7 +2,15 @@ import { redisStore } from "@/server/data/redis_store.js";
 import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { Redis } from "ioredis";
 import { timescaleStore } from "@/server/data/timescale_store.js";
-import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
+import {
+  HUB_PORT,
+  HUB_API_KEY,
+  HUB_ALLOWED_ORIGINS,
+  HUB_PUBLIC_RATE_LIMIT_WINDOW_MS,
+  HUB_PUBLIC_RATE_LIMIT_MAX,
+  HUB_ADMIN_RATE_LIMIT_WINDOW_MS,
+  HUB_ADMIN_RATE_LIMIT_MAX,
+} from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
@@ -19,11 +27,27 @@ export function setMassiveClientForTesting(client: MassiveWSClient | null): void
 }
 
 // Helper for CORS headers
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const baseCorsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+  Vary: "Origin",
 };
+
+const DEV_ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3010",
+  "http://127.0.0.1:3010",
+];
+
+const ALLOWED_ORIGINS = new Set(
+  [
+    ...(HUB_ALLOWED_ORIGINS?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? []),
+    ...(Bun.env.NODE_ENV === "production" ? [] : DEV_ALLOWED_ORIGINS),
+  ].map((origin) => origin.replace(/\/+$/, "")),
+);
 
 const ALLOWED_TIMEFRAMES = new Set([
   "1s",
@@ -40,6 +64,27 @@ const ALLOWED_TIMEFRAMES = new Set([
 ]);
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const PUBLIC_RATE_LIMIT_WINDOW_MS = HUB_PUBLIC_RATE_LIMIT_WINDOW_MS ?? 60_000;
+const PUBLIC_RATE_LIMIT_MAX = HUB_PUBLIC_RATE_LIMIT_MAX ?? 240;
+const ADMIN_RATE_LIMIT_WINDOW_MS = HUB_ADMIN_RATE_LIMIT_WINDOW_MS ?? 60_000;
+const ADMIN_RATE_LIMIT_MAX = HUB_ADMIN_RATE_LIMIT_MAX ?? 60;
+
+type RateLimitScope = "public" | "admin";
+
+interface RateLimitState {
+  count: number;
+  resetAt: number;
+}
+
+interface RateLimitDecision {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetAt: number;
+  retryAfterSeconds?: number;
+}
+
+const rateLimitBuckets = new Map<string, RateLimitState>();
 
 function parseTimeframe(value: string | null, fallback: string): string {
   if (!value) return fallback;
@@ -53,15 +98,70 @@ function parseMsParam(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function jsonResponse(data: any, status = 200) {
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.has(origin.replace(/\/+$/, ""));
+}
+
+function buildCorsHeaders(req?: Request): Record<string, string> {
+  const origin = req?.headers.get("Origin");
+  if (origin && isOriginAllowed(origin)) {
+    return {
+      ...baseCorsHeaders,
+      "Access-Control-Allow-Origin": origin,
+    };
+  }
+
+  return { ...baseCorsHeaders };
+}
+
+function buildRateLimitHeaders(decision?: RateLimitDecision): Record<string, string> {
+  if (!decision) return {};
+
+  const headers: Record<string, string> = {
+    "X-RateLimit-Limit": decision.limit.toString(),
+    "X-RateLimit-Remaining": Math.max(0, decision.remaining).toString(),
+    "X-RateLimit-Reset": Math.ceil(decision.resetAt / 1000).toString(),
+  };
+
+  if (!decision.allowed && decision.retryAfterSeconds !== undefined) {
+    headers["Retry-After"] = decision.retryAfterSeconds.toString();
+  }
+
+  return headers;
+}
+
+function jsonResponse(
+  data: any,
+  status = 200,
+  req?: Request,
+  extraHeaders?: Record<string, string>,
+) {
   return Response.json(data, {
     status,
-    headers: corsHeaders,
+    headers: {
+      ...buildCorsHeaders(req),
+      ...extraHeaders,
+    },
   });
 }
 
-function errorResponse(message: string, status = 500) {
-  return Response.json({ error: message }, { status, headers: corsHeaders });
+function errorResponse(
+  message: string,
+  status = 500,
+  req?: Request,
+  extraHeaders?: Record<string, string>,
+) {
+  return Response.json(
+    { error: message },
+    {
+      status,
+      headers: {
+        ...buildCorsHeaders(req),
+        ...extraHeaders,
+      },
+    },
+  );
 }
 
 // Auth middleware replacement
@@ -75,6 +175,66 @@ function isAuthorized(req: Request): boolean {
   return false;
 }
 
+function getClientIdentifier(req: Request): string {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  }
+
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function evaluateRateLimit(req: Request, scope: RateLimitScope): RateLimitDecision {
+  const now = Date.now();
+  const clientId = getClientIdentifier(req);
+  const windowMs =
+    scope === "admin" ? ADMIN_RATE_LIMIT_WINDOW_MS : PUBLIC_RATE_LIMIT_WINDOW_MS;
+  const limit = scope === "admin" ? ADMIN_RATE_LIMIT_MAX : PUBLIC_RATE_LIMIT_MAX;
+  const key = `${scope}:${clientId}`;
+  const existing = rateLimitBuckets.get(key);
+
+  if (!existing || existing.resetAt <= now) {
+    const nextState: RateLimitState = {
+      count: 1,
+      resetAt: now + windowMs,
+    };
+    rateLimitBuckets.set(key, nextState);
+    return {
+      allowed: true,
+      limit,
+      remaining: limit - 1,
+      resetAt: nextState.resetAt,
+    };
+  }
+
+  if (existing.count >= limit) {
+    return {
+      allowed: false,
+      limit,
+      remaining: 0,
+      resetAt: existing.resetAt,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+    };
+  }
+
+  existing.count += 1;
+  rateLimitBuckets.set(key, existing);
+  return {
+    allowed: true,
+    limit,
+    remaining: limit - existing.count,
+    resetAt: existing.resetAt,
+  };
+}
+
+export function resetRateLimitsForTesting(): void {
+  rateLimitBuckets.clear();
+}
+
 export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
   massiveClient = client;
 
@@ -84,6 +244,11 @@ export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
       const url = new URL(req.url);
       const path = url.pathname;
       const method = req.method;
+      const origin = req.headers.get("Origin");
+
+      if (origin && !isOriginAllowed(origin)) {
+        return errorResponse("Origin not allowed", 403, req);
+      }
 
       // Handle WebSocket upgrade
       if (server.upgrade(req, { data: undefined })) {
@@ -93,7 +258,7 @@ export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
       // Handle CORS preflight (don't log these)
       if (method === "OPTIONS") {
         return new Response(null, {
-          headers: corsHeaders,
+          headers: buildCorsHeaders(req),
         });
       }
 
@@ -179,6 +344,21 @@ export async function handleRequest(
   req: Request,
 ): Promise<Response> {
   const url = new URL(req.url);
+  const origin = req.headers.get("Origin");
+  const scope: RateLimitScope = path.startsWith("/admin") ? "admin" : "public";
+  const rateLimit = evaluateRateLimit(req, scope);
+  const rateLimitHeaders = buildRateLimitHeaders(rateLimit);
+  const respond = (data: any, status = 200) =>
+    jsonResponse(data, status, req, rateLimitHeaders);
+  const fail = (message: string, status = 500) =>
+    errorResponse(message, status, req, rateLimitHeaders);
+
+  if (origin && !isOriginAllowed(origin)) {
+    return fail("Origin not allowed", 403);
+  }
+  if (!rateLimit.allowed) {
+    return fail("Too Many Requests", 429);
+  }
   // --- Public Routes ---
 
   if (method === "GET" && path === "/health") {
@@ -217,7 +397,7 @@ export async function handleRequest(
       redisOk && wsConnected && (!timescaleEnabled || timescaleOk);
     const status = allHealthy ? "ok" : "degraded";
 
-    return jsonResponse({
+    return respond({
       status,
       timestamp: Date.now(),
       services: {
@@ -242,171 +422,163 @@ export async function handleRequest(
 
   if (method === "GET" && path === "/bars/latest") {
     const bars = await redisStore.getAllLatestArray();
-    return jsonResponse({ bars, count: bars.length });
+    return respond({ bars, count: bars.length });
   }
 
   // Match /bars/range/:symbol
   const rangeMatch = path.match(/^\/bars\/range\/([^\/]+)$/);
   if (method === "GET" && rangeMatch) {
     const symbol = rangeMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const start = parseMsParam(url.searchParams.get("start"));
     const end = parseMsParam(url.searchParams.get("end"));
     const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
 
     if (start === null || end === null) {
-      return errorResponse("start and end query params are required (ms)", 400);
+      return fail("start and end query params are required (ms)", 400);
     }
 
     const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
-    return jsonResponse({ symbol, tf, start, end, bars, count: bars.length });
+    return respond({ symbol, tf, start, end, bars, count: bars.length });
   }
 
   // Match /bars/week/:symbol
   const weekMatch = path.match(/^\/bars\/week\/([^\/]+)$/);
   if (method === "GET" && weekMatch) {
     const symbol = weekMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
     const end = Date.now();
     const start = end - ONE_WEEK_MS;
     const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
-    return jsonResponse({ symbol, tf, start, end, bars, count: bars.length });
+    return respond({ symbol, tf, start, end, bars, count: bars.length });
   }
 
   // Match /bars/latest/:symbol
   const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
   if (method === "GET" && latestMatch) {
     const symbol = latestMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const bar = await redisStore.getLatest(symbol);
     if (!bar) {
-      return errorResponse("Symbol not found", 404);
+      return fail("Symbol not found", 404);
     }
-    return jsonResponse(bar);
+    return respond(bar);
   }
 
   // Match /bars/today/:symbol
   const todayMatch = path.match(/^\/bars\/today\/([^\/]+)$/);
   if (method === "GET" && todayMatch) {
     const symbol = todayMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const tf = parseTimeframe(url.searchParams.get("tf"), "1s");
     const bars = await redisStore.getTodayBars(symbol, tf as any);
-    return jsonResponse({ symbol, tf, bars, count: bars.length });
+    return respond({ symbol, tf, bars, count: bars.length });
   }
 
   const sessionBarsMatch = path.match(/^\/bars\/session\/([^\/]+)$/);
   if (method === "GET" && sessionBarsMatch) {
     const symbol = sessionBarsMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const tf = parseTimeframe(url.searchParams.get("tf"), "1s");
     const ts = parseMsParam(url.searchParams.get("ts")) ?? Date.now();
     const bars = await redisStore.getSessionBars(symbol, ts, tf as any);
-    return jsonResponse({ symbol, tf, bars, count: bars.length });
+    return respond({ symbol, tf, bars, count: bars.length });
   }
 
   if (method === "GET" && path === "/symbols") {
     const symbols = await redisStore.getSymbols();
-    return jsonResponse({ symbols, count: symbols.length });
+    return respond({ symbols, count: symbols.length });
   }
 
   // Front months endpoint (public - no auth required)
   if (method === "GET" && path === "/front-months") {
     const cache = frontMonthJob.getCache();
     if (!cache) {
-      return jsonResponse({
+      return respond({
         lastUpdated: null,
         products: {},
         message:
           "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
       });
     }
-    return jsonResponse(cache);
+    return respond(cache);
   }
 
   if (method === "GET" && path === "/contracts/active") {
     const contracts = await redisStore.getAllActiveContracts();
-    return jsonResponse({
+    return respond({
       products: contracts,
       count: Object.keys(contracts).length,
-    });
-  }
-
-  if (method === "GET" && path === "/recovery/checkpoints") {
-    const checkpoints = await redisStore.getAllRecoveryCheckpoints();
-    return jsonResponse({
-      checkpoints,
-      count: Object.keys(checkpoints).length,
     });
   }
 
   const activeContractsMatch = path.match(/^\/contracts\/active\/([^\/]+)$/);
   if (method === "GET" && activeContractsMatch) {
     const productCode = activeContractsMatch[1];
-    if (!productCode) return errorResponse("Invalid product code", 400);
+    if (!productCode) return fail("Invalid product code", 400);
 
     const contracts = await redisStore.getActiveContracts(productCode);
     if (!contracts) {
-      return errorResponse("Contracts not found", 404);
+      return fail("Contracts not found", 404);
     }
 
-    return jsonResponse(contracts);
+    return respond(contracts);
   }
 
   // Session data endpoint (public - no auth required)
   if (method === "GET" && path === "/sessions") {
     const sessions = await redisStore.getAllSessions();
-    return jsonResponse({ sessions, count: Object.keys(sessions).length });
+    return respond({ sessions, count: Object.keys(sessions).length });
   }
 
   const sessionHistoryMatch = path.match(/^\/sessions\/week\/([^\/]+)$/);
   if (method === "GET" && sessionHistoryMatch) {
     const symbol = sessionHistoryMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const end = parseMsParam(url.searchParams.get("end")) ?? Date.now();
     const start = parseMsParam(url.searchParams.get("start")) ?? end - ONE_WEEK_MS;
     const sessions = await redisStore.getSessionHistory(symbol, start, end);
-    return jsonResponse({ symbol, start, end, sessions, count: sessions.length });
+    return respond({ symbol, start, end, sessions, count: sessions.length });
   }
 
   // Match /session/:symbol
   const sessionMatch = path.match(/^\/session\/([^\/]+)$/);
   if (method === "GET" && sessionMatch) {
     const symbol = sessionMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const ts = parseMsParam(url.searchParams.get("ts")) ?? Date.now();
     const session = await redisStore.getSession(symbol, ts);
     if (!session) {
-      return errorResponse("Session not found", 404);
+      return fail("Session not found", 404);
     }
-    return jsonResponse(session);
+    return respond(session);
   }
 
   // Snapshot data endpoint (public - no auth required)
   if (method === "GET" && path === "/snapshots") {
     const snapshots = await redisStore.getAllSnapshots();
-    return jsonResponse({ snapshots, count: Object.keys(snapshots).length });
+    return respond({ snapshots, count: Object.keys(snapshots).length });
   }
 
   // Match /snapshot/:symbol
   const snapshotMatch = path.match(/^\/snapshot\/([^\/]+)$/);
   if (method === "GET" && snapshotMatch) {
     const symbol = snapshotMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
     const snapshot = await redisStore.getSnapshot(symbol);
     if (!snapshot) {
-      return errorResponse("Snapshot not found", 404);
+      return fail("Snapshot not found", 404);
     }
-    return jsonResponse(snapshot);
+    return respond(snapshot);
   }
 
   // --- Protected Routes ---
@@ -414,26 +586,34 @@ export async function handleRequest(
   // Check auth for all /admin routes
   if (path.startsWith("/admin")) {
     if (!isAuthorized(req)) {
-      return errorResponse("Unauthorized", 401);
+      return fail("Unauthorized", 401);
+    }
+
+    if (method === "GET" && path === "/admin/recovery/checkpoints") {
+      const checkpoints = await redisStore.getAllRecoveryCheckpoints();
+      return respond({
+        checkpoints,
+        count: Object.keys(checkpoints).length,
+      });
     }
 
     if (method === "POST" && path === "/admin/clear-redis") {
       // Manual clear always uses force=true to bypass daily check
       await dailyClearJob.runClear(true);
       const status = dailyClearJob.getStatus();
-      return jsonResponse({ message: "Manual clear triggered", status });
+      return respond({ message: "Manual clear triggered", status });
     }
 
     if (method === "POST" && path === "/admin/refresh-subscriptions") {
       try {
         await monthlySubscriptionJob.runRefresh();
         const status = monthlySubscriptionJob.getStatus();
-        return jsonResponse({
+        return respond({
           message: "Manual subscription refresh triggered",
           status,
         });
       } catch (err) {
-        return jsonResponse(
+        return respond(
           {
             error: "Refresh failed",
             details: err instanceof Error ? err.message : String(err),
@@ -445,11 +625,11 @@ export async function handleRequest(
 
     if (method === "GET" && path === "/admin/subscriptions") {
       if (!massiveClient) {
-        return errorResponse("Massive client not initialized", 503);
+        return fail("Massive client not initialized", 503);
       }
 
       const subscriptions = massiveClient.getSubscriptions();
-      return jsonResponse({
+      return respond({
         subscriptions,
         count: subscriptions.length,
         totalSymbols: subscriptions.reduce(
@@ -465,7 +645,7 @@ export async function handleRequest(
         console.error("[FrontMonthJob] Background refresh failed:", err);
       });
 
-      return jsonResponse({
+      return respond({
         message: "Front month refresh started (running in background)",
         status: frontMonthJob.getStatus(),
         cache: frontMonthJob.getCache(), // Return current cache immediately
@@ -478,7 +658,7 @@ export async function handleRequest(
         console.error("[SnapshotJob] Background refresh failed:", err);
       });
 
-      return jsonResponse({
+      return respond({
         message: "Snapshot refresh started (running in background)",
         status: snapshotJob.getStatus(),
       });
@@ -491,7 +671,7 @@ export async function handleRequest(
         excludeCurrentMinute: true,
       });
 
-      return jsonResponse({
+      return respond({
         message: "Manual recovery backfill completed",
         symbols,
         results,
@@ -500,7 +680,7 @@ export async function handleRequest(
     }
   }
 
-  return errorResponse("Not Found", 404);
+  return fail("Not Found", 404);
 }
 
 async function startStreamBroadcaster(server: Server<undefined>) {

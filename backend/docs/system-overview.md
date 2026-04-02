@@ -28,6 +28,8 @@ TimescaleDB remains in the codebase as a historical-storage abstraction, but it 
   - `contracts:active:*`
   - `meta:subscribed_symbols`
   - current-session reads are projected from retained session buckets
+- `src/server/data/recovery_store.ts`
+  Persists a local SQLite recovery cache for short-window rehydration and reconnect gap-fill.
 
 ## Contract Resolution
 

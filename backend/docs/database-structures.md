@@ -103,6 +103,7 @@ interface FrontMonthInfo {
 ## Current Persistence Model
 
 - Redis is the only required store in the active runtime.
+- Recovery backfill state is persisted locally in `runtime/recovery/recovery.sqlite`.
 - TimescaleDB remains a deferred historical-store abstraction.
 - Time-series bars in Redis are retained for 7 days.
 - Active-contract cache and front-month cache survive daily clears.

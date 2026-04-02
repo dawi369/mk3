@@ -32,6 +32,11 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 HUB_PORT=3001
 HUB_API_KEY=dev_only_secret
+# HUB_ALLOWED_ORIGINS=http://localhost:3010,https://app.example.com
+# HUB_PUBLIC_RATE_LIMIT_WINDOW_MS=60000
+# HUB_PUBLIC_RATE_LIMIT_MAX=240
+# HUB_ADMIN_RATE_LIMIT_WINDOW_MS=60000
+# HUB_ADMIN_RATE_LIMIT_MAX=60
 # DATABASE_URL=postgres://...  # Optional, reserved for future historical storage
 # ENABLE_TIMESCALE=true        # Optional opt-in; disabled by default for now
 ```

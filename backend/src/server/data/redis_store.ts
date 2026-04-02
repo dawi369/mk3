@@ -684,9 +684,73 @@ class RedisStore {
     const result: Record<string, SessionData> = {};
 
     const symbols = await this.getSymbols();
-    for (const symbol of symbols) {
-      const session = await this.getSession(symbol);
-      if (session) result[symbol] = session;
+    if (symbols.length === 0) {
+      return result;
+    }
+
+    const keyedSymbols = symbols
+      .map((symbol) => {
+        const sessionWindow = getSessionWindowForTimestamp(symbol, Date.now());
+        if (!sessionWindow) return null;
+        return {
+          symbol,
+          key: buildSessionKey(symbol, sessionWindow.sessionId),
+          sessionWindow,
+        };
+      })
+      .filter(
+        (
+          entry,
+        ): entry is {
+          symbol: string;
+          key: string;
+          sessionWindow: ReturnType<typeof getSessionWindowForTimestamp>;
+        } => entry !== null,
+      );
+
+    if (keyedSymbols.length === 0) {
+      return result;
+    }
+
+    const pipeline = this.redis.pipeline();
+    for (const entry of keyedSymbols) {
+      pipeline.hgetall(entry.key);
+    }
+    const responses = await pipeline.exec();
+
+    for (const [index, entry] of keyedSymbols.entries()) {
+      const response = responses?.[index];
+      const data = response?.[1] as Record<string, string> | undefined;
+      if (!data || Object.keys(data).length === 0) continue;
+
+      const sessionWindow = entry.sessionWindow;
+      if (!sessionWindow) continue;
+
+      result[entry.symbol] = {
+        sessionId: data.sessionId || "",
+        sessionStartTime: parseInt(data.sessionStartTime || "0"),
+        sessionEndTime: parseInt(data.sessionEndTime || "0"),
+        rootSymbol: data.rootSymbol || sessionWindow.rootSymbol,
+        timezone: data.timezone || sessionWindow.timezone,
+        dayOpen: parseFloat(data.dayOpen || "0"),
+        dayHigh: parseFloat(data.dayHigh || "0"),
+        dayLow: parseFloat(data.dayLow || "0"),
+        vwap: parseFloat(data.vwap || "0"),
+        cvol: parseFloat(data.cvol || "0"),
+        tradeCount: parseInt(data.tradeCount || "0"),
+        volNow: parseFloat(data.volNow || "0"),
+        volMin: parseFloat(data.volMin || "0"),
+        volMax: parseFloat(data.volMax || "0"),
+        volPos: parseFloat(data.volPos || "0"),
+        volBucket: (data.volBucket as IndicatorBucket) || "mid",
+        vwapMin: parseFloat(data.vwapMin || "0"),
+        vwapMax: parseFloat(data.vwapMax || "0"),
+        vwapPos: parseFloat(data.vwapPos || "0"),
+        vwapBucket: (data.vwapBucket as IndicatorBucket) || "mid",
+        cumPriceVolume: parseFloat(data.cumPriceVolume || "0"),
+        cumVolume: parseFloat(data.cumVolume || "0"),
+        timestamp: parseInt(data.timestamp || "0"),
+      };
     }
 
     return result;
@@ -770,11 +834,35 @@ class RedisStore {
   async getAllSnapshots(): Promise<Record<string, SnapshotData>> {
     const keys = await this.scanKeys(`${KEYS.SNAPSHOT_PREFIX}*`);
     const result: Record<string, SnapshotData> = {};
+    if (keys.length === 0) {
+      return result;
+    }
 
+    const pipeline = this.redis.pipeline();
     for (const key of keys) {
+      pipeline.hgetall(key);
+    }
+    const responses = await pipeline.exec();
+
+    for (const [index, key] of keys.entries()) {
+      const data = responses?.[index]?.[1] as Record<string, string> | undefined;
+      if (!data || Object.keys(data).length === 0) continue;
+
       const symbol = key.replace(KEYS.SNAPSHOT_PREFIX, "");
-      const snapshot = await this.getSnapshot(symbol);
-      if (snapshot) result[symbol] = snapshot;
+      result[symbol] = {
+        productCode: data.productCode || "",
+        settlementDate: data.settlementDate || "",
+        sessionOpen: parseFloat(data.sessionOpen || "0"),
+        sessionHigh: parseFloat(data.sessionHigh || "0"),
+        sessionLow: parseFloat(data.sessionLow || "0"),
+        sessionClose: parseFloat(data.sessionClose || "0"),
+        settlementPrice: parseFloat(data.settlementPrice || "0"),
+        prevSettlement: parseFloat(data.prevSettlement || "0"),
+        change: parseFloat(data.change || "0"),
+        changePct: parseFloat(data.changePct || "0"),
+        openInterest: data.openInterest ? parseInt(data.openInterest) : null,
+        timestamp: parseInt(data.timestamp || "0"),
+      };
     }
 
     return result;
@@ -831,9 +919,18 @@ class RedisStore {
   async getAllRecoveryCheckpoints(): Promise<Record<string, RecoveryCheckpoint>> {
     const keys = await this.scanKeys(`${KEYS.RECOVERY_CHECKPOINT_PREFIX}*`);
     const result: Record<string, RecoveryCheckpoint> = {};
+    if (keys.length === 0) {
+      return result;
+    }
 
+    const pipeline = this.redis.pipeline();
     for (const key of keys) {
-      const raw = await this.redis.get(key);
+      pipeline.get(key);
+    }
+    const responses = await pipeline.exec();
+
+    for (const [index, key] of keys.entries()) {
+      const raw = responses?.[index]?.[1] as string | null | undefined;
       if (!raw) continue;
 
       try {
@@ -877,12 +974,26 @@ class RedisStore {
   async getAllActiveContracts(): Promise<Record<string, StoredActiveContracts>> {
     const keys = await this.scanKeys(`${KEYS.ACTIVE_CONTRACTS_PREFIX}*`);
     const result: Record<string, StoredActiveContracts> = {};
+    if (keys.length === 0) {
+      return result;
+    }
 
+    const pipeline = this.redis.pipeline();
     for (const key of keys) {
-      const productCode = key.replace(KEYS.ACTIVE_CONTRACTS_PREFIX, "");
-      const stored = await this.getActiveContracts(productCode);
-      if (stored) {
+      pipeline.get(key);
+    }
+    const responses = await pipeline.exec();
+
+    for (const [index, key] of keys.entries()) {
+      const raw = responses?.[index]?.[1] as string | null | undefined;
+      if (!raw) continue;
+
+      try {
+        const stored = JSON.parse(raw) as StoredActiveContracts;
+        const productCode = key.replace(KEYS.ACTIVE_CONTRACTS_PREFIX, "");
         result[productCode] = stored;
+      } catch {
+        // Ignore malformed contract payloads.
       }
     }
 

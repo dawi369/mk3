@@ -4,6 +4,8 @@
 
 - Public market-data endpoints are open.
 - Admin endpoints are protected only by `HUB_API_KEY`.
+- Browser CORS is origin-allowlisted instead of wildcard.
+- Basic in-memory request rate limiting exists for both public and admin routes.
 - Redis is treated as trusted internal infrastructure.
 
 ## Risks

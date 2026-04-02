@@ -3,7 +3,7 @@ import { recoveryStore } from "@/server/data/recovery_store.js";
 import { RECOVERY_TIMEFRAME } from "@/types/recovery.types.js";
 import type { Bar } from "@/types/common.types.js";
 
-describe("FileRecoveryStore", () => {
+describe("RecoveryStore", () => {
   test("upserts and reads recoverable bars by symbol", async () => {
     await recoveryStore.init();
 

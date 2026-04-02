@@ -56,6 +56,22 @@ function buildRange(
   return { start, end };
 }
 
+function excludeLiveBucketFromRange(
+  range: { start: number; end: number },
+  bucketMs: number,
+): { start: number; end: number } {
+  const now = Date.now();
+  const liveBucketStart = Math.floor(now / bucketMs) * bucketMs;
+  if (range.end < liveBucketStart) {
+    return range;
+  }
+
+  return {
+    start: range.start,
+    end: liveBucketStart - 1,
+  };
+}
+
 function normalizeBars(bars: Bar[], maxPoints: number): Bar[] {
   if (!bars || bars.length === 0) return [];
   const normalized = bars
@@ -198,7 +214,19 @@ export function useChartHistory({
     const requestId = requestIdRef.current;
     if (isReady) setIsReady(false);
 
-    const { start, end } = buildRange(timeframe, rangeOverride, windowMs);
+    const range = excludeLiveBucketFromRange(
+      buildRange(timeframe, rangeOverride, windowMs),
+      bucketMs,
+    );
+    const { start, end } = range;
+
+    if (end < start) {
+      setSeriesBySymbol({});
+      setIsReady(true);
+      return () => {
+        controller.abort();
+      };
+    }
 
     const load = async () => {
       try {

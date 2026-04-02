@@ -1,6 +1,7 @@
-import { describe, expect, spyOn, test } from "bun:test";
+import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 import {
   handleRequest,
+  resetRateLimitsForTesting,
   setMassiveClientForTesting,
 } from "@/server/api/rest_client.js";
 import { redisStore } from "@/server/data/redis_store.js";
@@ -23,6 +24,10 @@ function createRequest(
 }
 
 describe("REST request handler", () => {
+  beforeEach(() => {
+    resetRateLimitsForTesting();
+  });
+
   test("returns health status with recovery checkpoint counts", async () => {
     setMassiveClientForTesting({
       isConnected: () => true,
@@ -55,7 +60,7 @@ describe("REST request handler", () => {
     expect(payload.services.massiveWs).toBe("connected");
   });
 
-  test("returns recovery checkpoints", async () => {
+  test("returns recovery checkpoints when authorized", async () => {
     spyOn(redisStore, "getAllRecoveryCheckpoints").mockResolvedValue({
       "1m:ESH6": {
         symbol: "ESH6",
@@ -68,14 +73,64 @@ describe("REST request handler", () => {
 
     const response = await handleRequest(
       "GET",
-      "/recovery/checkpoints",
-      createRequest("/recovery/checkpoints"),
+      "/admin/recovery/checkpoints",
+      createRequest("/admin/recovery/checkpoints", {
+        headers: { "X-API-Key": Bun.env.HUB_API_KEY ?? "" },
+      }),
     );
     const payload = (await response.json()) as any;
 
     expect(response.status).toBe(200);
     expect(payload.count).toBe(1);
     expect(payload.checkpoints["1m:ESH6"].symbol).toBe("ESH6");
+  });
+
+  test("rejects recovery checkpoints when unauthorized", async () => {
+    const response = await handleRequest(
+      "GET",
+      "/admin/recovery/checkpoints",
+      createRequest("/admin/recovery/checkpoints"),
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  test("reflects allowed local dev origins and rejects disallowed origins", async () => {
+    setMassiveClientForTesting({
+      isConnected: () => true,
+    } as any);
+
+    spyOn(redisStore, "ping").mockResolvedValue("PONG");
+    spyOn(redisStore, "getStats").mockResolvedValue({
+      date: "2026-03-25",
+      barCount: 10,
+      symbolCount: 2,
+      streamLength: 0,
+    } as any);
+    spyOn(redisStore, "getSymbols").mockResolvedValue(["ESH6", "NQH6"]);
+    spyOn(timescaleStore, "ping").mockResolvedValue(true);
+    spyOn(redisStore, "getAllRecoveryCheckpoints").mockResolvedValue({} as any);
+
+    const allowed = await handleRequest(
+      "GET",
+      "/health",
+      createRequest("/health", {
+        headers: { Origin: "http://localhost:3010" },
+      }),
+    );
+    const denied = await handleRequest(
+      "GET",
+      "/health",
+      createRequest("/health", {
+        headers: { Origin: "https://evil.example" },
+      }),
+    );
+
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe(
+      "http://localhost:3010",
+    );
+    expect(denied.status).toBe(403);
   });
 
   test("validates required range query params", async () => {
@@ -305,5 +360,59 @@ describe("REST request handler", () => {
     expect(notFound.status).toBe(404);
     expect(refresh.status).toBe(500);
     expect(((await refresh.json()) as any).details).toContain("refresh failed");
+  });
+
+  test("rate limits repeated public requests from the same client", async () => {
+    setMassiveClientForTesting({
+      isConnected: () => true,
+    } as any);
+
+    spyOn(redisStore, "ping").mockResolvedValue("PONG");
+    spyOn(redisStore, "getStats").mockResolvedValue({
+      date: "2026-03-25",
+      barCount: 10,
+      symbolCount: 2,
+      streamLength: 0,
+    } as any);
+    spyOn(redisStore, "getSymbols").mockResolvedValue(["ESH6", "NQH6"]);
+    spyOn(timescaleStore, "ping").mockResolvedValue(true);
+    spyOn(redisStore, "getAllRecoveryCheckpoints").mockResolvedValue({} as any);
+
+    let response: Response | null = null;
+    for (let i = 0; i <= 240; i++) {
+      response = await handleRequest(
+        "GET",
+        "/health",
+        createRequest("/health", {
+          headers: { "x-forwarded-for": "203.0.113.10" },
+        }),
+      );
+    }
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get("Retry-After")).not.toBeNull();
+  });
+
+  test("rate limits repeated admin requests from the same client", async () => {
+    setMassiveClientForTesting({
+      getSubscriptions: () => [],
+    } as any);
+
+    let response: Response | null = null;
+    for (let i = 0; i <= 60; i++) {
+      response = await handleRequest(
+        "GET",
+        "/admin/subscriptions",
+        createRequest("/admin/subscriptions", {
+          headers: {
+            "X-API-Key": Bun.env.HUB_API_KEY ?? "",
+            "x-forwarded-for": "203.0.113.11",
+          },
+        }),
+      );
+    }
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get("X-RateLimit-Limit")).toBe("60");
   });
 });

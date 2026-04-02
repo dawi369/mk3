@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useTickerStore } from "@/store/use-ticker-store";
 import { useChartHistory } from "@/hooks/use-chart-history";
 import { buildTickerSnapshot } from "@/lib/ticker-snapshot";
@@ -9,7 +9,6 @@ import {
   TIMEFRAME_MS,
   normalizeTimestamp,
   inferIntervalMs,
-  mergeLatestIntoSeries,
   toCandleData,
   toLineData,
   buildSpreadSeries,
@@ -86,10 +85,6 @@ export function useChartSeries({
   const snapshots = useTickerStore((state) => state.snapshotsBySymbol);
   const sessions = useTickerStore((state) => state.sessionsBySymbol);
 
-  // Merge cache refs
-  const latestSignatureRef = useRef<Map<string, string>>(new Map());
-  const mergedHistoryRef = useRef<Map<string, { key: string; series: Bar[] }>>(new Map());
-
   // ── Ordered symbols ────────────────────────────────────────────────────
 
   const orderedSymbols = useMemo(() => {
@@ -142,30 +137,7 @@ export function useChartSeries({
     for (const symbol of chartSymbols) {
       const history = historySeriesBySymbol[symbol];
       if (history && history.length > 0) {
-        const targetMs = TIMEFRAME_MS[timeframe];
-        const latest = entities[symbol]?.latestBar;
-        if (!latest) {
-          map[symbol] = history;
-          continue;
-        }
-
-        const signature = `${latest.startTime}:${latest.high}:${latest.low}:${latest.close}:${latest.volume}:${latest.trades}`;
-        const historyTail = history[history.length - 1];
-        const historyKey = `${history.length}:${historyTail?.startTime ?? 0}:${historyTail?.close ?? 0}`;
-        const cacheKey = `${historyKey}:${targetMs}`;
-        const cached = mergedHistoryRef.current.get(symbol);
-        const lastSignature = latestSignatureRef.current.get(symbol);
-
-        if (cached && cached.key === cacheKey && lastSignature === signature) {
-          map[symbol] = cached.series;
-          continue;
-        }
-
-        const baseSeries = cached && cached.key === cacheKey ? cached.series : history;
-        const merged = mergeLatestIntoSeries(baseSeries, latest, targetMs);
-        latestSignatureRef.current.set(symbol, signature);
-        mergedHistoryRef.current.set(symbol, { key: cacheKey, series: merged });
-        map[symbol] = merged;
+        map[symbol] = history;
         continue;
       }
 
@@ -181,7 +153,7 @@ export function useChartSeries({
       map[symbol] = needsResample ? resampleBars(live, timeframe) : live;
     }
     return map;
-  }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe, entities]);
+  }, [chartSymbols, historySeriesBySymbol, liveSeriesBySymbol, timeframe]);
 
   // ── Primary data ───────────────────────────────────────────────────────
 

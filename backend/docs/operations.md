@@ -24,6 +24,13 @@ HUB_API_KEY=...
 Optional:
 
 ```bash
+# Explicit browser origins allowed by backend CORS
+HUB_ALLOWED_ORIGINS=http://localhost:3010,https://app.example.com
+# Optional request-rate controls
+HUB_PUBLIC_RATE_LIMIT_WINDOW_MS=60000
+HUB_PUBLIC_RATE_LIMIT_MAX=240
+HUB_ADMIN_RATE_LIMIT_WINDOW_MS=60000
+HUB_ADMIN_RATE_LIMIT_MAX=60
 # Reserved for future historical storage work
 DATABASE_URL=postgres://...
 # Optional opt-in while historical storage is paused by default
@@ -67,6 +74,7 @@ Use `X-API-Key` or `Authorization: Bearer ...`.
 
 ```bash
 curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/subscriptions | jq
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/recovery/checkpoints | jq
 curl -X POST -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/refresh-subscriptions | jq
 curl -X POST -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/refresh-front-months | jq
 curl -X POST -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/refresh-snapshots | jq

@@ -80,6 +80,7 @@ These require one of:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/admin/subscriptions` | GET | Current upstream WS subscriptions |
+| `/admin/recovery/checkpoints` | GET | Recovery checkpoint state for operator inspection |
 | `/admin/refresh-subscriptions` | POST | Rebuild subscriptions from current active contracts |
 | `/admin/refresh-front-months` | POST | Rebuild front-month cache |
 | `/admin/refresh-snapshots` | POST | Refresh per-symbol snapshot cache |
@@ -95,4 +96,5 @@ curl "http://localhost:3001/bars/session/ESM6?tf=1m" | jq
 curl "http://localhost:3001/sessions/week/ESM6" | jq
 curl "http://localhost:3001/bars/range/ESH6?tf=1m&start=1710000000000&end=1710086400000" | jq
 curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/subscriptions | jq
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/recovery/checkpoints | jq
 ```
