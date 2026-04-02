@@ -32,7 +32,8 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 HUB_PORT=3001
 HUB_API_KEY=dev_only_secret
-# DATABASE_URL=postgres://...  # Optional and currently unused in normal runtime
+# DATABASE_URL=postgres://...  # Optional, reserved for future historical storage
+# ENABLE_TIMESCALE=true        # Optional opt-in; disabled by default for now
 ```
 
 ## Test the API

@@ -26,6 +26,8 @@ Optional:
 ```bash
 # Reserved for future historical storage work
 DATABASE_URL=postgres://...
+# Optional opt-in while historical storage is paused by default
+ENABLE_TIMESCALE=true
 ```
 
 ## Local Startup

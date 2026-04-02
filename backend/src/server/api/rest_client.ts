@@ -1,4 +1,6 @@
 import { redisStore } from "@/server/data/redis_store.js";
+import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
+import { Redis } from "ioredis";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
@@ -503,8 +505,12 @@ export async function handleRequest(
 
 async function startStreamBroadcaster(server: Server<undefined>) {
   logger.info("Starting Redis Stream Broadcaster...");
-  // Create a dedicated Redis client for blocking operations
-  const subRedis = redisStore.redis.duplicate();
+  // Create a dedicated Redis client for blocking operations (not a duplicate to avoid command queue conflicts)
+  const subRedis = new Redis({
+    host: REDIS_HOST,
+    port: REDIS_PORT,
+    password: REDIS_PASSWORD,
+  });
   let lastId = "$"; // Start reading from new messages
 
   while (true) {

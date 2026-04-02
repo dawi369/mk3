@@ -108,24 +108,24 @@ export default function Home() {
           </motion.div>
 
           {/* Hero Graphic Section */}
-          <motion.div
+          {/* <motion.div
             initial={{ opacity: 0, y: 100 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 1, ease: [0.22, 1, 0.36, 1] }}
             className="mt-24 relative w-full max-w-6xl mx-auto"
-          >
+          > */}
             {/* Glow Behind Image */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[60%] bg-primary/20 blur-[120px] rounded-full pointer-events-none opacity-50" />
+            {/* <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[60%] bg-primary/20 blur-[120px] rounded-full pointer-events-none opacity-50" /> */}
 
-            <Image
+            {/* <Image
               src="/images/home_material_1.png"
               alt="Swordfish Experimental Interface"
               width={1800}
               height={1000}
               priority
               className="w-full h-auto object-contain select-none drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-            />
-          </motion.div>
+            /> */}
+          {/* </motion.div> */}
         </section>
 
         {/* Bento Feature Section */}
@@ -227,9 +227,9 @@ export default function Home() {
         </section> */}
 
         {/* Platform Demo Section */}
-        <section className="pt-60 pb-30 px-6 max-w-6xl mx-auto">
+        {/* <section className="pt-60 pb-30 px-6 max-w-6xl mx-auto">
           <PlatformDemoSection variants={fadeInUp} />
-        </section>
+        </section> */}
       </main>
     </div>
   );

@@ -11,7 +11,11 @@ const unzipAsync = promisify(unzip);
 class TimescaleStore {
   private sql: postgres.Sql | null = null;
   private connected = false;
-  private readonly enabled = Boolean(DATABASE_URL);
+  // TODO: Re-enable TimescaleDB by default once flat-file historical ingestion is available.
+  // For the current runtime, Redis is the hot-path source of truth and historical storage is paused.
+  private readonly enabled =
+    Boolean(DATABASE_URL) &&
+    (Bun.env.ENABLE_TIMESCALE === "true" || Bun.env.RUN_TIMESCALE_TESTS === "1");
 
   constructor() {}
 
@@ -37,7 +41,14 @@ class TimescaleStore {
   }
 
   async init() {
-    if (!this.enabled || !DATABASE_URL) {
+    if (!this.enabled) {
+      console.warn(
+        "TimescaleDB init skipped for current runtime (set ENABLE_TIMESCALE=true to opt in)",
+      );
+      return;
+    }
+
+    if (!DATABASE_URL) {
       console.warn("DATABASE_URL not set, skipping TimescaleDB init");
       return;
     }
