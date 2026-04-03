@@ -28,6 +28,7 @@ Create `.env` file:
 
 ```bash
 MASSIVE_API_KEY=your_key_here
+HUB_HOST=::
 REDIS_HOST=localhost
 REDIS_PORT=6379
 HUB_PORT=3001

@@ -24,3 +24,20 @@ export const FEATURE_REQUEST_EMAIL = requireEnv(
 
 export const MASSIVE_API_KEY = getOptionalEnv("MASSIVE_API_KEY", process.env.MASSIVE_API_KEY);
 export const SENTRY_DSN = getOptionalEnv("SENTRY_DSN", process.env.SENTRY_DSN);
+export const WAITLIST_RATE_LIMIT_WINDOW_MS = Number(
+  getOptionalEnv("WAITLIST_RATE_LIMIT_WINDOW_MS", process.env.WAITLIST_RATE_LIMIT_WINDOW_MS) ??
+    "60000"
+);
+export const WAITLIST_RATE_LIMIT_MAX = Number(
+  getOptionalEnv("WAITLIST_RATE_LIMIT_MAX", process.env.WAITLIST_RATE_LIMIT_MAX) ?? "5"
+);
+export const FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS = Number(
+  getOptionalEnv(
+    "FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS",
+    process.env.FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS
+  ) ?? "60000"
+);
+export const FEATURE_REQUEST_RATE_LIMIT_MAX = Number(
+  getOptionalEnv("FEATURE_REQUEST_RATE_LIMIT_MAX", process.env.FEATURE_REQUEST_RATE_LIMIT_MAX) ??
+    "5"
+);

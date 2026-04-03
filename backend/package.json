@@ -7,13 +7,13 @@
     "dev": "bun --watch src/server/index.ts",
     "start": "bun src/server/index.ts",
     "run:server": "bun src/server/index.ts",
-    "test": "bun test",
-    "test:unit": "bun test src/tests/logger.test.ts src/tests/front_month_resolver.test.ts src/tests/refresh_subscriptions.test.ts src/tests/recovery_service.test.ts src/tests/recovery_store.test.ts src/tests/history_client.test.ts src/tests/rest_client.test.ts src/tests/schedule_builder.test.ts src/tests/contract_provider.test.ts src/tests/contracts_calendar.test.ts src/tests/market_session.test.ts src/tests/front_month_job.unit.test.ts src/tests/snapshot_job.test.ts src/tests/ws_client.test.ts src/tests/massive_utils.test.ts src/tests/massive_snapshots.test.ts src/tests/clear_daily.test.ts src/tests/tickers.test.ts src/tests/futures_universe.test.ts",
-    "test:redis": "RUN_REDIS_TESTS=1 bun test src/tests/redis_store.test.ts src/tests/redis_store_contracts.test.ts",
-    "test:timescale": "RUN_TIMESCALE_TESTS=1 bun test src/tests/timescale_store.test.ts",
-    "test:live": "RUN_LIVE_TESTS=1 bun test src/tests/active_tickers.test.ts src/tests/front_month_job.test.ts src/tests/session_rules.live.test.ts",
-    "test:coverage": "bun test --coverage src/tests/logger.test.ts src/tests/front_month_resolver.test.ts src/tests/refresh_subscriptions.test.ts src/tests/recovery_service.test.ts src/tests/recovery_store.test.ts src/tests/history_client.test.ts src/tests/rest_client.test.ts src/tests/schedule_builder.test.ts src/tests/contract_provider.test.ts src/tests/contracts_calendar.test.ts src/tests/market_session.test.ts src/tests/front_month_job.unit.test.ts src/tests/snapshot_job.test.ts src/tests/ws_client.test.ts src/tests/massive_utils.test.ts src/tests/massive_snapshots.test.ts src/tests/clear_daily.test.ts src/tests/tickers.test.ts src/tests/futures_universe.test.ts",
-    "test:all": "bun run test:unit && bun run test:redis"
+    "test": "NODE_ENV=test bun test",
+    "test:unit": "NODE_ENV=test bun test src/tests/logger.test.ts src/tests/front_month_resolver.test.ts src/tests/refresh_subscriptions.test.ts src/tests/recovery_service.test.ts src/tests/recovery_store.test.ts src/tests/history_client.test.ts src/tests/rest_client.test.ts src/tests/schedule_builder.test.ts src/tests/contract_provider.test.ts src/tests/contracts_calendar.test.ts src/tests/market_session.test.ts src/tests/front_month_job.unit.test.ts src/tests/snapshot_job.test.ts src/tests/ws_client.test.ts src/tests/massive_utils.test.ts src/tests/massive_snapshots.test.ts src/tests/clear_daily.test.ts src/tests/tickers.test.ts src/tests/futures_universe.test.ts src/tests/redis_store.test.ts src/tests/redis_store_contracts.test.ts",
+    "test:redis": "NODE_ENV=test bun test src/tests/redis_store.test.ts src/tests/redis_store_contracts.test.ts",
+    "test:timescale": "NODE_ENV=test RUN_TIMESCALE_TESTS=1 bun test src/tests/timescale_store.test.ts",
+    "test:live": "NODE_ENV=test RUN_LIVE_TESTS=1 bun test src/tests/active_tickers.test.ts src/tests/front_month_job.test.ts src/tests/session_rules.live.test.ts",
+    "test:coverage": "NODE_ENV=test bun test --coverage",
+    "test:all": "bun run test"
   },
   "devDependencies": {
     "@types/bun": "^1.3.3"

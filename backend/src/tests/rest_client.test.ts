@@ -334,7 +334,7 @@ describe("REST request handler", () => {
       createRequest("/admin/subscriptions", {
         headers: {
           "X-API-Key": Bun.env.HUB_API_KEY ?? "",
-          Origin: "http://localhost:3010",
+          Origin: "https://disallowed-admin-origin.example",
         },
       }),
     );

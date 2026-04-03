@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { BackgroundBeams } from "@/components/ui/background-beams";
 import { Footer } from "@/components/common/footer";
 import { addToWaitlist } from "@/app/(waitlist)/actions";
+import { ANALYTICS_EVENTS, captureAnalyticsEvent } from "@/lib/analytics";
 
 const ANIMATION_CONFIG = {
   fadeInUp: {
@@ -32,6 +33,9 @@ export default function WaitlistPage() {
     setIsLoading(false);
 
     if (result.success) {
+      captureAnalyticsEvent(ANALYTICS_EVENTS.waitlistSubmitted, {
+        source: "waitlist_page",
+      });
       setEmail("");
     }
   };

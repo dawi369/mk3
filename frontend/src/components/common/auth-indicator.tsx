@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { type UserProfile } from "@/lib/supabase/profiles";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
+import { ANALYTICS_EVENTS, captureAnalyticsEvent } from "@/lib/analytics";
 
 
 const getDisplayName = (user: User, profile: UserProfile | null): string => {
@@ -89,6 +90,10 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
 
       setFeatureRequest("");
       setRequestStatus("success");
+      captureAnalyticsEvent(ANALYTICS_EVENTS.featureRequestSubmitted, {
+        source: "auth_indicator",
+        has_user: true,
+      });
 
       // Reset status after 3 seconds
       setTimeout(() => setRequestStatus("idle"), 3000);

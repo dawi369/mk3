@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Mail, AlertCircle, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
+import { ANALYTICS_EVENTS, captureAnalyticsEvent } from "@/lib/analytics";
 
 // OAuth provider icons
 const GoogleIcon = () => (
@@ -69,6 +70,9 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
+        captureAnalyticsEvent(ANALYTICS_EVENTS.loginMagicLinkRequested, {
+          method: "magic_link",
+        });
         setSuccess(true);
       }
     } catch (err) {
@@ -82,6 +86,9 @@ export default function LoginPage() {
     setOauthLoading(provider);
     setError(null);
     try {
+      captureAnalyticsEvent(ANALYTICS_EVENTS.loginOAuthStarted, {
+        provider,
+      });
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {

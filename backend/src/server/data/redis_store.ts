@@ -14,6 +14,8 @@ import {
 } from "@/utils/market_session.js";
 import { Redis } from "ioredis";
 
+const IS_TEST_ENV = Bun.env.NODE_ENV === "test";
+
 // Redis Key Constants
 const KEYS = {
   LATEST_HASH: "bar:latest", // HASH: symbol -> bar JSON
@@ -140,22 +142,32 @@ class RedisStore {
     this.redis = new Redis({
       host: REDIS_HOST,
       port: REDIS_PORT,
+      family: IS_TEST_ENV ? 4 : undefined,
       password: REDIS_PASSWORD,
       lazyConnect: true,
-      retryStrategy: (times) => {
-        // Exponential backoff with max delay of 2 seconds
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
+      enableOfflineQueue: !IS_TEST_ENV,
+      maxRetriesPerRequest: IS_TEST_ENV ? 1 : null,
+      retryStrategy: IS_TEST_ENV
+        ? undefined
+        : (times) => {
+            // Exponential backoff with max delay of 2 seconds
+            const delay = Math.min(times * 50, 2000);
+            return delay;
+          },
     });
 
     this.redis.on("connect", () => {
-      console.log("Redis connected");
+      if (!IS_TEST_ENV) {
+        console.log("Redis connected");
+      }
       const today = new Date().toISOString().split("T")[0]!;
       this.redis.setnx(KEYS.META_DATE, today).catch(() => undefined);
       this.redis.setnx(KEYS.META_COUNT, "0").catch(() => undefined);
     });
     this.redis.on("error", (err: any) => {
+      if (IS_TEST_ENV) {
+        return;
+      }
       console.error("Redis error:", err);
       if (err.code === "ECONNREFUSED") {
         console.error(

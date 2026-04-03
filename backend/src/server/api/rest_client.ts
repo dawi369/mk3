@@ -3,6 +3,7 @@ import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
 import { Redis } from "ioredis";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import {
+  HUB_HOST,
   HUB_PORT,
   HUB_API_KEY,
   HUB_ALLOWED_ORIGINS,
@@ -252,6 +253,7 @@ export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
   massiveClient = client;
 
   const server = Bun.serve({
+    hostname: HUB_HOST,
     port: HUB_PORT,
     async fetch(req: Request, server: Server<undefined>) {
       const url = new URL(req.url);

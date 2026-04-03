@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { PlanCard } from "@/components/billing/plan-card";
+import { ANALYTICS_EVENTS, captureAnalyticsEvent } from "@/lib/analytics";
 
 const ANIMATION_CONFIG = {
   fadeInUp: {
@@ -14,12 +15,13 @@ const ANIMATION_CONFIG = {
 };
 
 export default function PricingPage() {
-  const handleGetStarted = () => {
-    // TODO: Redirect to signup or login
-    window.location.href = "/auth/sign-up";
-  };
-
   const handleSubscribe = () => {
+    captureAnalyticsEvent(ANALYTICS_EVENTS.pricingCtaClicked, {
+      tier: "pro",
+      cta: "start_free_trial",
+      source: "pricing_page",
+    });
+
     // TODO: Redirect to signup with pro intent
     window.location.href = "/auth/sign-up?plan=pro";
   };
