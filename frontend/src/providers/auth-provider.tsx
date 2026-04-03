@@ -10,6 +10,7 @@ import {
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
 import posthog from "posthog-js";
+import { NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN } from "@/config/env";
 import {
   getUserProfile,
   ensureUserProfile,
@@ -190,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, fetchProfile]);
 
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+    if (!NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
       return;
     }
 

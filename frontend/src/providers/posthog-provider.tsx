@@ -1,6 +1,6 @@
 "use client";
 
-import { NEXT_PUBLIC_POSTHOG_HOST, NEXT_PUBLIC_POSTHOG_KEY } from "@/config/env";
+import { NEXT_PUBLIC_POSTHOG_HOST, NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN } from "@/config/env";
 import { PostHogProvider } from "posthog-js/react";
 
 const posthogOptions = {
@@ -13,12 +13,12 @@ const posthogOptions = {
 };
 
 export function AppPostHogProvider({ children }: { children: React.ReactNode }) {
-  if (!NEXT_PUBLIC_POSTHOG_KEY) {
+  if (!NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
     return <>{children}</>;
   }
 
   return (
-    <PostHogProvider apiKey={NEXT_PUBLIC_POSTHOG_KEY} options={posthogOptions}>
+    <PostHogProvider apiKey={NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN} options={posthogOptions}>
       {children}
     </PostHogProvider>
   );

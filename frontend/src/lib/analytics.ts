@@ -1,7 +1,7 @@
 "use client";
 
 import posthog from "posthog-js";
-import { NEXT_PUBLIC_POSTHOG_KEY } from "@/config/env";
+import { NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN } from "@/config/env";
 
 type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
 
@@ -17,7 +17,7 @@ export function captureAnalyticsEvent(
   event: (typeof ANALYTICS_EVENTS)[keyof typeof ANALYTICS_EVENTS],
   properties: AnalyticsProperties = {},
 ) {
-  if (!NEXT_PUBLIC_POSTHOG_KEY) {
+  if (!NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
     return;
   }
 

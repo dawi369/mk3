@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { MASSIVE_API_KEY } from "@/config/env.server";
+import { MASSIVE_API_KEY, MASSIVE_API_URL } from "@/config/env.server";
 
-const MARKET_STATUS_URL = "https://api.massive.com/futures/vX/market-status?product_code=ES&limit=10";
+const MARKET_STATUS_PATH = "/futures/vX/market-status?product_code=ES&limit=10";
 
 export async function GET() {
   if (!MASSIVE_API_KEY) {
@@ -12,7 +12,7 @@ export async function GET() {
   }
 
   try {
-    const response = await fetch(`${MARKET_STATUS_URL}&apiKey=${MASSIVE_API_KEY}`, {
+    const response = await fetch(`${MASSIVE_API_URL}${MARKET_STATUS_PATH}&apiKey=${MASSIVE_API_KEY}`, {
       next: { revalidate: 60 },
     });
 

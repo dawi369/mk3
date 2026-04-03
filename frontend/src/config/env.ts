@@ -30,5 +30,7 @@ export const NEXT_PUBLIC_HUB_URL = requireEnv(
 );
 
 export const NEXT_PUBLIC_SENTRY_DSN = getOptionalEnv(process.env.NEXT_PUBLIC_SENTRY_DSN);
-export const NEXT_PUBLIC_POSTHOG_KEY = getOptionalEnv(process.env.NEXT_PUBLIC_POSTHOG_KEY);
+export const NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = getOptionalEnv(
+  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ?? process.env.NEXT_PUBLIC_POSTHOG_KEY,
+);
 export const NEXT_PUBLIC_POSTHOG_HOST = getOptionalEnv(process.env.NEXT_PUBLIC_POSTHOG_HOST);

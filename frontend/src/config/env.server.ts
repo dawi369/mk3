@@ -23,6 +23,8 @@ export const FEATURE_REQUEST_EMAIL = requireEnv(
 );
 
 export const MASSIVE_API_KEY = getOptionalEnv("MASSIVE_API_KEY", process.env.MASSIVE_API_KEY);
+export const MASSIVE_API_URL =
+  getOptionalEnv("MASSIVE_API_URL", process.env.MASSIVE_API_URL) ?? "https://api.massive.com";
 export const SENTRY_DSN = getOptionalEnv("SENTRY_DSN", process.env.SENTRY_DSN);
 export const WAITLIST_RATE_LIMIT_WINDOW_MS = Number(
   getOptionalEnv("WAITLIST_RATE_LIMIT_WINDOW_MS", process.env.WAITLIST_RATE_LIMIT_WINDOW_MS) ??
