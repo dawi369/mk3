@@ -49,9 +49,10 @@ export class HubClient {
   ) {
     this.webSocketFactory =
       options.webSocketFactory ?? ((url) => new WebSocket(url));
-    this.setTimeoutImpl = options.setTimeoutImpl ?? globalThis.setTimeout;
+    this.setTimeoutImpl =
+      options.setTimeoutImpl ?? globalThis.setTimeout.bind(globalThis);
     this.clearTimeoutImpl =
-      options.clearTimeoutImpl ?? globalThis.clearTimeout;
+      options.clearTimeoutImpl ?? globalThis.clearTimeout.bind(globalThis);
     this.maxReconnectDelayMs = options.maxReconnectDelayMs ?? 30_000;
   }
 

@@ -22,8 +22,7 @@ export default function PricingPage() {
       source: "pricing_page",
     });
 
-    // TODO: Redirect to signup with pro intent
-    window.location.href = "/auth/sign-up?plan=pro";
+    window.location.href = "/checkout";
   };
 
   return (

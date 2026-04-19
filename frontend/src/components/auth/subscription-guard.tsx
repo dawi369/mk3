@@ -99,7 +99,7 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
                </div>
 
                <div className="space-y-3 pt-4">
-                  <Link href="/pricing" className="block w-full">
+                  <Link href="/checkout" className="block w-full">
                     <Button className="w-full group" size="lg">
                       Upgrade to Pro
                     </Button>

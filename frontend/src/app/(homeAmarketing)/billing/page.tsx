@@ -1,15 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CreditCard, Receipt, Plus } from "lucide-react";
+import { CreditCard, Plus } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { PaymentCard } from "@/components/billing/payment-card";
 import { EmptyPaymentCard } from "@/components/billing/payment-card";
-import { PlanCard } from "@/components/billing/plan-card";
 import { CurrentPlanSummary } from "@/components/billing/plan-card";
-import { TransactionTable } from "@/components/billing/transaction-table";
 import { getUserSubscription, ensureUserSubscription } from "@/lib/supabase/subscriptions";
 import type { Subscription, Transaction } from "@/types/billing.types";
 
@@ -55,20 +54,13 @@ export default function BillingPage() {
   }, [user]);
 
   const handleUpgrade = () => {
-    // TODO: Implement checkout flow
-    // This will call billingService.getCheckoutUrl() once provider is configured
-    console.log("Upgrade clicked - implement checkout flow");
+    window.location.href = "/checkout";
   };
 
   const handleManage = () => {
     // TODO: Implement portal flow
     // This will call billingService.getPortalUrl() once provider is configured
     console.log("Manage clicked - implement portal flow");
-  };
-
-  const handleAddPaymentMethod = () => {
-    // TODO: Implement add payment method flow
-    console.log("Add payment method clicked");
   };
 
   if (loading) {
@@ -86,32 +78,14 @@ export default function BillingPage() {
     <div className="min-h-screen">
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-12 md:py-16">
         <motion.div initial="initial" animate="animate" variants={ANIMATION_CONFIG.stagger}>
-          <motion.header variants={ANIMATION_CONFIG.fadeInUp} className="mb-10 space-y-3">
-            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-white/42">
-              Account
-            </p>
+          <motion.header variants={ANIMATION_CONFIG.fadeInUp} className="mb-10">
             <h1 className="max-w-3xl text-balance font-space text-4xl font-semibold tracking-[-0.05em] text-foreground md:text-5xl">
               Billing
             </h1>
           </motion.header>
 
-          <motion.section variants={ANIMATION_CONFIG.fadeInUp} className="mb-10 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px]">
+          <motion.section variants={ANIMATION_CONFIG.fadeInUp} className="mb-10">
             <CurrentPlanSummary subscription={subscription} />
-            
-            <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.2)]">
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-white/42">
-                Pro Plan
-              </p>
-              <div className="mt-4">
-                <PlanCard
-                  tier="pro"
-                  subscription={subscription}
-                  onUpgrade={handleUpgrade}
-                  onManage={handleManage}
-                  className="w-full border-0 bg-transparent p-0 shadow-none before:hidden after:hidden"
-                />
-              </div>
-            </div>
           </motion.section>
 
           <motion.section variants={ANIMATION_CONFIG.fadeInUp} className="mb-10">
@@ -126,13 +100,15 @@ export default function BillingPage() {
                   </h2>
                 </div>
                 <Button
+                  asChild
                   variant="outline"
                   size="sm"
                   className="rounded-full border-white/12 bg-white/4 hover:bg-white/8"
-                  onClick={handleAddPaymentMethod}
                 >
-                  <Plus aria-hidden="true" className="mr-1 h-4 w-4" />
-                  Add Card
+                  <Link href="/checkout">
+                    <Plus aria-hidden="true" className="mr-1 h-4 w-4" />
+                    Add Card
+                  </Link>
                 </Button>
               </div>
               {subscription?.paymentMethod ? (
@@ -145,20 +121,6 @@ export default function BillingPage() {
                 <EmptyPaymentCard />
               )}
             </div>
-          </motion.section>
-
-          <motion.section variants={ANIMATION_CONFIG.fadeInUp}>
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/6">
-                <Receipt aria-hidden="true" className="h-4 w-4 text-white/72" />
-              </div>
-              <div>
-                <h2 className="font-space text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                  Transactions
-                </h2>
-              </div>
-            </div>
-            <TransactionTable transactions={transactions} />
           </motion.section>
         </motion.div>
       </div>

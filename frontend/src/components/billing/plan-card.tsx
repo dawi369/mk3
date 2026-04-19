@@ -113,9 +113,6 @@ export function PlanCard({
         <div className="rounded-[22px] border border-white/10 bg-black/22 p-5">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-white/42">
-                Monthly Rate
-              </p>
               <div className="mt-3 flex items-end gap-2">
                 <span className="font-space text-6xl font-semibold leading-none tracking-[-0.06em] text-white [font-variant-numeric:tabular-nums]">
                   {config.priceDisplay}
