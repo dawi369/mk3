@@ -9,7 +9,8 @@ interface ClearJobStatus {
   totalRuns: number;
 }
 
-class DailyClearJob {
+export class DailyClearJob {
+  private cronJob: CronJob | null = null;
   private status: ClearJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -44,12 +45,14 @@ class DailyClearJob {
 
   async runClear(force = false): Promise<void> {
     console.log("--- DailyClearJob ---");
-    console.log(`Running Redis clear job... (force: ${force})`);
+    console.log(`Running Redis maintenance job... (force: ${force})`);
     this.status.totalRuns++;
     this.status.lastRunTime = Date.now();
 
     try {
-      const result = await redisStore.clearTodayData(force);
+      const result = force
+        ? await redisStore.clearTodayData(true)
+        : await redisStore.runDailyMaintenance();
 
       this.status.lastSuccess = true;
       this.status.lastError = null;
@@ -58,7 +61,7 @@ class DailyClearJob {
       await this.saveStatus();
 
       console.log(
-        `Daily clear completed: ${result.cleared} keys cleared, new date: ${result.newDate}`
+        `Daily maintenance completed: ${result.cleared} keys cleared, new date: ${result.newDate}`
       );
       console.log("");
     } catch (err) {
@@ -76,7 +79,11 @@ class DailyClearJob {
   }
 
   schedule(): void {
-    new CronJob(
+    if (this.cronJob) {
+      return;
+    }
+
+    this.cronJob = new CronJob(
       "0 2 * * *",
       async () => {
         await this.runClear();
@@ -87,6 +94,11 @@ class DailyClearJob {
     );
 
     console.log("Daily clear job scheduled (2 AM ET)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 

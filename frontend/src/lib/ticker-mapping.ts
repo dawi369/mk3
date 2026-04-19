@@ -67,6 +67,10 @@ export function getTickerDetails(ticker: string): TickerConfig | undefined {
   return undefined;
 }
 
+export function getAllProductCodes(): string[] {
+  return Object.keys(PRODUCT_CODE_MAP);
+}
+
 export const ASSET_CLASSES: { id: AssetClassId; title: string }[] = [
   { id: "indices", title: "US Indices" },
   { id: "metals", title: "Metals" },

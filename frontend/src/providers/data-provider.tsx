@@ -1,37 +1,92 @@
 "use client";
 
-import React, { createContext, useContext, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useConnection } from "./connection-provider";
 import { Bar } from "@/types/common.types";
-import { useMarketStore } from "@/store/use-market-store";
-
-interface MarketData {
-  [symbol: string]: Bar[];
-}
-
-interface DataContextType {
-  marketData: MarketData;
-  isLoading: boolean;
-  getLatestBar: (symbol: string) => Bar | undefined;
-}
-
-const DataContext = createContext<DataContextType | null>(null);
+import { useTickerStore } from "@/store/use-ticker-store";
+import { NEXT_PUBLIC_HUB_URL } from "@/config/env";
+import { getAllProductCodes } from "@/lib/ticker-mapping";
+import { loadHubBootstrap, loadHubSessions, loadHubSnapshots } from "@/lib/hub/bootstrap";
+import type { HubMessage } from "@/types/hub.types";
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const { subscribe, status } = useConnection();
-  const handleMarketUpdate = useMarketStore(
-    (state) => state.handleMarketUpdate,
-  );
-  const setIsLoading = useMarketStore((state) => state.setIsLoading);
-  const marketData = useMarketStore((state) => state.marketData);
-  const isLoading = useMarketStore((state) => state.isLoading);
+  const { subscribe } = useConnection();
+  const applyMarketBootstrap = useTickerStore((state) => state.applyMarketBootstrap);
+  const ingestBars = useTickerStore((state) => state.ingestBars);
+  const setSnapshots = useTickerStore((state) => state.setSnapshots);
+  const setSessions = useTickerStore((state) => state.setSessions);
+  const pendingBarsRef = useRef<Bar[]>([]);
+  const flushHandleRef = useRef<number | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    // Subscribe to WebSocket messages
-    const unsubscribe = subscribe((message: any) => {
-      // Handle info messages from backend
+    const controller = new AbortController();
+
+    void loadHubBootstrap({
+      baseUrl: NEXT_PUBLIC_HUB_URL,
+      curveSymbols: getAllProductCodes(),
+      signal: controller.signal,
+    }).then((payload) => {
+      applyMarketBootstrap(payload);
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [applyMarketBootstrap]);
+
+  useEffect(() => {
+    let active = true;
+
+    const refreshMetadata = async () => {
+      const [snapshots, sessions] = await Promise.all([
+        loadHubSnapshots(NEXT_PUBLIC_HUB_URL),
+        loadHubSessions(NEXT_PUBLIC_HUB_URL),
+      ]);
+
+      if (!active) return;
+      setSnapshots(snapshots);
+      setSessions(sessions);
+    };
+
+    void refreshMetadata();
+
+    const sessionsInterval = window.setInterval(() => {
+      void loadHubSessions(NEXT_PUBLIC_HUB_URL).then((sessions) => {
+        if (active) setSessions(sessions);
+      });
+    }, 60_000);
+
+    const snapshotsInterval = window.setInterval(() => {
+      void loadHubSnapshots(NEXT_PUBLIC_HUB_URL).then((snapshots) => {
+        if (active) setSnapshots(snapshots);
+      });
+    }, 5 * 60_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(sessionsInterval);
+      window.clearInterval(snapshotsInterval);
+    };
+  }, [setSnapshots, setSessions]);
+
+  useEffect(() => {
+    const flush = () => {
+      flushHandleRef.current = null;
+      const queued = pendingBarsRef.current;
+      if (queued.length === 0) return;
+      pendingBarsRef.current = [];
+      ingestBars("front", queued);
+      hasLoadedRef.current = true;
+    };
+
+    const scheduleFlush = () => {
+      if (flushHandleRef.current !== null) return;
+      flushHandleRef.current = window.requestAnimationFrame(flush);
+    };
+
+    const unsubscribe = subscribe((message: HubMessage) => {
       if (message.type === "info") {
-        console.log("ℹ️ [Hub]", message.message);
         return;
       }
 
@@ -45,37 +100,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Update the global store instead of local state
-        handleMarketUpdate(symbol, { symbol, ...barData });
-        setIsLoading(false);
+        pendingBarsRef.current.push({ symbol, ...barData });
+        scheduleFlush();
       }
     });
 
-    return () => unsubscribe();
-  }, [subscribe, handleMarketUpdate, setIsLoading]);
+    return () => {
+      if (flushHandleRef.current !== null) {
+        window.cancelAnimationFrame(flushHandleRef.current);
+      }
+      unsubscribe();
+    };
+  }, [ingestBars, subscribe]);
 
-  const getLatestBar = (symbol: string) => {
-    const bars = marketData[symbol];
-    return bars ? bars[bars.length - 1] : undefined;
-  };
-
-  return (
-    <DataContext.Provider
-      value={{
-        marketData,
-        isLoading: isLoading && status !== "connected",
-        getLatestBar,
-      }}
-    >
-      {children}
-    </DataContext.Provider>
-  );
+  return <>{children}</>;
 }
-
-export const useData = () => {
-  const context = useContext(DataContext);
-  if (!context) {
-    throw new Error("useData must be used within a DataProvider");
-  }
-  return context;
-};

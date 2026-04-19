@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/providers/theme-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ConnectionProvider } from "@/providers/connection-provider";
 import { DataProvider } from "@/providers/data-provider";
+import { AppPostHogProvider } from "@/providers/posthog-provider";
 import { GlobalBackground } from "@/components/common/global-background";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -20,23 +21,25 @@ export function RootProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, setIsHoveringBackground]);
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem={false}
-      disableTransitionOnChange
-    >
-      <AuthProvider>
-        <ConnectionProvider>
-          <DataProvider>
-            {/* Global wavy dot background for all pages */}
-            <GlobalBackground />
-            {/* <TooltipProvider> */}
-            {children}
-            {/* </TooltipProvider> */}
-          </DataProvider>
-        </ConnectionProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AppPostHogProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        enableSystem={false}
+        disableTransitionOnChange
+      >
+        <AuthProvider>
+          <ConnectionProvider>
+            <DataProvider>
+              {/* Global wavy dot background for all pages */}
+              <GlobalBackground />
+              {/* <TooltipProvider> */}
+              {children}
+              {/* </TooltipProvider> */}
+            </DataProvider>
+          </ConnectionProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </AppPostHogProvider>
   );
 }

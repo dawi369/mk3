@@ -1,119 +1,49 @@
 import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
-import { POLYGON_API_KEY } from "@/config/env.js";
-import activeMonthsData from "@/utils/cbs/active.json" with { type: "json" };
 import type {
-  FrontMonthInfo,
   FrontMonthCache,
   FrontMonthJobStatus,
-  PolygonSnapshotResponse,
-  PolygonSnapshotContract,
 } from "@/types/front_month.types.js";
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import { getAllConfiguredProducts } from "@/utils/futures_universe.js";
+import { contractProvider } from "@/utils/contract_provider.js";
+import { fetchTickerSnapshotContract } from "@/utils/massive_snapshots.js";
+import { resolveFrontMonth } from "@/utils/front_month_resolver.js";
+import { buildGeneratedContracts } from "@/utils/contracts_calendar.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
+import type { ActiveContract } from "@/types/contract.types.js";
 
-const POLYGON_SNAPSHOT_URL = "https://api.massive.com/futures/vX/snapshot";
 const REDIS_CACHE_KEY = "cache:front-months";
 const REDIS_STATUS_KEY = "job:front-months:status";
 
-// Map active.json categories to PolygonAssetClass
-const CATEGORY_TO_ASSET_CLASS: Record<string, PolygonAssetClass> = {
-  INTEREST_RATES: "currencies",
-  GRAINS: "grains",
-  METALS: "metals",
-  SOFTS: "softs",
-  US_INDICES: "us_indices",
-  ENERGY_VOLATILES: "volatiles",
+const FRONT_MONTH_CANDIDATE_LIMITS: Record<MassiveAssetClass, number> = {
+  us_indices: 4,
+  metals: 6,
+  currencies: 4,
+  grains: 6,
+  softs: 6,
+  volatiles: 6,
 };
 
-// Extract all product codes from active.json with their asset class
-function getProductCodes(): Array<{ code: string; assetClass: PolygonAssetClass }> {
-  const products: Array<{ code: string; assetClass: PolygonAssetClass }> = [];
+function mergeContracts(
+  providerContracts: ActiveContract[],
+  generatedContracts: ActiveContract[],
+): ActiveContract[] {
+  const merged = new Map<string, ActiveContract>();
 
-  for (const [category, tickers] of Object.entries(activeMonthsData.FUTURES_ACTIVE_MONTHS)) {
-    const assetClass = CATEGORY_TO_ASSET_CLASS[category];
-    if (!assetClass) continue;
-
-    for (const code of Object.keys(tickers)) {
-      products.push({ code, assetClass });
+  for (const contract of [...providerContracts, ...generatedContracts]) {
+    if (!merged.has(contract.ticker)) {
+      merged.set(contract.ticker, contract);
     }
   }
 
-  return products;
+  return Array.from(merged.values()).sort(
+    (a, b) =>
+      new Date(a.lastTradeDate).getTime() - new Date(b.lastTradeDate).getTime(),
+  );
 }
 
-async function fetchSnapshot(productCode: string): Promise<PolygonSnapshotContract[]> {
-  const url = `${POLYGON_SNAPSHOT_URL}?product_code=${productCode}&apiKey=${POLYGON_API_KEY}`;
-
-  try {
-    const response = await fetch(url);
-    const data = (await response.json()) as PolygonSnapshotResponse;
-
-    if (data.status !== "OK" || !data.results) {
-      console.warn(`[FrontMonthJob] No snapshot data for ${productCode}`);
-      return [];
-    }
-
-    return data.results;
-  } catch (error) {
-    console.error(`[FrontMonthJob] Error fetching snapshot for ${productCode}:`, error);
-    return [];
-  }
-}
-
-function analyzeContracts(
-  contracts: PolygonSnapshotContract[],
-  productCode: string,
-  assetClass: PolygonAssetClass
-): FrontMonthInfo | null {
-  const now = new Date();
-
-  // Filter and analyze outright contracts (no spreads)
-  const outrights = contracts
-    .filter((c) => !c.details.ticker.includes("-"))
-    .map((c) => {
-      const settlementDate = new Date(c.details.settlement_date / 1_000_000);
-      const daysToExpiry = Math.ceil(
-        (settlementDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      return {
-        ticker: c.details.ticker,
-        volume: c.session?.volume || 0,
-        daysToExpiry,
-        lastPrice: c.last_trade?.price || c.session?.close || null,
-        expiryDate: settlementDate.toISOString().split("T")[0],
-      };
-    })
-    .filter((c) => c.daysToExpiry > 0); // Only future contracts
-
-  if (outrights.length === 0) {
-    return null;
-  }
-
-  // Find nearest expiry
-  const nearest = [...outrights].sort((a, b) => a.daysToExpiry - b.daysToExpiry)[0];
-
-  // Find highest volume
-  const highestVolume = [...outrights].sort((a, b) => b.volume - a.volume)[0];
-
-  if (!nearest || !highestVolume) {
-    return null;
-  }
-
-  return {
-    frontMonth: highestVolume.ticker,
-    productCode,
-    assetClass,
-    volume: highestVolume.volume,
-    daysToExpiry: highestVolume.daysToExpiry,
-    nearestExpiry: nearest.ticker,
-    isRolling: highestVolume.ticker !== nearest.ticker,
-    lastPrice: highestVolume.lastPrice,
-    expiryDate: highestVolume.expiryDate || "",
-  };
-}
-
-class FrontMonthJob {
+export class FrontMonthJob {
+  private cronJob: CronJob | null = null;
   private status: FrontMonthJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -177,28 +107,42 @@ class FrontMonthJob {
     this.status.lastRunTime = Date.now();
 
     try {
-      const products = getProductCodes();
+      const products = await getAllConfiguredProducts();
       const newCache: FrontMonthCache = {
         lastUpdated: Date.now(),
         products: {},
       };
 
       for (const { code, assetClass } of products) {
-        const contracts = await fetchSnapshot(code);
-        const frontMonth = analyzeContracts(contracts, code, assetClass);
+        const providerContracts =
+          await contractProvider.fetchActiveContractsDetailed(code);
+        const generatedContracts = buildGeneratedContracts(
+          code,
+          FRONT_MONTH_CANDIDATE_LIMITS[assetClass],
+        );
+        const contracts = mergeContracts(providerContracts, generatedContracts);
+        await redisStore.writeActiveContracts(code, contracts);
+
+        const snapshots = await Promise.all(
+          contracts.map(async (contract) => ({
+            contract,
+            snapshot: await fetchTickerSnapshotContract(contract.ticker),
+          })),
+        );
+
+        const frontMonth = resolveFrontMonth(snapshots, code, assetClass);
 
         if (frontMonth) {
           newCache.products[code] = frontMonth;
           const rollIndicator = frontMonth.isRolling ? " (ROLLING)" : "";
           console.log(
-            `[FrontMonthJob] ${code}: ${frontMonth.frontMonth} (${frontMonth.volume.toLocaleString()} vol)${rollIndicator}`
+            `[FrontMonthJob] ${code}: ${frontMonth.frontMonth} (${frontMonth.volume.toLocaleString()} vol, confidence=${frontMonth.confidence})${rollIndicator}`
           );
         } else {
           console.warn(`[FrontMonthJob] ${code}: No front month detected`);
         }
 
-        // Small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
 
       this.cache = newCache;
@@ -229,8 +173,12 @@ class FrontMonthJob {
   }
 
   schedule(): void {
+    if (this.cronJob) {
+      return;
+    }
+
     // Run at 3 AM ET daily (after the 2 AM clear job)
-    new CronJob(
+    this.cronJob = new CronJob(
       "0 3 * * *",
       async () => {
         await this.runRefresh();
@@ -241,6 +189,11 @@ class FrontMonthJob {
     );
 
     console.log("[FrontMonthJob] Scheduled (3 AM ET daily)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 

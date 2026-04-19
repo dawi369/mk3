@@ -1,10 +1,11 @@
 export const LIMITS = {
-  // Bar storage limits
-  maxHubBars: 86_400, // legacy, Max bars to keep in Redis List per symbol, used for testing with the rest api
-  maxFlowHistoryBars: 100, // legacy, Max bars in Hub's in-memory rolling history
+  // RedisTimeSeries retention
+  redisTsRetentionMs: 7 * 24 * 60 * 60 * 1000, // 7 days
 
-  // Redis operation limits
-  redisScanBatchSize: 100, // Batch size for SCAN operations
-  redisDeleteBatchSize: 100, // Batch size for DEL operations
-  maxStreamLength: 10_000_000, // Max bars in Stream (100 tickers * 24h = 8.6m)
+  // Redis operation batching
+  redisScanBatchSize: 100,
+  redisDeleteBatchSize: 100,
+
+  // Stream cap (~100 tickers × 24h of 1-min bars = 144k, set 10M for headroom)
+  maxStreamLength: 10_000_000,
 };

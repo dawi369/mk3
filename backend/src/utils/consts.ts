@@ -1,9 +1,9 @@
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
 
-export const POLYGON_WS_URL = "wss://socket.polygon.io";
-export const POLYGON_CONTRACTS_URL = "https://api.massive.com/futures/vX/contracts";
+export const MASSIVE_WS_URL = "wss://socket.massive.com";
+export const MASSIVE_CONTRACTS_URL = "https://api.massive.com/futures/vX/contracts";
 
-export const POLYGON_ASSET_CLASS_LIST: readonly PolygonAssetClass[] = [
+export const MASSIVE_ASSET_CLASS_LIST: readonly MassiveAssetClass[] = [
   "us_indices",
   "metals",
   "currencies",

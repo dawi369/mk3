@@ -1,31 +1,181 @@
 import { redisStore } from "@/server/data/redis_store.js";
+import { REDIS_HOST, REDIS_PORT, REDIS_PASSWORD } from "@/config/env.js";
+import { Redis } from "ioredis";
 import { timescaleStore } from "@/server/data/timescale_store.js";
-import { HUB_PORT, HUB_API_KEY } from "@/config/env.js";
+import {
+  HUB_HOST,
+  HUB_PORT,
+  HUB_API_KEY,
+  HUB_ALLOWED_ORIGINS,
+  HUB_ADMIN_ALLOWED_ORIGINS,
+  HUB_PUBLIC_RATE_LIMIT_WINDOW_MS,
+  HUB_PUBLIC_RATE_LIMIT_MAX,
+  HUB_ADMIN_RATE_LIMIT_WINDOW_MS,
+  HUB_ADMIN_RATE_LIMIT_MAX,
+} from "@/config/env.js";
 import { dailyClearJob } from "@/jobs/clear_daily.js";
 import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
 import { frontMonthJob } from "@/jobs/front_month_job.js";
-import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
+import { snapshotJob } from "@/jobs/snapshot_job.js";
+import type { MassiveWSClient } from "@/server/api/massive/ws_client.js";
 import type { Server, ServerWebSocket } from "bun";
 import { logger } from "@/utils/logger.js";
+import { recoveryService } from "@/services/recovery_service.js";
 
-let polygonClient: PolygonWSClient | null = null;
+let massiveClient: MassiveWSClient | null = null;
+
+export function setMassiveClientForTesting(client: MassiveWSClient | null): void {
+  massiveClient = client;
+}
 
 // Helper for CORS headers
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+const baseCorsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+  Vary: "Origin",
 };
 
-function jsonResponse(data: any, status = 200) {
+const DEV_ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3010",
+  "http://127.0.0.1:3010",
+];
+
+const ALLOWED_ORIGINS = new Set(
+  [
+    ...(HUB_ALLOWED_ORIGINS?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? []),
+    ...(Bun.env.NODE_ENV === "production" ? [] : DEV_ALLOWED_ORIGINS),
+  ].map((origin) => origin.replace(/\/+$/, "")),
+);
+
+const ADMIN_ALLOWED_ORIGINS = new Set(
+  (HUB_ADMIN_ALLOWED_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? []
+  ).map((origin) => origin.replace(/\/+$/, "")),
+);
+
+const ALLOWED_TIMEFRAMES = new Set([
+  "1s",
+  "15s",
+  "30s",
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "2h",
+  "4h",
+  "1d",
+]);
+
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const PUBLIC_RATE_LIMIT_WINDOW_MS = HUB_PUBLIC_RATE_LIMIT_WINDOW_MS ?? 60_000;
+const PUBLIC_RATE_LIMIT_MAX = HUB_PUBLIC_RATE_LIMIT_MAX ?? 240;
+const ADMIN_RATE_LIMIT_WINDOW_MS = HUB_ADMIN_RATE_LIMIT_WINDOW_MS ?? 60_000;
+const ADMIN_RATE_LIMIT_MAX = HUB_ADMIN_RATE_LIMIT_MAX ?? 60;
+
+type RateLimitScope = "public" | "admin";
+
+interface RateLimitState {
+  count: number;
+  resetAt: number;
+}
+
+interface RateLimitDecision {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetAt: number;
+  retryAfterSeconds?: number;
+}
+
+const rateLimitBuckets = new Map<string, RateLimitState>();
+
+function parseTimeframe(value: string | null, fallback: string): string {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  return ALLOWED_TIMEFRAMES.has(trimmed) ? trimmed : fallback;
+}
+
+function parseMsParam(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.has(origin.replace(/\/+$/, ""));
+}
+
+function isAdminOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true;
+  return ADMIN_ALLOWED_ORIGINS.has(origin.replace(/\/+$/, ""));
+}
+
+function buildCorsHeaders(req?: Request): Record<string, string> {
+  const origin = req?.headers.get("Origin");
+  if (origin && isOriginAllowed(origin)) {
+    return {
+      ...baseCorsHeaders,
+      "Access-Control-Allow-Origin": origin,
+    };
+  }
+
+  return { ...baseCorsHeaders };
+}
+
+function buildRateLimitHeaders(decision?: RateLimitDecision): Record<string, string> {
+  if (!decision) return {};
+
+  const headers: Record<string, string> = {
+    "X-RateLimit-Limit": decision.limit.toString(),
+    "X-RateLimit-Remaining": Math.max(0, decision.remaining).toString(),
+    "X-RateLimit-Reset": Math.ceil(decision.resetAt / 1000).toString(),
+  };
+
+  if (!decision.allowed && decision.retryAfterSeconds !== undefined) {
+    headers["Retry-After"] = decision.retryAfterSeconds.toString();
+  }
+
+  return headers;
+}
+
+function jsonResponse(
+  data: any,
+  status = 200,
+  req?: Request,
+  extraHeaders?: Record<string, string>,
+) {
   return Response.json(data, {
     status,
-    headers: corsHeaders,
+    headers: {
+      ...buildCorsHeaders(req),
+      ...extraHeaders,
+    },
   });
 }
 
-function errorResponse(message: string, status = 500) {
-  return Response.json({ error: message }, { status, headers: corsHeaders });
+function errorResponse(
+  message: string,
+  status = 500,
+  req?: Request,
+  extraHeaders?: Record<string, string>,
+) {
+  return Response.json(
+    { error: message },
+    {
+      status,
+      headers: {
+        ...buildCorsHeaders(req),
+        ...extraHeaders,
+      },
+    },
+  );
 }
 
 // Auth middleware replacement
@@ -39,15 +189,84 @@ function isAuthorized(req: Request): boolean {
   return false;
 }
 
-export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
-  polygonClient = client;
+function getClientIdentifier(req: Request): string {
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  }
+
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
+function evaluateRateLimit(req: Request, scope: RateLimitScope): RateLimitDecision {
+  const now = Date.now();
+  const clientId = getClientIdentifier(req);
+  const windowMs =
+    scope === "admin" ? ADMIN_RATE_LIMIT_WINDOW_MS : PUBLIC_RATE_LIMIT_WINDOW_MS;
+  const limit = scope === "admin" ? ADMIN_RATE_LIMIT_MAX : PUBLIC_RATE_LIMIT_MAX;
+  const key = `${scope}:${clientId}`;
+  const existing = rateLimitBuckets.get(key);
+
+  if (!existing || existing.resetAt <= now) {
+    const nextState: RateLimitState = {
+      count: 1,
+      resetAt: now + windowMs,
+    };
+    rateLimitBuckets.set(key, nextState);
+    return {
+      allowed: true,
+      limit,
+      remaining: limit - 1,
+      resetAt: nextState.resetAt,
+    };
+  }
+
+  if (existing.count >= limit) {
+    return {
+      allowed: false,
+      limit,
+      remaining: 0,
+      resetAt: existing.resetAt,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+    };
+  }
+
+  existing.count += 1;
+  rateLimitBuckets.set(key, existing);
+  return {
+    allowed: true,
+    limit,
+    remaining: limit - existing.count,
+    resetAt: existing.resetAt,
+  };
+}
+
+export function resetRateLimitsForTesting(): void {
+  rateLimitBuckets.clear();
+}
+
+export function startHubRESTApi(client: MassiveWSClient): Promise<void> {
+  massiveClient = client;
 
   const server = Bun.serve({
+    hostname: HUB_HOST,
     port: HUB_PORT,
     async fetch(req: Request, server: Server<undefined>) {
       const url = new URL(req.url);
       const path = url.pathname;
       const method = req.method;
+      const origin = req.headers.get("Origin");
+
+      if (origin && !isOriginAllowed(origin)) {
+        return errorResponse("Origin not allowed", 403, req);
+      }
+      if (path.startsWith("/admin") && origin && !isAdminOriginAllowed(origin)) {
+        return errorResponse("Admin browser origin not allowed", 403, req);
+      }
 
       // Handle WebSocket upgrade
       if (server.upgrade(req, { data: undefined })) {
@@ -57,7 +276,7 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
       // Handle CORS preflight (don't log these)
       if (method === "OPTIONS") {
         return new Response(null, {
-          headers: corsHeaders,
+          headers: buildCorsHeaders(req),
         });
       }
 
@@ -137,17 +356,36 @@ export function startHubRESTApi(client: PolygonWSClient): Promise<void> {
 /**
  * Handle incoming HTTP requests
  */
-async function handleRequest(
+export async function handleRequest(
   method: string,
   path: string,
   req: Request,
 ): Promise<Response> {
+  const url = new URL(req.url);
+  const origin = req.headers.get("Origin");
+  const scope: RateLimitScope = path.startsWith("/admin") ? "admin" : "public";
+  const rateLimit = evaluateRateLimit(req, scope);
+  const rateLimitHeaders = buildRateLimitHeaders(rateLimit);
+  const respond = (data: any, status = 200) =>
+    jsonResponse(data, status, req, rateLimitHeaders);
+  const fail = (message: string, status = 500) =>
+    errorResponse(message, status, req, rateLimitHeaders);
+
+  if (origin && !isOriginAllowed(origin)) {
+    return fail("Origin not allowed", 403);
+  }
+  if (path.startsWith("/admin") && origin && !isAdminOriginAllowed(origin)) {
+    return fail("Admin browser origin not allowed", 403);
+  }
+  if (!rateLimit.allowed) {
+    return fail("Too Many Requests", 429);
+  }
   // --- Public Routes ---
 
   if (method === "GET" && path === "/health") {
-    // Check database connections
     let redisOk = false;
     let timescaleOk = false;
+    const timescaleEnabled = timescaleStore.isEnabled;
 
     try {
       const pong = await redisStore.ping();
@@ -156,86 +394,128 @@ async function handleRequest(
       redisOk = false;
     }
 
-    try {
-      timescaleOk = await timescaleStore.ping();
-    } catch {
-      timescaleOk = false;
+    if (timescaleEnabled) {
+      try {
+        timescaleOk = await timescaleStore.ping();
+      } catch {
+        timescaleOk = false;
+      }
     }
 
-    // Get stats and job statuses
-    const redisStats = await redisStore.getStats();
-    const symbols = await redisStore.getSymbols();
-    const clearJobStatus = dailyClearJob.getStatus();
-    const refreshJobStatus = monthlySubscriptionJob.getStatus();
-
-    // Check WebSocket connection
-    const wsConnected = polygonClient !== null;
-
-    // Determine overall status
-    const allHealthy = redisOk && timescaleOk && wsConnected;
+    const wsConnected = massiveClient?.isConnected() || false;
+    const allHealthy =
+      redisOk && wsConnected && (!timescaleEnabled || timescaleOk);
     const status = allHealthy ? "ok" : "degraded";
 
-    return jsonResponse({
+    return respond({
       status,
       timestamp: Date.now(),
       services: {
         redis: redisOk ? "connected" : "disconnected",
-        timescaledb: timescaleOk ? "connected" : "disconnected",
-        polygonWs: wsConnected ? "connected" : "disconnected",
+        timescaledb: timescaleEnabled
+          ? timescaleOk
+            ? "connected"
+            : "disconnected"
+          : "disabled",
+        massiveWs: wsConnected ? "connected" : "disconnected",
       },
-      symbols: symbols,
-      symbolCount: redisStats.symbolCount,
-      redis: redisStats,
-      dailyClearJob: clearJobStatus,
-      subscriptionRefreshJob: refreshJobStatus,
     });
   }
 
-  if (method === "GET" && path === "/bars/latest") {
-    const bars = await redisStore.getAllLatestArray();
-    return jsonResponse({ bars, count: bars.length });
-  }
+  // Match /bars/range/:symbol
+  const rangeMatch = path.match(/^\/bars\/range\/([^\/]+)$/);
+  if (method === "GET" && rangeMatch) {
+    const symbol = rangeMatch[1];
+    if (!symbol) return fail("Invalid symbol", 400);
 
-  // Match /bars/latest/:symbol
-  const latestMatch = path.match(/^\/bars\/latest\/([^\/]+)$/);
-  if (method === "GET" && latestMatch) {
-    const symbol = latestMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    const start = parseMsParam(url.searchParams.get("start"));
+    const end = parseMsParam(url.searchParams.get("end"));
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
 
-    const bar = await redisStore.getLatest(symbol);
-    if (!bar) {
-      return errorResponse("Symbol not found", 404);
+    if (start === null || end === null) {
+      return fail("start and end query params are required (ms)", 400);
     }
-    return jsonResponse(bar);
+
+    const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
+    return respond({ symbol, tf, start, end, bars, count: bars.length });
   }
+
 
   // Match /bars/today/:symbol
   const todayMatch = path.match(/^\/bars\/today\/([^\/]+)$/);
   if (method === "GET" && todayMatch) {
     const symbol = todayMatch[1];
-    if (!symbol) return errorResponse("Invalid symbol", 400);
+    if (!symbol) return fail("Invalid symbol", 400);
 
-    const bars = await redisStore.getTodayBars(symbol);
-    return jsonResponse({ symbol, bars, count: bars.length });
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1s");
+    const bars = await redisStore.getTodayBars(symbol, tf as any);
+    return respond({ symbol, tf, bars, count: bars.length });
+  }
+
+  const sessionBarsMatch = path.match(/^\/bars\/session\/([^\/]+)$/);
+  if (method === "GET" && sessionBarsMatch) {
+    const symbol = sessionBarsMatch[1];
+    if (!symbol) return fail("Invalid symbol", 400);
+
+    const tf = parseTimeframe(url.searchParams.get("tf"), "1s");
+    const ts = parseMsParam(url.searchParams.get("ts")) ?? Date.now();
+    const bars = await redisStore.getSessionBars(symbol, ts, tf as any);
+    return respond({ symbol, tf, bars, count: bars.length });
   }
 
   if (method === "GET" && path === "/symbols") {
     const symbols = await redisStore.getSymbols();
-    return jsonResponse({ symbols, count: symbols.length });
+    return respond({ symbols, count: symbols.length });
   }
 
-  // Front months endpoint (public - no auth required)
-  if (method === "GET" && path === "/front-months") {
-    const cache = frontMonthJob.getCache();
-    if (!cache) {
-      return jsonResponse({
-        lastUpdated: null,
-        products: {},
-        message:
-          "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
-      });
+  // Session data endpoint (public - no auth required)
+  if (method === "GET" && path === "/sessions") {
+    const sessions = await redisStore.getAllSessions();
+    return respond({ sessions, count: Object.keys(sessions).length });
+  }
+
+  const sessionHistoryMatch = path.match(/^\/sessions\/week\/([^\/]+)$/);
+  if (method === "GET" && sessionHistoryMatch) {
+    const symbol = sessionHistoryMatch[1];
+    if (!symbol) return fail("Invalid symbol", 400);
+
+    const end = parseMsParam(url.searchParams.get("end")) ?? Date.now();
+    const start = parseMsParam(url.searchParams.get("start")) ?? end - ONE_WEEK_MS;
+    const sessions = await redisStore.getSessionHistory(symbol, start, end);
+    return respond({ symbol, start, end, sessions, count: sessions.length });
+  }
+
+  // Match /session/:symbol
+  const sessionMatch = path.match(/^\/session\/([^\/]+)$/);
+  if (method === "GET" && sessionMatch) {
+    const symbol = sessionMatch[1];
+    if (!symbol) return fail("Invalid symbol", 400);
+
+    const ts = parseMsParam(url.searchParams.get("ts")) ?? Date.now();
+    const session = await redisStore.getSession(symbol, ts);
+    if (!session) {
+      return fail("Session not found", 404);
     }
-    return jsonResponse(cache);
+    return respond(session);
+  }
+
+  // Snapshot data endpoint (public - no auth required)
+  if (method === "GET" && path === "/snapshots") {
+    const snapshots = await redisStore.getAllSnapshots();
+    return respond({ snapshots, count: Object.keys(snapshots).length });
+  }
+
+  // Match /snapshot/:symbol
+  const snapshotMatch = path.match(/^\/snapshot\/([^\/]+)$/);
+  if (method === "GET" && snapshotMatch) {
+    const symbol = snapshotMatch[1];
+    if (!symbol) return fail("Invalid symbol", 400);
+
+    const snapshot = await redisStore.getSnapshot(symbol);
+    if (!snapshot) {
+      return fail("Snapshot not found", 404);
+    }
+    return respond(snapshot);
   }
 
   // --- Protected Routes ---
@@ -243,26 +523,150 @@ async function handleRequest(
   // Check auth for all /admin routes
   if (path.startsWith("/admin")) {
     if (!isAuthorized(req)) {
-      return errorResponse("Unauthorized", 401);
+      return fail("Unauthorized", 401);
+    }
+
+    if (method === "GET" && path === "/admin/recovery/checkpoints") {
+      const checkpoints = await redisStore.getAllRecoveryCheckpoints();
+      return respond({
+        checkpoints,
+        count: Object.keys(checkpoints).length,
+      });
+    }
+
+    if (method === "GET" && path === "/admin/health") {
+      let redisOk = false;
+      let timescaleOk = false;
+      const timescaleEnabled = timescaleStore.isEnabled;
+
+      try {
+        const pong = await redisStore.ping();
+        redisOk = pong === "PONG";
+      } catch {
+        redisOk = false;
+      }
+
+      if (timescaleEnabled) {
+        try {
+          timescaleOk = await timescaleStore.ping();
+        } catch {
+          timescaleOk = false;
+        }
+      }
+
+      const redisStats = await redisStore.getStats();
+      const symbols = await redisStore.getSymbols();
+      const recoveryCheckpoints = await redisStore.getAllRecoveryCheckpoints();
+      const clearJobStatus = dailyClearJob.getStatus();
+      const refreshJobStatus = monthlySubscriptionJob.getStatus();
+      const wsConnected = massiveClient?.isConnected() || false;
+      const allHealthy =
+        redisOk && wsConnected && (!timescaleEnabled || timescaleOk);
+      const status = allHealthy ? "ok" : "degraded";
+
+      return respond({
+        status,
+        timestamp: Date.now(),
+        services: {
+          redis: redisOk ? "connected" : "disconnected",
+          timescaledb: timescaleEnabled
+            ? timescaleOk
+              ? "connected"
+              : "disconnected"
+            : "disabled",
+          massiveWs: wsConnected ? "connected" : "disconnected",
+        },
+        symbols,
+        symbolCount: redisStats.symbolCount,
+        redis: redisStats,
+        recovery: {
+          checkpointCount: Object.keys(recoveryCheckpoints).length,
+        },
+        dailyClearJob: clearJobStatus,
+        subscriptionRefreshJob: refreshJobStatus,
+      });
+    }
+
+    if (method === "GET" && path === "/admin/front-months") {
+      const cache = frontMonthJob.getCache();
+      if (!cache) {
+        return respond({
+          lastUpdated: null,
+          products: {},
+          message:
+            "Cache not yet populated. Refresh will occur at 3 AM ET or trigger manually via admin endpoint.",
+        });
+      }
+      return respond(cache);
+    }
+
+    if (method === "GET" && path === "/admin/contracts/active") {
+      const contracts = await redisStore.getAllActiveContracts();
+      return respond({
+        products: contracts,
+        count: Object.keys(contracts).length,
+      });
+    }
+
+    if (method === "GET" && path === "/admin/bars/latest") {
+      const bars = await redisStore.getAllLatestArray();
+      return respond({ bars, count: bars.length });
+    }
+
+    const latestMatch = path.match(/^\/admin\/bars\/latest\/([^\/]+)$/);
+    if (method === "GET" && latestMatch) {
+      const symbol = latestMatch[1];
+      if (!symbol) return fail("Invalid symbol", 400);
+
+      const bar = await redisStore.getLatest(symbol);
+      if (!bar) {
+        return fail("Symbol not found", 404);
+      }
+      return respond(bar);
+    }
+
+    const weekMatch = path.match(/^\/admin\/bars\/week\/([^\/]+)$/);
+    if (method === "GET" && weekMatch) {
+      const symbol = weekMatch[1];
+      if (!symbol) return fail("Invalid symbol", 400);
+
+      const tf = parseTimeframe(url.searchParams.get("tf"), "1m");
+      const end = Date.now();
+      const start = end - ONE_WEEK_MS;
+      const bars = await redisStore.getBarsRange(symbol, start, end, tf as any);
+      return respond({ symbol, tf, start, end, bars, count: bars.length });
+    }
+
+    const activeContractsMatch = path.match(/^\/admin\/contracts\/active\/([^\/]+)$/);
+    if (method === "GET" && activeContractsMatch) {
+      const productCode = activeContractsMatch[1];
+      if (!productCode) return fail("Invalid product code", 400);
+
+      const contracts = await redisStore.getActiveContracts(productCode);
+      if (!contracts) {
+        return fail("Contracts not found", 404);
+      }
+
+      return respond(contracts);
     }
 
     if (method === "POST" && path === "/admin/clear-redis") {
       // Manual clear always uses force=true to bypass daily check
       await dailyClearJob.runClear(true);
       const status = dailyClearJob.getStatus();
-      return jsonResponse({ message: "Manual clear triggered", status });
+      return respond({ message: "Manual clear triggered", status });
     }
 
     if (method === "POST" && path === "/admin/refresh-subscriptions") {
       try {
         await monthlySubscriptionJob.runRefresh();
         const status = monthlySubscriptionJob.getStatus();
-        return jsonResponse({
+        return respond({
           message: "Manual subscription refresh triggered",
           status,
         });
       } catch (err) {
-        return jsonResponse(
+        return respond(
           {
             error: "Refresh failed",
             details: err instanceof Error ? err.message : String(err),
@@ -273,12 +677,12 @@ async function handleRequest(
     }
 
     if (method === "GET" && path === "/admin/subscriptions") {
-      if (!polygonClient) {
-        return errorResponse("Polygon client not initialized", 503);
+      if (!massiveClient) {
+        return fail("Massive client not initialized", 503);
       }
 
-      const subscriptions = polygonClient.getSubscriptions();
-      return jsonResponse({
+      const subscriptions = massiveClient.getSubscriptions();
+      return respond({
         subscriptions,
         count: subscriptions.length,
         totalSymbols: subscriptions.reduce(
@@ -289,34 +693,57 @@ async function handleRequest(
     }
 
     if (method === "POST" && path === "/admin/refresh-front-months") {
-      try {
-        await frontMonthJob.runRefresh();
-        const status = frontMonthJob.getStatus();
-        const cache = frontMonthJob.getCache();
-        return jsonResponse({
-          message: "Front month refresh triggered",
-          status,
-          cache,
-        });
-      } catch (err) {
-        return jsonResponse(
-          {
-            error: "Refresh failed",
-            details: err instanceof Error ? err.message : String(err),
-          },
-          500,
-        );
-      }
+      // Run in background to prevent timeout
+      frontMonthJob.runRefresh().catch((err) => {
+        console.error("[FrontMonthJob] Background refresh failed:", err);
+      });
+
+      return respond({
+        message: "Front month refresh started (running in background)",
+        status: frontMonthJob.getStatus(),
+        cache: frontMonthJob.getCache(), // Return current cache immediately
+      });
+    }
+
+    if (method === "POST" && path === "/admin/refresh-snapshots") {
+      // Run job in background (don't await) - prevents HTTP timeout
+      snapshotJob.runRefresh().catch((err) => {
+        console.error("[SnapshotJob] Background refresh failed:", err);
+      });
+
+      return respond({
+        message: "Snapshot refresh started (running in background)",
+        status: snapshotJob.getStatus(),
+      });
+    }
+
+    if (method === "POST" && path === "/admin/recovery/backfill") {
+      const symbols = await redisStore.getSubscribedSymbols();
+      const results = await recoveryService.backfillSymbolsFromProvider(symbols, {
+        source: "manual",
+        excludeCurrentMinute: true,
+      });
+
+      return respond({
+        message: "Manual recovery backfill completed",
+        symbols,
+        results,
+        providerBars: results.reduce((sum, result) => sum + result.providerBars, 0),
+      });
     }
   }
 
-  return errorResponse("Not Found", 404);
+  return fail("Not Found", 404);
 }
 
 async function startStreamBroadcaster(server: Server<undefined>) {
   logger.info("Starting Redis Stream Broadcaster...");
-  // Create a dedicated Redis client for blocking operations
-  const subRedis = redisStore.redis.duplicate();
+  // Create a dedicated Redis client for blocking operations (not a duplicate to avoid command queue conflicts)
+  const subRedis = new Redis({
+    host: REDIS_HOST,
+    port: REDIS_PORT,
+    password: REDIS_PASSWORD,
+  });
   let lastId = "$"; // Start reading from new messages
 
   while (true) {

@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Mail, AlertCircle, CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { NEXT_PUBLIC_SITE_URL } from "@/config/env";
+import { ANALYTICS_EVENTS, captureAnalyticsEvent } from "@/lib/analytics";
 
 // OAuth provider icons
 const GoogleIcon = () => (
@@ -69,6 +70,9 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
+        captureAnalyticsEvent(ANALYTICS_EVENTS.loginMagicLinkRequested, {
+          method: "magic_link",
+        });
         setSuccess(true);
       }
     } catch (err) {
@@ -82,6 +86,9 @@ export default function LoginPage() {
     setOauthLoading(provider);
     setError(null);
     try {
+      captureAnalyticsEvent(ANALYTICS_EVENTS.loginOAuthStarted, {
+        provider,
+      });
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -98,12 +105,13 @@ export default function LoginPage() {
   const isAnyLoading = loading || oauthLoading !== null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md space-y-8"
+        className="w-full max-w-md space-y-8 -mt-[16vh]"
       >
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Welcome</h1>
@@ -155,14 +163,14 @@ export default function LoginPage() {
                   variant="outline"
                   className="w-full"
                   onClick={() => handleOAuthLogin("apple")}
-                  disabled={true}
+                  disabled={isAnyLoading}
                 >
                   {oauthLoading === "apple" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <AppleIcon />
                   )}
-                  Continue with Apple (fuc u apple, not paying 100 ayear)
+                  Continue with Apple
                 </Button>
 
                 <Button

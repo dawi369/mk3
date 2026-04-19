@@ -1,8 +1,14 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
-import { RESEND_API_KEY, FEATURE_REQUEST_EMAIL } from "@/config/env.server";
+import {
+  FEATURE_REQUEST_EMAIL,
+  FEATURE_REQUEST_RATE_LIMIT_MAX,
+  FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS,
+  RESEND_API_KEY,
+} from "@/config/env.server";
 import { createClient } from "@/utils/supabase/server";
 import type { SubscriptionRow } from "@/types/billing.types";
+import { enforceRateLimit, isValidEmail } from "@/lib/server/request-guard";
 
 const resend = new Resend(RESEND_API_KEY);
 
@@ -13,21 +19,47 @@ function formatDate(dateStr: string | null): string {
 
 export async function POST(request: Request) {
   try {
+    await enforceRateLimit({
+      key: "feature-request",
+      max: FEATURE_REQUEST_RATE_LIMIT_MAX,
+      windowMs: FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS,
+    });
+
     const body = await request.json();
     const { featureRequest, userName, userEmail, userId } = body;
+    const normalizedFeatureRequest =
+      typeof featureRequest === "string" ? featureRequest.trim() : "";
+    const normalizedUserName = typeof userName === "string" ? userName.trim() : "";
+    const normalizedUserEmail = typeof userEmail === "string" ? userEmail.trim() : "";
+    const normalizedUserId = typeof userId === "string" ? userId.trim() : "";
 
-    if (!featureRequest?.trim()) {
+    if (!normalizedFeatureRequest) {
       return NextResponse.json({ error: "Feature request is required" }, { status: 400 });
+    }
+
+    if (normalizedFeatureRequest.length > 2000) {
+      return NextResponse.json(
+        { error: "Feature request is too long" },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedUserName.length > 120 || normalizedUserId.length > 120) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+
+    if (normalizedUserEmail && !isValidEmail(normalizedUserEmail)) {
+      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
 
     // Fetch subscription data if userId is provided
     let subscription: SubscriptionRow | null = null;
-    if (userId) {
+    if (normalizedUserId) {
       const supabase = await createClient();
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*")
-        .eq("user_id", userId)
+        .eq("user_id", normalizedUserId)
         .single();
 
       if (!error && data) {
@@ -38,7 +70,7 @@ export async function POST(request: Request) {
     const { data, error } = await resend.emails.send({
       from: "Swordfish <onboarding@resend.dev>", // TODO, change to verified domain when we get it
       to: FEATURE_REQUEST_EMAIL,
-      subject: `Swordfish Feature Request from ${userName || "Anonymous User"}`,
+      subject: `Swordfish Feature Request from ${normalizedUserName || "Anonymous User"}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333; border-bottom: 2px solid #6366f1; padding-bottom: 10px;">
@@ -48,15 +80,15 @@ export async function POST(request: Request) {
           <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #6366f1;">Request Details</h3>
             <p style="font-size: 16px; line-height: 1.6; color: #333;">
-              ${featureRequest}
+              ${normalizedFeatureRequest}
             </p>
           </div>
           
           <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
             <h4 style="margin-top: 0; color: #666;">User Information</h4>
-            <p style="margin: 5px 0;"><strong>Name:</strong> ${userName || "Not provided"}</p>
-            <p style="margin: 5px 0;"><strong>Email:</strong> ${userEmail || "Not provided"}</p>
-            <p style="margin: 5px 0;"><strong>User ID:</strong> ${userId || "Not provided"}</p>
+            <p style="margin: 5px 0;"><strong>Name:</strong> ${normalizedUserName || "Not provided"}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${normalizedUserEmail || "Not provided"}</p>
+            <p style="margin: 5px 0;"><strong>User ID:</strong> ${normalizedUserId || "Not provided"}</p>
             <p style="margin: 5px 0;"><strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
           </div>
           
@@ -113,15 +145,15 @@ export async function POST(request: Request) {
         </div>
       `,
       text: `
-New Feature Request from ${userName || "Anonymous User"}
+New Feature Request from ${normalizedUserName || "Anonymous User"}
 
 REQUEST:
-${featureRequest}
+${normalizedFeatureRequest}
 
 USER INFO:
-- Name: ${userName || "Not provided"}
-- Email: ${userEmail || "Not provided"}
-- User ID: ${userId || "Not provided"}
+- Name: ${normalizedUserName || "Not provided"}
+- Email: ${normalizedUserEmail || "Not provided"}
+- User ID: ${normalizedUserId || "Not provided"}
 - Submitted: ${new Date().toLocaleString()}
 
 SUBSCRIPTION:
@@ -153,6 +185,13 @@ ${
 
     return NextResponse.json({ success: true, id: data?.id });
   } catch (error) {
+    if (error instanceof Error && error.message === "rate_limit_exceeded") {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a minute and try again." },
+        { status: 429 }
+      );
+    }
+
     console.error("Feature request error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

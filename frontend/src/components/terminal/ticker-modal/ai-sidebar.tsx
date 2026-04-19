@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Sparkles, TrendingUp, BarChart3, Brain } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface AISidebarProps {
   isOpen: boolean;
@@ -65,13 +64,6 @@ export function AISidebar({ isOpen }: AISidebarProps) {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-3 py-2 border-t border-white/10">
-        <p className="text-[10px] text-muted-foreground text-center">
-          AI features require Pro subscription
-        </p>
       </div>
     </div>
   );

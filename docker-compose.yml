@@ -1,12 +1,12 @@
 services:
   redis:
-    image: redis:8.2-alpine
+    image: redis/redis-stack-server:latest
     container_name: mk3-redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes
+    command: redis-stack-server --appendonly yes
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -14,48 +14,48 @@ services:
       timeout: 3s
       retries: 3
 
-  timescaledb:
-    image: timescale/timescaledb:latest-pg17
-    container_name: mk3-timescaledb
-    ports:
-      - "5432:5432"
-    volumes:
-      - timescaledb-data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # timescaledb:
+  #   image: timescale/timescaledb:latest-pg17
+  #   container_name: mk3-timescaledb
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - timescaledb-data:/var/lib/postgresql/data
+  #   environment:
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=postgres
+  #     - POSTGRES_DB=postgres
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "pg_isready", "-U", "postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: mk3-backend
-    ports:
-      - "${HUB_PORT:-3001}:${HUB_PORT:-3001}"  # Match your env
-    environment:
-      - NODE_ENV=production
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - DATABASE_URL=postgres://postgres:postgres@timescaledb:5432/postgres
-      - POLYGON_API_KEY=${POLYGON_API_KEY}
-      - POLYGON_API_URL=${POLYGON_API_URL:-https://api.massive.com}
-      - HUB_PORT=${HUB_PORT:-3001}
-      - HUB_API_KEY=${HUB_API_KEY}
-    depends_on:
-      redis:
-        condition: service_healthy
-      timescaledb:
-        condition: service_healthy
-    # Remove volumes for production, keep only for local dev
-    restart: unless-stopped
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: mk3-backend
+  #   ports:
+  #     - "${HUB_PORT:-3001}:${HUB_PORT:-3001}"  # Match your env
+  #   environment:
+  #     - NODE_ENV=production
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #     - DATABASE_URL=postgres://postgres:postgres@timescaledb:5432/postgres
+  #     - POLYGON_API_KEY=${POLYGON_API_KEY}
+  #     - POLYGON_API_URL=${POLYGON_API_URL:-https://api.massive.com}
+  #     - HUB_PORT=${HUB_PORT:-3001}
+  #     - HUB_API_KEY=${HUB_API_KEY}
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #     timescaledb:
+  #       condition: service_healthy
+  #   # Remove volumes for production, keep only for local dev
+  #   restart: unless-stopped
 
 volumes:
   redis-data:
-  timescaledb-data:
+  # timescaledb-data:

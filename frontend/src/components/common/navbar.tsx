@@ -49,18 +49,17 @@ export function Navbar() {
                     </Link>
                   </NavigationMenuLink>
                 </li>
-                {/* <ListItem href="/terminal?view=indicators" title="Indicators" icon={ChartLine}> */}
-                <ListItem href="/terminal?view=backtesting" title="Backtesting" icon={FlaskConical}>
-                  Test your edge. Run historical simulations and validate strategies.
-                </ListItem>
-                {/* <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Activity}> */}
-                <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Scale}>
-                  Feel the market. Understand the pulse of futures trading across all asset classes.
-                </ListItem>
                 <ListItem href="/terminal?view=ai-lab" title="AI Lab" icon={Sparkles}>
                   {/* <ListItem href="/terminal?view=ai-lab" title="AI Lab" icon={BrainCircuit}> */}
                   See what the data sees. Powered by the latest systems.
                 </ListItem>
+                <ListItem href="/terminal?view=backtesting" title="Backtesting" icon={FlaskConical}>
+                  Test your edge. Run historical simulations and validate strategies.
+                </ListItem>
+                {/* <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Activity}> */}
+                {/* <ListItem href="/terminal?view=sentiment" title="Market Sentiment" icon={Scale}>
+                  Feel the market. Understand the pulse of futures trading across all asset classes.
+                </ListItem> */}
               </ul>
             </NavigationMenuContent>
           </NavigationMenuItem>

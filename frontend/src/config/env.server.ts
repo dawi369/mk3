@@ -10,10 +10,36 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
+function getOptionalEnv(name: string, value: string | undefined): string | undefined {
+  return value && value.length > 0 ? value : undefined;
+}
+
 // Resend email configuration
 export const RESEND_API_KEY = requireEnv("RESEND_API_KEY", process.env.RESEND_API_KEY);
 
 export const FEATURE_REQUEST_EMAIL = requireEnv(
   "FEATURE_REQUEST_EMAIL",
   process.env.FEATURE_REQUEST_EMAIL
+);
+
+export const MASSIVE_API_KEY = getOptionalEnv("MASSIVE_API_KEY", process.env.MASSIVE_API_KEY);
+export const MASSIVE_API_URL =
+  getOptionalEnv("MASSIVE_API_URL", process.env.MASSIVE_API_URL) ?? "https://api.massive.com";
+export const SENTRY_DSN = getOptionalEnv("SENTRY_DSN", process.env.SENTRY_DSN);
+export const WAITLIST_RATE_LIMIT_WINDOW_MS = Number(
+  getOptionalEnv("WAITLIST_RATE_LIMIT_WINDOW_MS", process.env.WAITLIST_RATE_LIMIT_WINDOW_MS) ??
+    "60000"
+);
+export const WAITLIST_RATE_LIMIT_MAX = Number(
+  getOptionalEnv("WAITLIST_RATE_LIMIT_MAX", process.env.WAITLIST_RATE_LIMIT_MAX) ?? "5"
+);
+export const FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS = Number(
+  getOptionalEnv(
+    "FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS",
+    process.env.FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS
+  ) ?? "60000"
+);
+export const FEATURE_REQUEST_RATE_LIMIT_MAX = Number(
+  getOptionalEnv("FEATURE_REQUEST_RATE_LIMIT_MAX", process.env.FEATURE_REQUEST_RATE_LIMIT_MAX) ??
+    "5"
 );

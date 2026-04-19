@@ -1,9 +1,11 @@
-import { POLYGON_API_KEY } from "@/config/env.js";
+import { MASSIVE_API_KEY } from "@/config/env.js";
 import {
-  POLYGON_CONTRACTS_URL,
+  MASSIVE_CONTRACTS_URL,
   MAX_PAGES_PER_TICKER,
   MAX_UNIQUE_CONTRACTS,
 } from "@/utils/consts.js";
+import type { ActiveContract } from "@/types/contract.types.js";
+import { isOutrightTickerForRoot } from "@/utils/contracts_calendar.js";
 import { appendFileSync, existsSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -12,22 +14,24 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const INVALID_TICKERS_FILE = join(__dirname, "invalid_tickers.txt");
 
-interface Contract {
-  ticker: string;
-  product_code: string;
-  last_trade_date: string;
-  active: boolean;
+const CACHE_TTL_MS = 15 * 60 * 1000;
+const CONTRACT_PAGE_SIZE = 5000;
+
+interface CachedContracts {
+  fetchedAt: number;
+  contracts: ActiveContract[];
 }
 
 export class ContractProvider {
   private apiKey: string;
+  private cache = new Map<string, CachedContracts>();
 
-  constructor(apiKey: string = POLYGON_API_KEY) {
+  constructor(apiKey: string = MASSIVE_API_KEY) {
     this.apiKey = apiKey;
   }
 
   /**
-   * Log an invalid ticker (one that returns empty JSON) to the invalid_tickers.txt file.
+   * Log an invalid ticker to invalid_tickers.txt
    */
   private logInvalidTicker(root: string): void {
     const timestamp = new Date().toISOString();
@@ -37,7 +41,7 @@ export class ContractProvider {
       if (!existsSync(INVALID_TICKERS_FILE)) {
         writeFileSync(
           INVALID_TICKERS_FILE,
-          "# Invalid Tickers Log\n# Tickers that returned empty JSON from Polygon API\n\n"
+          "# Invalid Tickers Log\n# Tickers that returned empty JSON from Massive API\n\n"
         );
       }
       appendFileSync(INVALID_TICKERS_FILE, entry);
@@ -52,12 +56,16 @@ export class ContractProvider {
    * @param root The product code (e.g. "ES")
    * @returns List of contract tickers (e.g. ["ESZ5", "ESH6"]) sorted by expiration.
    */
-  async fetchActiveContracts(root: string): Promise<string[]> {
-    // console.log(`[ContractProvider] Starting fetch for ${root}`);
-    const contractsMap = new Map<string, Contract>();
+  async fetchActiveContractsDetailed(root: string): Promise<ActiveContract[]> {
+    const cached = this.cache.get(root);
+    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+      return cached.contracts;
+    }
+
+    const contractsMap = new Map<string, ActiveContract>();
     let nextUrl:
       | string
-      | null = `${POLYGON_CONTRACTS_URL}?product_code=${root}&active=true&apiKey=${this.apiKey}`;
+      | null = `${MASSIVE_CONTRACTS_URL}?product_code=${root}&active=true&limit=${CONTRACT_PAGE_SIZE}&apiKey=${this.apiKey}`;
     let pageCount = 0;
     const now = new Date();
 
@@ -65,15 +73,12 @@ export class ContractProvider {
       while (nextUrl && pageCount < MAX_PAGES_PER_TICKER) {
         if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) {
           console.log(
-            `[ContractProvider] Reached max unique contracts (${MAX_UNIQUE_CONTRACTS}) for ${root}. Stopping search.`
+            `[ContractProvider] Reached max contracts (${MAX_UNIQUE_CONTRACTS}) for ${root}`
           );
           break;
         }
 
         pageCount++;
-        // console.log(`[ContractProvider] Fetching page ${pageCount} for ${root}...`);
-        // console.log(`[ContractProvider] URL: ${nextUrl.replace(this.apiKey, "REDACTED")}`);
-
         const response = await fetch(nextUrl, {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
@@ -81,11 +86,9 @@ export class ContractProvider {
           },
         });
 
-        // console.log(`[ContractProvider] Response status for ${root}: ${response.status}`);
-
         if (!response.ok) {
           console.error(
-            `[ContractProvider] Failed to fetch contracts for ${root}: ${response.status} ${response.statusText}`
+            `[ContractProvider] Failed to fetch contracts for ${root}: ${response.status}`
           );
           break;
         }
@@ -93,77 +96,86 @@ export class ContractProvider {
         const data: any = await response.json();
         const results = Array.isArray(data) ? data : data.results || [];
 
-        // Check for invalid ticker on first page - empty results means invalid ticker
+        // Empty results on first page = invalid ticker
         if (pageCount === 1 && results.length === 0) {
-          console.log(`[ContractProvider] Empty response for ${root} - ticker is invalid`);
+          console.log(`[ContractProvider] Empty response for ${root} - invalid ticker`);
           this.logInvalidTicker(root);
           break;
         }
 
-        // console.log(
-        //   `[ContractProvider] Received ${results.length} results for ${root} (page ${pageCount})`
-        // );
-
         for (const item of results) {
-          if (item.active !== false && item.type === "single") {
-            // Check expiration immediately
-            const lastTradeDate = new Date(item.last_trade_date);
-            if (lastTradeDate < now) {
-              // console.log(`[ContractProvider] Skipping expired contract ${item.ticker}`);
-              continue;
-            }
+          if (item.active === false) continue;
 
-            // Deduplicate by ticker
-            if (!contractsMap.has(item.ticker)) {
-              contractsMap.set(item.ticker, {
-                ticker: item.ticker,
-                product_code: item.product_code,
-                last_trade_date: item.last_trade_date,
-                active: item.active,
-              });
+          const ticker =
+            typeof item.ticker === "string" ? item.ticker.trim() : "";
+          if (!ticker || !isOutrightTickerForRoot(root, ticker)) {
+            continue;
+          }
 
-              if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) {
-                break;
-              }
-            }
+          const type =
+            typeof item.type === "string" ? item.type.trim().toLowerCase() : "";
+          if (type && type !== "single") {
+            continue;
+          }
+
+          const lastTradeDateValue =
+            typeof item.last_trade_date === "string" &&
+            item.last_trade_date.length > 0
+              ? item.last_trade_date
+              : typeof item.settlement_date === "string" &&
+                  item.settlement_date.length > 0
+                ? item.settlement_date
+                : null;
+
+          if (!lastTradeDateValue) {
+            continue;
+          }
+
+          const lastTradeDate = new Date(lastTradeDateValue);
+          if (isNaN(lastTradeDate.getTime()) || lastTradeDate < now) {
+            continue;
+          }
+
+          if (!contractsMap.has(ticker)) {
+            contractsMap.set(ticker, {
+              ticker,
+              productCode: item.product_code || root,
+              lastTradeDate: lastTradeDateValue,
+              active: item.active !== false,
+            });
+
+            if (contractsMap.size >= MAX_UNIQUE_CONTRACTS) break;
           }
         }
 
         nextUrl = data.next_url;
-        // console.log(
-        // `[ContractProvider] Next URL for ${root}: ${nextUrl ? "exists" : "null (done)"}`
-        // );
-        // console.log(
-        // `[ContractProvider] Total unique contracts so far for ${root}: ${contractsMap.size}`
-        // );
-
-        // If next_url doesn't have apiKey and we rely on query param, we might need to append it.
-        // But we are using Header auth now, so it should be fine.
       }
 
-      // Log if we stopped due to reaching max pages
       if (pageCount >= MAX_PAGES_PER_TICKER && nextUrl) {
-        console.log(
-          `[ContractProvider] Reached max pages (${MAX_PAGES_PER_TICKER}) for ${root}. Stopped pagination.`
-        );
+        console.log(`[ContractProvider] Reached max pages (${MAX_PAGES_PER_TICKER}) for ${root}`);
       }
     } catch (error) {
       console.error(`[ContractProvider] Error fetching contracts for ${root}:`, error);
-      throw error; // Re-throw to help identify the issue
+      throw error;
     }
 
-    // console.log(`[ContractProvider] Finished fetching for ${root}, total pages: ${pageCount}`);
+    // Sort by expiration date
     const contracts = Array.from(contractsMap.values());
-    // console.log(`[ContractProvider] Total unique contracts for ${root}: ${contracts.length}`);
-
-    // Sort by last_trade_date
     contracts.sort((a, b) => {
-      return new Date(a.last_trade_date).getTime() - new Date(b.last_trade_date).getTime();
+      return new Date(a.lastTradeDate).getTime() - new Date(b.lastTradeDate).getTime();
     });
 
-    const tickers = contracts.map((c) => c.ticker);
-    // console.log(`[ContractProvider] Returning ${tickers.length} tickers for ${root}:`, tickers);
-    return tickers;
+    this.cache.set(root, {
+      fetchedAt: Date.now(),
+      contracts,
+    });
+
+    return contracts;
+  }
+
+  async fetchActiveContracts(root: string): Promise<string[]> {
+    const contracts = await this.fetchActiveContractsDetailed(root);
+    return contracts.map((contract) => contract.ticker);
   }
 }
 

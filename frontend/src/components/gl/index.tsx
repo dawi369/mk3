@@ -1,14 +1,39 @@
 import { Perf } from "r3f-perf";
 import { Effects } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { useControls } from "leva";
+import { useRef } from "react";
 import { Particles } from "./particles";
 import { VignetteShader } from "./shaders/vignetteShader";
+import * as easing from "maath/easing";
 
 interface GLProps {
   hovering: boolean;
   speed?: number;
   darknessMultiplier?: number;
+}
+
+// Component to animate vignette darkness smoothly
+function AnimatedVignette({ targetDarkness, offset }: { targetDarkness: number; offset: number }) {
+  const shaderRef = useRef<any>(null);
+  const darknessRef = useRef({ value: targetDarkness });
+
+  useFrame((_, delta) => {
+    if (!shaderRef.current) return;
+    
+    // Smooth transition over 0.5s
+    easing.damp(darknessRef.current, "value", targetDarkness, 0.5, delta);
+    shaderRef.current.uniforms.darkness.value = darknessRef.current.value;
+  });
+
+  return (
+    <shaderPass
+      ref={shaderRef}
+      args={[VignetteShader]}
+      uniforms-darkness-value={darknessRef.current.value}
+      uniforms-offset-value={offset}
+    />
+  );
 }
 
 export const GL = ({ hovering, speed: externalSpeed = 1.0, darknessMultiplier = 1.0 }: GLProps) => {
@@ -97,10 +122,9 @@ export const GL = ({ hovering, speed: externalSpeed = 1.0, darknessMultiplier = 
           introspect={hovering}
         />
         <Effects multisamping={0} disableGamma>
-          <shaderPass
-            args={[VignetteShader]}
-            uniforms-darkness-value={effectiveVignetteDarkness}
-            uniforms-offset-value={vignetteOffset}
+          <AnimatedVignette 
+            targetDarkness={effectiveVignetteDarkness} 
+            offset={vignetteOffset} 
           />
         </Effects>
       </Canvas>

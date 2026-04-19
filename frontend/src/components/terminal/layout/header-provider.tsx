@@ -1,10 +1,16 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode, useEffect } from "react";
+
+// --- Row density type ---
+export type VisibleRows = 3 | 4;
 
 interface HeaderContextValue {
   navContent: ReactNode;
   setNavContent: (content: ReactNode) => void;
+  // --- Row density state ---
+  visibleRows: VisibleRows;
+  setVisibleRows: (rows: VisibleRows) => void;
 }
 
 const HeaderContext = createContext<HeaderContextValue | undefined>(undefined);
@@ -23,18 +29,36 @@ interface HeaderProviderProps {
 
 export function HeaderProvider({ children }: HeaderProviderProps) {
   const [navContent, setNavContentState] = useState<ReactNode>(null);
+  const [visibleRows, setVisibleRowsState] = useState<VisibleRows>(3);
 
   // Wrap in useCallback to maintain stable identity
   const setNavContent = useCallback((content: ReactNode) => {
     setNavContentState(content);
   }, []);
 
+  const setVisibleRows = useCallback((rows: VisibleRows) => {
+    setVisibleRowsState(rows);
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("terminal-visible-rows");
+    if (stored === "3" || stored === "4") {
+      setVisibleRowsState(Number(stored) as VisibleRows);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("terminal-visible-rows", String(visibleRows));
+  }, [visibleRows]);
+
   const value = useMemo(
     () => ({
       navContent,
       setNavContent,
+      visibleRows,
+      setVisibleRows,
     }),
-    [navContent, setNavContent]
+    [navContent, setNavContent, visibleRows, setVisibleRows]
   );
 
   return <HeaderContext.Provider value={value}>{children}</HeaderContext.Provider>;

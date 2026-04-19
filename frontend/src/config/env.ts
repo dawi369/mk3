@@ -5,6 +5,10 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
+function getOptionalEnv(value: string | undefined): string | undefined {
+  return value && value.length > 0 ? value : undefined;
+}
+
 export const NEXT_PUBLIC_SITE_URL = requireEnv(
   "NEXT_PUBLIC_SITE_URL",
   process.env.NEXT_PUBLIC_SITE_URL,
@@ -25,5 +29,8 @@ export const NEXT_PUBLIC_HUB_URL = requireEnv(
   process.env.NEXT_PUBLIC_HUB_URL,
 );
 
-export const NEXT_PUBLIC_MASSIVE_API_KEY =
-  process.env.NEXT_PUBLIC_MASSIVE_API_KEY || "pUDIi5dPFpkd4mbcIyMAQGzz09EMgBlu";
+export const NEXT_PUBLIC_SENTRY_DSN = getOptionalEnv(process.env.NEXT_PUBLIC_SENTRY_DSN);
+export const NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN = getOptionalEnv(
+  process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ?? process.env.NEXT_PUBLIC_POSTHOG_KEY,
+);
+export const NEXT_PUBLIC_POSTHOG_HOST = getOptionalEnv(process.env.NEXT_PUBLIC_POSTHOG_HOST);

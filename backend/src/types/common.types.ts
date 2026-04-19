@@ -1,4 +1,4 @@
-import type { PolygonAssetClass } from "@/types/polygon.types.js";
+import type { MassiveAssetClass } from "@/types/massive.types.js";
 
 export interface Bar {
   symbol: string;
@@ -13,33 +13,8 @@ export interface Bar {
   endTime: number; // ms since epoch
 }
 
-export interface FuturesInstrument {
-  symbol: string; // e.g. ESZ5
-  root: string; // e.g. ES
-  expiry: string; // YYYY-MM (approx) or broker format
-  exchange?: string;
-  tickSize?: number; // minimum price increment
-  multiplier?: number; // dollar value per point
-  currency?: string; // e.g. USD
-}
-
-// Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec
-export type MonthCode =
-  | "F"
-  | "G"
-  | "H"
-  | "J"
-  | "K"
-  | "M"
-  | "N"
-  | "Q"
-  | "U"
-  | "V"
-  | "X"
-  | "Z";
-
 export interface RefreshDetails {
-  assetClass: PolygonAssetClass;
+  assetClass: MassiveAssetClass;
   eventType: "A" | "AM";
   oldSymbols: string[];
   newSymbols: string[];
@@ -54,4 +29,56 @@ export interface RefreshJobStatus {
   lastError: string | null;
   lastRefreshDetails: RefreshDetails[];
   totalRuns: number;
+}
+
+/**
+ * Rolling intraday session calculations
+ * Stored in Redis at session:{symbol}
+ */
+export type IndicatorBucket = "low" | "mid" | "high";
+
+export interface SessionData {
+  sessionId: string;
+  sessionStartTime: number;
+  sessionEndTime: number;
+  rootSymbol: string;
+  timezone: string;
+  dayOpen: number;
+  dayHigh: number;
+  dayLow: number;
+  vwap: number;
+  cvol: number;
+  tradeCount: number;
+  volNow: number;
+  volMin: number;
+  volMax: number;
+  volPos: number;
+  volBucket: IndicatorBucket;
+  vwapMin: number;
+  vwapMax: number;
+  vwapPos: number;
+  vwapBucket: IndicatorBucket;
+  // Internal running totals for VWAP calculation
+  cumPriceVolume: number;
+  cumVolume: number;
+  timestamp: number;
+}
+
+/**
+ * Exchange session snapshot from Massive REST API
+ * Stored in Redis at snapshot:{symbol}
+ */
+export interface SnapshotData {
+  productCode: string;
+  settlementDate: string;
+  sessionOpen: number;
+  sessionHigh: number;
+  sessionLow: number;
+  sessionClose: number;
+  settlementPrice: number;
+  prevSettlement: number;
+  change: number;
+  changePct: number;
+  openInterest: number | null;
+  timestamp: number;
 }

@@ -1,97 +1,121 @@
 import { useMemo } from "react";
-import { useMarketStore } from "@/store/use-market-store";
+import { useTickerStore } from "@/store/use-ticker-store";
 import { useThrottledValue } from "@/hooks/use-throttled-value";
-import {
-  ASSET_CLASSES,
-  AssetClassId,
-  getAssetClassForTicker,
-  getTickerDetails,
-} from "@/lib/ticker-mapping";
-import { AssetClassData, MarketMover } from "@/components/terminal/_shared/mock-data";
+import { ASSET_CLASSES, AssetClassId } from "@/lib/ticker-mapping";
+import { getChangeMetrics } from "@/lib/ticker-snapshot";
+import type { SnapshotData } from "@/types/redis.types";
+import type { Bar } from "@/types/common.types";
+
+export interface AssetClassTickers {
+  id: AssetClassId;
+  title: string;
+  symbols: string[];
+  avgChange: number;
+  openInterest?: number;
+  openInterestPercent?: number;
+}
+
+function getChangePercent(
+  bars: Bar[] | undefined,
+  latest: Bar | undefined,
+  snapshot: SnapshotData | undefined
+): { value: number; valid: boolean } {
+  const metrics = getChangeMetrics({ bars, latest, snapshot });
+  return { value: metrics.changePercent, valid: metrics.hasReference };
+}
 
 export function useTerminalData() {
-  const rawMarketData = useMarketStore((state) => state.marketData);
-  const marketData = useThrottledValue(rawMarketData, 100);
+  const mode = useTickerStore((state) => state.mode);
+  const rawEntities = useTickerStore((state) => state.entitiesByMode[mode]);
+  const rawSeries = useTickerStore((state) => state.seriesByMode[mode]);
+  const rawIndex = useTickerStore((state) => state.byAssetClassByMode[mode]);
+  const snapshots = useTickerStore((state) => state.snapshotsBySymbol);
+  const entities = useThrottledValue(rawEntities, 100);
+  const series = useThrottledValue(rawSeries, 100);
+  const index = rawIndex;
 
   const terminalData = useMemo(() => {
-    // Initialize data structure for all asset classes
-    const dataByClass: Record<AssetClassId, AssetClassData> = {} as any;
+    const dataByClass: Record<AssetClassId, AssetClassTickers> = {} as Record<
+      AssetClassId,
+      AssetClassTickers
+    >;
 
     ASSET_CLASSES.forEach((ac) => {
       dataByClass[ac.id] = {
         id: ac.id,
         title: ac.title,
-        activeMonth: "DEC 25", // Placeholder, ideally dynamic
-        nextMonth: "MAR 26", // Placeholder
-        winners: [],
-        losers: [],
-        openInterest: 1.0, // Placeholder
-        sentiment: 50, // Placeholder
+        symbols: [],
         avgChange: 0,
+        openInterest: undefined,
+        openInterestPercent: undefined,
       };
     });
 
-    // Process all available market data
-    Object.entries(marketData).forEach(([ticker, bars]) => {
-      if (!bars || bars.length === 0) return;
+    const openInterestByClass: Record<AssetClassId, number> = {} as Record<
+      AssetClassId,
+      number
+    >;
 
-      const assetClassId = getAssetClassForTicker(ticker);
-      if (!assetClassId || !dataByClass[assetClassId]) return;
+    ASSET_CLASSES.forEach((assetClass) => {
+      const symbols = index[assetClass.id] || [];
+      const sorted = [...symbols].sort((a, b) => {
+        const aEntity = entities[a];
+        const bEntity = entities[b];
+        const aSeries = series[a];
+        const bSeries = series[b];
+        const aSnapshot = snapshots[a];
+        const bSnapshot = snapshots[b];
+        const aChange = getChangePercent(aSeries, aEntity?.latestBar, aSnapshot).value;
+        const bChange = getChangePercent(bSeries, bEntity?.latestBar, bSnapshot).value;
+        return bChange - aChange;
+      });
 
-      const latestBar = bars[bars.length - 1];
-      const firstBar = bars[0]; // Using first bar of the session as "open" reference for now
+      dataByClass[assetClass.id].symbols = sorted;
 
-      // Calculate change based on session open (first bar) vs current
-      // Ideally we'd use previous day close, but we might not have it in this stream yet
-      const openPrice = firstBar.open;
-      const currentPrice = latestBar.close;
-      const change = ((currentPrice - openPrice) / openPrice) * 100;
+      const totalChange = sorted.reduce((sum, symbol) => {
+        const entity = entities[symbol];
+        const bars = series[symbol];
+        const snapshot = snapshots[symbol];
+        return sum + getChangePercent(bars, entity?.latestBar, snapshot).value;
+      }, 0);
 
-      const sparklineData = bars.map((b) => b.close);
+      const validChanges = sorted.filter((symbol) => {
+        const entity = entities[symbol];
+        const bars = series[symbol];
+        const snapshot = snapshots[symbol];
+        return getChangePercent(bars, entity?.latestBar, snapshot).valid;
+      }).length;
 
-      // Limit sparkline points to last 50 for performance/visuals if needed,
-      // but Sparkline component handles it.
+      dataByClass[assetClass.id].avgChange =
+        validChanges > 0 ? totalChange / validChanges : 0;
 
-      const tickerDetails = getTickerDetails(ticker);
+      const openInterestTotal = sorted.reduce((sum, symbol) => {
+        const snapshot = snapshots[symbol];
+        const oi = snapshot?.openInterest;
+        return typeof oi === "number" ? sum + oi : sum;
+      }, 0);
 
-      const mover: MarketMover = {
-        ticker,
-        change,
-        price: currentPrice,
-        stats: {
-          open: latestBar.open,
-          high: latestBar.high,
-          low: latestBar.low,
-          prevClose: openPrice, // Approximation
-          volume: latestBar.volume,
-        },
-        sparklineData,
-      };
+      dataByClass[assetClass.id].openInterest =
+        openInterestTotal > 0 ? openInterestTotal : undefined;
 
-      if (change >= 0) {
-        dataByClass[assetClassId].winners.push(mover);
-      } else {
-        dataByClass[assetClassId].losers.push(mover);
-      }
+      openInterestByClass[assetClass.id] = openInterestTotal;
     });
 
-    // Sort winners and losers
-    Object.values(dataByClass).forEach((ac) => {
-      ac.winners.sort((a, b) => b.change - a.change); // Descending
-      ac.winners.sort((a, b) => b.change - a.change); // Descending
-      ac.losers.sort((a, b) => a.change - b.change); // Ascending (most negative first)
-      
-      // Calculate Average Change
-      const allMovers = [...ac.winners, ...ac.losers];
-      if (allMovers.length > 0) {
-        const totalChange = allMovers.reduce((sum, m) => sum + m.change, 0);
-        ac.avgChange = totalChange / allMovers.length;
-      }
-    });
+    const totalOpenInterest = Object.values(openInterestByClass).reduce(
+      (sum, value) => sum + value,
+      0
+    );
 
-    // Convert to array in the order of ASSET_CLASSES
+    if (totalOpenInterest > 0) {
+      ASSET_CLASSES.forEach((assetClass) => {
+        const classTotal = openInterestByClass[assetClass.id];
+        dataByClass[assetClass.id].openInterestPercent =
+          classTotal > 0 ? (classTotal / totalOpenInterest) * 100 : undefined;
+      });
+    }
+
     return ASSET_CLASSES.map((ac) => dataByClass[ac.id]);
-  }, [marketData]);
+  }, [entities, series, index, snapshots]);
 
   return terminalData;
 }

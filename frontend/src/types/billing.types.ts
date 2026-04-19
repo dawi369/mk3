@@ -102,7 +102,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierInfo> = {
     price: 0,
     priceDisplay: "$0",
     interval: "month",
-    description: "Get started with delayed data",
+    description: "Legacy plan - not available for new users",
     features: [
       { name: "Delayed market data", included: true },
       { name: "All contracts except front month", included: true },
@@ -115,19 +115,14 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierInfo> = {
   pro: {
     id: "pro",
     name: "Pro",
-    price: 29,
-    priceDisplay: "$29",
+    price: 99,
+    priceDisplay: "$99",
     interval: "month",
-    description: "Real-time data and full access",
+    description: "7-day free trial, then $99/mo",
     features: [
-      { name: "Real-time market data", included: true },
-      { name: "All contracts including front month", included: true },
-      { name: "Advanced charting", included: true },
-      { name: "AI signals & insights", included: true },
-      { name: "Priority support", included: true },
-      { name: "API access", included: true },
+      { name: "Full access to the Swordfish platform", included: true },
+      { name: "Personal support", included: true },
     ],
-    popular: true,
   },
 };
 

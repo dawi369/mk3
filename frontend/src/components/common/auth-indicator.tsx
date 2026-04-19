@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import {
@@ -23,15 +23,20 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { Input } from "@/components/ui/input";
-import { updateDisplayName, type UserProfile } from "@/lib/supabase/profiles";
+import { type UserProfile } from "@/lib/supabase/profiles";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
-import { toast } from "sonner";
-import { ThemeToggle } from "@/components/common/theme-toggle";
+import { ANALYTICS_EVENTS, captureAnalyticsEvent } from "@/lib/analytics";
+
 
 const getDisplayName = (user: User, profile: UserProfile | null): string => {
-  if (profile?.display_name) {
-    return profile.display_name.split(" ")[0];
+  // Prefer first_name from profile (populated by trigger from OAuth)
+  if (profile?.first_name) {
+    return profile.first_name;
+  }
+  // Fallback to user metadata from OAuth provider
+  if (user.user_metadata?.given_name) {
+    return user.user_metadata.given_name;
   }
   if (user.user_metadata?.name) {
     return user.user_metadata.name.split(" ")[0];
@@ -49,53 +54,16 @@ interface AuthIndicatorProps {
 }
 
 export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
-  const { user, profile, loading, signOut, refreshProfile, updateProfile } = useAuth();
-  const [editedName, setEditedName] = useState("");
+  const { user, profile, loading, signOut } = useAuth();
   const [featureRequest, setFeatureRequest] = useState("");
-  const [isSavingName, setIsSavingName] = useState(false);
   const [isSendingRequest, setIsSendingRequest] = useState(false);
   const [requestStatus, setRequestStatus] = useState<"idle" | "success" | "error">("idle");
-
-  useEffect(() => {
-    if (user) {
-      setEditedName(profile?.display_name || getDisplayName(user, profile));
-    }
-  }, [user, profile]);
 
   const handleSignOut = async () => {
     await signOut();
   };
 
-  const handleSaveName = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!user || !editedName.trim()) return;
 
-    setIsSavingName(true);
-    const newName = editedName.trim();
-    const oldName = profile?.display_name;
-
-    // Optimistic update
-    updateProfile({ display_name: newName });
-
-    try {
-      const success = await updateDisplayName(user.id, newName);
-      if (success) {
-        await refreshProfile();
-        toast.success("Profile name updated");
-      } else {
-        throw new Error("Failed to update name");
-      }
-    } catch (error) {
-      // Revert on failure
-      if (oldName) {
-        updateProfile({ display_name: oldName });
-      }
-      await refreshProfile();
-      toast.error("Failed to update name");
-    } finally {
-      setIsSavingName(false);
-    }
-  };
 
   const handleFeatureRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +90,10 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
 
       setFeatureRequest("");
       setRequestStatus("success");
+      captureAnalyticsEvent(ANALYTICS_EVENTS.featureRequestSubmitted, {
+        source: "auth_indicator",
+        has_user: true,
+      });
 
       // Reset status after 3 seconds
       setTimeout(() => setRequestStatus("idle"), 3000);
@@ -206,29 +178,6 @@ export function AuthIndicator({ align = "left" }: AuthIndicatorProps) {
                       </div>
 
                       <div className="grid gap-2">
-                        {/* Profile / Name Edit */}
-                        <div className="space-y-2">
-                          <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                            <UserIcon className="w-3 h-3" /> Profile
-                          </h4>
-                          <form onSubmit={handleSaveName} className="flex gap-2">
-                            <Input
-                              value={editedName}
-                              onChange={(e) => setEditedName(e.target.value)}
-                              placeholder="Display Name"
-                              className="h-8 text-xs bg-muted/50 border-white/10 focus-visible:ring-primary/20"
-                              onKeyDown={(e) => e.stopPropagation()}
-                              disabled={isSavingName}
-                            />
-                            <button
-                              type="submit"
-                              disabled={isSavingName}
-                              className="inline-flex items-center justify-center rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 h-8 px-3"
-                            >
-                              {isSavingName ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
-                            </button>
-                          </form>
-                        </div>
 
                         {/* Links */}
                         <div className="grid grid-cols-2 gap-2">

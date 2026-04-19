@@ -1,17 +1,18 @@
-import { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
+import { MassiveWSClient } from "@/server/api/massive/ws_client.js";
 import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
-import type { PolygonMarketType } from "@/types/polygon.types.js";
+import type { MassiveMarketType } from "@/types/massive.types.js";
 import { startHubRESTApi } from "@/server/api/rest_client.js";
-import { dailyClearJob } from "@/jobs/clear_daily.js";
-import { monthlySubscriptionJob } from "@/jobs/refresh_subscriptions.js";
-import { frontMonthJob } from "@/jobs/front_month_job.js";
-// import { historySyncJob } from "@/jobs/sync_history.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
+import { recoveryService } from "@/services/recovery_service.js";
+import { initializeJobRuntime, stopJobRuntime } from "@/server/job_runtime.js";
+import { flushSentry, initSentry, Sentry } from "@/utils/sentry.js";
 
 // Global reference for graceful shutdown
-let polygonClient: PolygonWSClient | null = null;
+let massiveClient: MassiveWSClient | null = null;
 let statsInterval: Timer | null = null;
+
+initSentry();
 
 /**
  * Main Hub server startup
@@ -21,13 +22,19 @@ async function startHubServer() {
   try {
     console.log("Starting Hub server...");
 
-    // Initialize TimescaleDB
-    await timescaleStore.init();
+    await redisStore.ping();
+    await recoveryService.init();
 
-    polygonClient = new PolygonWSClient();
-    const futuresMarket: PolygonMarketType = "futures";
+    if (timescaleStore.isEnabled) {
+      await timescaleStore.init();
+    } else {
+      console.log("TimescaleDB disabled for current runtime");
+    }
 
-    await polygonClient.connect(futuresMarket);
+    massiveClient = new MassiveWSClient();
+    const futuresMarket: MassiveMarketType = "futures";
+
+    await massiveClient.connect(futuresMarket);
 
     // Build requests dynamically using API
     console.log("Building subscription requests...");
@@ -39,28 +46,45 @@ async function startHubServer() {
     const softsReq = await scheduleBuilder.buildRequestAsync("softs", "A");
     const volatilesReq = await scheduleBuilder.buildRequestAsync("volatiles", "A");
 
-    await polygonClient.subscribe(usIndicesReq);
-    await polygonClient.subscribe(metalsReq);
-    await polygonClient.subscribe(currenciesReq);
-    await polygonClient.subscribe(grainsReq);
-    await polygonClient.subscribe(softsReq);
-    await polygonClient.subscribe(volatilesReq);
+    await massiveClient.subscribe(usIndicesReq);
+    await massiveClient.subscribe(metalsReq);
+    await massiveClient.subscribe(currenciesReq);
+    await massiveClient.subscribe(grainsReq);
+    await massiveClient.subscribe(softsReq);
+    await massiveClient.subscribe(volatilesReq);
+
+    const subscribedSymbols = massiveClient.getSubscribedSymbols();
+    await redisStore.setSubscribedSymbols(subscribedSymbols);
+
+    const rehydration = await recoveryService.hydrateRedisFromRecoveryStore(
+      subscribedSymbols,
+    );
+    console.log(
+      `[Recovery] Rehydrated ${rehydration.barsLoaded} bars across ${rehydration.hydratedSymbols} symbols`,
+    );
+
+    const backfillResults = await recoveryService.backfillSymbolsFromProvider(
+      subscribedSymbols,
+      {
+        source: "startup",
+        excludeCurrentMinute: true,
+      },
+    );
+    const startupBackfillCount = backfillResults.reduce(
+      (sum, result) => sum + result.providerBars,
+      0,
+    );
+    console.log(
+      `[Recovery] Provider backfill loaded ${startupBackfillCount} bars across ${backfillResults.length} symbols`,
+    );
 
     // Brief pause before continuing
     await Bun.sleep(1000);
 
-    // Load persisted job statuses
-    await dailyClearJob.loadStatus();
-    await monthlySubscriptionJob.loadStatus();
-    await frontMonthJob.loadStatus();
+    await initializeJobRuntime(massiveClient);
 
-    // Schedule jobs (disabled for now)
-    // dailyClearJob.schedule();
-    // monthlySubscriptionJob.schedule(polygonClient);
-    // historySyncJob.schedule();
-
-    // Start Hub REST API (pass polygon client for subscription management)
-    await startHubRESTApi(polygonClient);
+    // Start Hub REST API (pass massive client for subscription management)
+    await startHubRESTApi(massiveClient);
 
     console.log("Hub server running\n");
 
@@ -72,6 +96,7 @@ async function startHubServer() {
       );
     }, 5000);
   } catch (err) {
+    Sentry.captureException(err);
     console.error("Hub server startup failed:", err);
     const retrySeconds = 10;
     console.error(`Retrying in ${retrySeconds} seconds...`);
@@ -93,12 +118,15 @@ async function gracefulShutdown(signal: string) {
     statsInterval = null;
   }
 
-  // Disconnect Polygon WebSocket
-  if (polygonClient) {
-    console.log("Disconnecting Polygon WebSocket...");
-    polygonClient.disconnect();
-    polygonClient = null;
+  // Disconnect Massive WebSocket
+  if (massiveClient) {
+    console.log("Disconnecting Massive WebSocket...");
+    massiveClient.disconnect();
+    massiveClient = null;
   }
+
+  console.log("Stopping scheduled jobs...");
+  stopJobRuntime();
 
   // Close TimescaleDB connections
   console.log("Closing TimescaleDB connections...");
@@ -109,6 +137,7 @@ async function gracefulShutdown(signal: string) {
   await redisStore.redis.quit();
 
   console.log("Shutdown complete.");
+  await flushSentry();
   process.exit(0);
 }
 

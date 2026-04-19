@@ -5,9 +5,12 @@ import {
   useState,
   useCallback,
   useRef,
+  useMemo,
 } from "react";
 import { User } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
+import posthog from "posthog-js";
+import { NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN } from "@/config/env";
 import {
   getUserProfile,
   ensureUserProfile,
@@ -30,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const userRef = useRef<User | null>(null);
   const initializedRef = useRef(false);
@@ -83,9 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, router]);
 
   useEffect(() => {
+    let active = true;
+
     // Prevent multiple initializations
     if (initializedRef.current) {
-      return;
+      return () => {
+        active = false;
+      };
     }
 
     const initAuth = async () => {
@@ -114,17 +121,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         userRef.current = currentUser;
+        if (!active) return;
         setUser(currentUser);
+        if (!currentUser) {
+          setProfile(null);
+        }
+        setLoading(false);
+        initializedRef.current = true;
 
         if (currentUser) {
-          await fetchProfile(currentUser.id, currentUser.email || undefined);
+          void fetchProfile(currentUser.id, currentUser.email || undefined);
         }
       } catch (error) {
         console.error("Unexpected error in auth init:", error);
         // Ensure loading state is resolved even on error
         userRef.current = null;
+        if (!active) return;
         setUser(null);
-      } finally {
+        setProfile(null);
         setLoading(false);
         initializedRef.current = true;
       }
@@ -135,6 +149,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!active) return;
+
       const currentUser = session?.user ?? null;
 
       // Handle INITIAL_SESSION event - this fires on first load with existing session
@@ -142,14 +158,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (currentUser && currentUser.id !== userRef.current?.id) {
           userRef.current = currentUser;
           setUser(currentUser);
-          setLoading(true);
-          await fetchProfile(currentUser.id, currentUser.email || undefined);
           setLoading(false);
+          void fetchProfile(currentUser.id, currentUser.email || undefined);
         } else if (!currentUser && userRef.current) {
           // Session was cleared
           userRef.current = null;
           setUser(null);
           setProfile(null);
+          setLoading(false);
         }
         return;
       }
@@ -159,19 +175,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userRef.current = currentUser;
         setUser(currentUser);
         if (currentUser) {
-          setLoading(true); // Briefly show loading while profile fetches on switch
-          await fetchProfile(currentUser.id, currentUser.email || undefined);
           setLoading(false);
+          void fetchProfile(currentUser.id, currentUser.email || undefined);
         } else {
           setProfile(null);
+          setLoading(false);
         }
       }
     });
 
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
   }, [supabase, fetchProfile]);
+
+  useEffect(() => {
+    if (!NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN) {
+      return;
+    }
+
+    if (user) {
+      posthog.identify(user.id, {
+        email: user.email,
+        auth_provider: profile?.auth_provider ?? undefined,
+        display_name: profile?.display_name ?? undefined,
+      });
+      return;
+    }
+
+    posthog.reset();
+  }, [user, profile]);
 
   return (
     <AuthContext.Provider

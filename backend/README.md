@@ -1,123 +1,98 @@
 # MK3 Backend (Bun)
 
-This is the MK3 Futures Dashboard backend, ported from Node.js to Bun for improved performance.
+Real-time futures data backend using Massive futures APIs.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) v1.3.3 or later
-- Redis running (via Docker or locally)
-- Valid Polygon.io API key
+- [Bun](https://bun.sh) v1.3.3+
+- Redis (Docker or local)
+- Valid Massive API key
+- TimescaleDB is paused until futures flat-file or equivalent historical access is available
 
-## Installation
-
-Install dependencies:
+## Quick Start
 
 ```bash
+# Install dependencies
 bun install
+
+# Development (with hot reload)
+bun run dev
+
+# Production
+bun run start
 ```
 
 ## Configuration
 
-Create or update `.env` file in the backend directory:
+Create `.env` file:
 
 ```bash
-# Polygon API
-POLYGON_API_KEY=your_key_here
-
-# Redis
+MASSIVE_API_KEY=your_key_here
+HUB_HOST=::
 REDIS_HOST=localhost
 REDIS_PORT=6379
-
-# Hub Server
-HUB_REST_PORT=3001
+HUB_PORT=3001
+HUB_API_KEY=dev_only_secret
+# HUB_ALLOWED_ORIGINS=http://localhost:3010,https://app.example.com
+# HUB_ADMIN_ALLOWED_ORIGINS=https://ops.example.com
+# HUB_PUBLIC_RATE_LIMIT_WINDOW_MS=60000
+# HUB_PUBLIC_RATE_LIMIT_MAX=240
+# HUB_ADMIN_RATE_LIMIT_WINDOW_MS=60000
+# HUB_ADMIN_RATE_LIMIT_MAX=60
+# HUB_ENABLE_SCHEDULED_JOBS=true
+# HUB_BOOTSTRAP_SNAPSHOTS_ON_STARTUP=true
+# HUB_BOOTSTRAP_FRONT_MONTHS_ON_STARTUP=true
+# DATABASE_URL=postgres://...  # Optional, reserved for future historical storage
+# ENABLE_TIMESCALE=true        # Optional opt-in; disabled by default for now
 ```
 
-## Running the Server
+Scheduled jobs are enabled by default. On startup, the backend now bootstraps stale or missing snapshot and front-month caches before serving traffic.
 
-### Development Mode (with auto-reload)
-
-```bash
-bun run dev
-# or
-bun --watch src/server/index.ts
-```
-
-This will start the Hub server with file watching enabled. Any changes to your TypeScript files will automatically restart the server.
-
-### Production Mode
-
-```bash
-bun run start
-# or
-bun run run:server
-# or directly
-bun src/server/index.ts
-```
-
-### Quick Test
-
-To verify Bun is working:
-
-```bash
-bun run index.ts
-```
-
-This should print "Hello via Bun!"
-
-## Available Scripts
-
-- `bun run dev` - Start server in watch mode (auto-reload on file changes)
-- `bun run start` - Start server in production mode
-- `bun run run:server` - Alias for start (matches old Node.js workflow)
-
-## Testing the Server
-
-Once running, test the Hub API:
+## Test the API
 
 ```bash
 # Health check
 curl http://localhost:3001/health | jq
 
-# Current subscriptions
-curl http://localhost:3001/admin/subscriptions | jq
+# Public health
+curl http://localhost:3001/health | jq
+
+# Subscriptions
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/subscriptions | jq
+
+# Cached active contracts per product
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/contracts/active | jq
+
+# Front-month resolution
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/front-months | jq
 
 # Latest bars
-curl http://localhost:3001/bars/latest | jq
+curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/bars/latest | jq
+
+# Current trading-session bars
+curl http://localhost:3001/bars/session/ESM6 | jq
+
+# Retained session history
+curl http://localhost:3001/sessions/week/ESM6 | jq
 ```
 
 ## Documentation
 
-For detailed documentation, see:
+Start here:
 
-- [docs/README.md](./docs/README.md) - Complete backend overview
-- [docs/system-overview.md](./docs/system-overview.md) - System architecture
-- [docs/architecture.md](./docs/architecture.md) - Technical details
+- [docs/README.md](./docs/README.md)
+- [docs/operations.md](./docs/operations.md)
+- [docs/api-reference.md](./docs/api-reference.md)
+- [docs/system-overview.md](./docs/system-overview.md)
 
 ## Troubleshooting
 
-### Server won't start
-
-1. Check Redis is running: `docker ps`
-2. Verify `.env` file exists with `POLYGON_API_KEY`
+**Server won't start:**
+1. Check Redis: `docker ps`
+2. Verify `.env` file with `MASSIVE_API_KEY`
 3. Check Bun version: `bun --version`
 
-### No data flowing
-
+**No data flowing:**
 1. Verify market hours (Mon-Fri, not 5pm-6pm ET)
-2. Check subscriptions: `curl http://localhost:3001/admin/subscriptions`
-3. Review server logs for WebSocket connection status
-
-## Migration from Node.js
-
-This project was ported from Node.js to Bun. Key changes:
-
-- **Runtime**: `tsx` → `bun`
-- **Watch mode**: `tsx watch` → `bun --watch`
-- **Performance**: Significantly faster startup and execution
-- **Native TypeScript**: No transpilation needed
-
-The original Node.js version is preserved in `../backend_node/` for reference.
-
----
-
-This project uses [Bun](https://bun.sh), a fast all-in-one JavaScript runtime.
+2. Check subscriptions: `curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/subscriptions`
+3. Inspect cached contract universe: `curl -H "X-API-Key: $HUB_API_KEY" http://localhost:3001/admin/contracts/active`

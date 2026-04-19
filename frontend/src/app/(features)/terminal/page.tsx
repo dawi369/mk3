@@ -1,23 +1,12 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSearchParams, useRouter } from "next/navigation";
-import { ProtectedRoute } from "@/components/auth/protected-route";
-import { TerminalDock, TerminalViewType } from "@/components/terminal/layout/terminal-dock";
 import { TerminalView } from "@/components/terminal/views/terminal";
-import { SentimentView } from "@/components/terminal/views/sentiment";
 import { AiLabView } from "@/components/terminal/views/ai-lab";
-import { StreamView } from "@/components/terminal/views/stream";
 import { BacktestingView } from "@/components/terminal/views/backtesting";
 import { useTerminalView } from "@/providers/terminal-view-provider";
 import { ErrorBoundary } from "@/components/common/error-boundary";
-
-const VALID_VIEWS: TerminalViewType[] = ["terminal", "sentiment", "ai-lab", "backtesting", "stream"];
-
-function isValidView(view: string | null): view is TerminalViewType {
-  return view !== null && VALID_VIEWS.includes(view as TerminalViewType);
-}
 
 function TerminalPageContent() {
   const { activeView } = useTerminalView();
@@ -42,19 +31,9 @@ function TerminalPageContent() {
               <TerminalView />
             </ErrorBoundary>
           )}
-          {activeView === "sentiment" && (
-            <ErrorBoundary name="Sentiment">
-              <SentimentView />
-            </ErrorBoundary>
-          )}
           {activeView === "ai-lab" && (
             <ErrorBoundary name="AI Lab">
               <AiLabView />
-            </ErrorBoundary>
-          )}
-          {activeView === "stream" && (
-            <ErrorBoundary name="Data Stream">
-              <StreamView />
             </ErrorBoundary>
           )}
           {activeView === "backtesting" && (
@@ -70,19 +49,17 @@ function TerminalPageContent() {
 
 export default function TerminalPage() {
   return (
-    <ProtectedRoute redirectTo="/login">
-      <Suspense
-        fallback={
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
-              <p className="mt-4 text-muted-foreground">Loading...</p>
-            </div>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
           </div>
-        }
-      >
-        <TerminalPageContent />
-      </Suspense>
-    </ProtectedRoute>
+        </div>
+      }
+    >
+      <TerminalPageContent />
+    </Suspense>
   );
 }

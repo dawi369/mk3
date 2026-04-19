@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 import { useHeader } from "@/components/terminal/layout/header-provider";
 import { AuthIndicator } from "@/components/common/auth-indicator";
 import { useTerminalView } from "@/providers/terminal-view-provider";
@@ -10,13 +11,32 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BarChart2, TrendingUp, Spline, Zap } from "lucide-react";
 
-import { useState } from "react";
-// ... (keep other imports)
+import { useTickerStore } from "@/store/use-ticker-store";
+
+// --- Centralized Header Animation Config ---
+const HEADER_ANIMATION = {
+  initial: { opacity: 0, y: -5 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 5 },
+  transition: { duration: 0.15 },
+};
 
 export function TerminalHeader() {
-  const { navContent: manualNavContent } = useHeader();
+  const { navContent: manualNavContent, visibleRows, setVisibleRows } = useHeader();
   const { activeView } = useTerminalView();
-  const [viewMode, setViewMode] = useState<"front" | "curve">("front");
+  const viewMode = useTickerStore((state) => state.mode);
+  const setMode = useTickerStore((state) => state.setMode);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("terminal-view-mode");
+    if (stored === "front" || stored === "curve") {
+      setMode(stored);
+    }
+  }, [setMode]);
+
+  useEffect(() => {
+    localStorage.setItem("terminal-view-mode", viewMode);
+  }, [viewMode]);
 
   // Declarative navigation mapping
   const renderNavContent = () => {
@@ -34,14 +54,14 @@ export function TerminalHeader() {
               <ToggleGroup 
                 type="single" 
                 value={viewMode}
-                onValueChange={(val) => val && setViewMode(val as "front" | "curve")}
+                onValueChange={(val) => val && setMode(val as "front" | "curve")}
                 className="bg-muted/50 p-1 rounded-lg border border-white/5"
               >
-                <ToggleGroupItem value="front" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
-                  <Zap className="w-3.5 h-3.5 mr-2" />
+                <ToggleGroupItem value="front" size="sm" className="h-7 px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                  <TrendingUp className="w-3.5 h-3.5 mr-2" />
                   Front
                 </ToggleGroupItem>
-                <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="curve" size="sm" className="h-7 px-3 data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Spline className="w-3.5 h-3.5 mr-2" />
                   Curve
                 </ToggleGroupItem>
@@ -83,7 +103,6 @@ export function TerminalHeader() {
             </motion.div> */}
           </motion.div>
         );
-      case "sentiment":
       case "ai-lab":
       default:
         return null;
@@ -118,18 +137,45 @@ export function TerminalHeader() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView + (manualNavContent ? "-manual" : "")}
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-              transition={{ duration: 0.15 }}
+              {...HEADER_ANIMATION}
             >
               {renderNavContent()}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Auth indicator - right aligned */}
-        <div className="w-48 shrink-0 flex justify-end">
+        {/* Auth indicator + density toggle - right aligned */}
+        <div className="w-48 shrink-0 flex items-center justify-end gap-3">
+          {/* --- Row Density Toggle --- */}
+          <AnimatePresence mode="wait">
+            {activeView === "terminal" && (
+              <motion.div
+                key="density-toggle"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.55 } }}
+                exit={{ opacity: 0, y: 5, transition: { duration: 0.15 } }}
+              >
+                {/* Match Front/Curve layout structure */}
+                <motion.div layout className="flex items-center overflow-hidden">
+                  <motion.div layout="position">
+                    <ToggleGroup 
+                      type="single" 
+                      value={String(visibleRows)}
+                      onValueChange={(val) => val && setVisibleRows(Number(val) as 3 | 4)}
+                      className="bg-muted/50 p-0.5 rounded-md border border-white/5"
+                    >
+                      <ToggleGroupItem value="3" size="sm" className="h-6 px-2 font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                        3
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="4" size="sm" className="h-6 px-2 font-mono data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                        4
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <motion.div layoutId="header-auth" layout="position" className="will-change-transform">
             <AuthIndicator align="right" />
           </motion.div>

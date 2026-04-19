@@ -1,14 +1,9 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
-import { MarketMover } from "@/components/terminal/_shared/mock-data";
-
-// Timeframe options
-export const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
-export type Timeframe = (typeof TIMEFRAMES)[number];
-
-// Max comparison symbols
-export const MAX_COMPARISONS = 3;
+import { useMemo } from "react";
+import type { ReactNode } from "react";
+import type { SpreadLeg, SpreadPresetId, Timeframe } from "@/types/ticker.types";
+import { useTickerStore } from "@/store/use-ticker-store";
 
 // Symbol colors for chart overlay
 export const SYMBOL_COLORS = [
@@ -18,114 +13,96 @@ export const SYMBOL_COLORS = [
   "#8b5cf6", // violet
 ] as const;
 
-interface TickerModalContextValue {
-  // Modal state
+interface TickerModalState {
   isOpen: boolean;
-  ticker: MarketMover | null;
-  open: (ticker: MarketMover) => void;
+  primarySymbol: string | null;
+  comparisons: string[];
+  spreadLegs: SpreadLeg[];
+  open: (input: string | { ticker: string }) => void;
   close: () => void;
 
-  // Chart state
   timeframe: Timeframe;
   setTimeframe: (tf: Timeframe) => void;
-  comparisons: string[]; // Additional tickers to overlay
-  addComparison: (ticker: string) => void;
-  removeComparison: (ticker: string) => void;
-  clearComparisons: () => void;
-
-  // Sidebar state
   isSidebarOpen: boolean;
   toggleSidebar: () => void;
+  setSidebarOpen: (open: boolean) => void;
+  showSessionLevels: boolean;
+  toggleShowSessionLevels: () => void;
+
+  addComparison: (symbol: string) => void;
+  removeComparison: (symbol: string) => void;
+  reorderSelection: (order: string[]) => void;
+
+  spreadEnabled: boolean;
+  spreadPreset: SpreadPresetId;
+  setSpreadEnabled: (enabled: boolean) => void;
+  toggleSpreadLegSign: (symbol: string) => void;
+  moveSpreadLeg: (symbol: string, direction: -1 | 1) => void;
+  reverseSpreadLegs: () => void;
+  applySpreadPreset: (preset: SpreadPresetId) => void;
 }
 
-const TickerModalContext = createContext<TickerModalContextValue | undefined>(undefined);
+export function useTickerModal(): TickerModalState {
+  const mode = useTickerStore((state) => state.mode);
+  const selection = useTickerStore((state) => state.selectionByMode[mode]);
+  const isOpen = useTickerStore((state) => state.isModalOpen);
+  const openPrimary = useTickerStore((state) => state.openPrimary);
+  const close = useTickerStore((state) => state.closeModal);
+  const timeframe = useTickerStore((state) => state.timeframe);
+  const setTimeframe = useTickerStore((state) => state.setTimeframe);
+  const isSidebarOpen = useTickerStore((state) => state.isSidebarOpen);
+  const toggleSidebar = useTickerStore((state) => state.toggleSidebar);
+  const setSidebarOpen = useTickerStore((state) => state.setSidebarOpen);
+  const showSessionLevels = useTickerStore((state) => state.showSessionLevels);
+  const toggleShowSessionLevels = useTickerStore((state) => state.toggleShowSessionLevels);
+  const addComparison = useTickerStore((state) => state.addComparison);
+  const removeComparison = useTickerStore((state) => state.removeComparison);
+  const reorderSelection = useTickerStore((state) => state.reorderSelection);
+  const setSpreadEnabled = useTickerStore((state) => state.setSpreadEnabled);
+  const toggleSpreadLegSign = useTickerStore((state) => state.toggleSpreadLegSign);
+  const moveSpreadLeg = useTickerStore((state) => state.moveSpreadLeg);
+  const reverseSpreadLegs = useTickerStore((state) => state.reverseSpreadLegs);
+  const applySpreadPreset = useTickerStore((state) => state.applySpreadPreset);
 
-export function useTickerModal() {
-  const context = useContext(TickerModalContext);
-  if (!context) {
-    throw new Error("useTickerModal must be used within a TickerModalProvider");
-  }
-  return context;
-}
+  const open = (input: string | { ticker: string }) => {
+    const symbol = typeof input === "string" ? input : input.ticker;
+    if (symbol) {
+      openPrimary(symbol);
+    }
+  };
 
-interface TickerModalProviderProps {
-  children: ReactNode;
-}
-
-export function TickerModalProvider({ children }: TickerModalProviderProps) {
-  // Modal state
-  const [isOpen, setIsOpen] = useState(false);
-  const [ticker, setTicker] = useState<MarketMover | null>(null);
-
-  // Chart state
-  const [timeframe, setTimeframe] = useState<Timeframe>("1h");
-  const [comparisons, setComparisons] = useState<string[]>([]);
-
-  // Sidebar state
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-  const open = useCallback((newTicker: MarketMover) => {
-    setTicker(newTicker);
-    setComparisons([]); // Clear comparisons when opening new ticker
-    setIsOpen(true);
-  }, []);
-
-  const close = useCallback(() => {
-    setIsOpen(false);
-    setTimeout(() => {
-      setTicker(null);
-      setComparisons([]);
-    }, 300);
-  }, []);
-
-  const addComparison = useCallback((tickerSymbol: string) => {
-    setComparisons((prev) => {
-      if (prev.includes(tickerSymbol) || prev.length >= MAX_COMPARISONS) return prev;
-      return [...prev, tickerSymbol];
-    });
-  }, []);
-
-  const removeComparison = useCallback((tickerSymbol: string) => {
-    setComparisons((prev) => prev.filter((t) => t !== tickerSymbol));
-  }, []);
-
-  const clearComparisons = useCallback(() => {
-    setComparisons([]);
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    setIsSidebarOpen((prev) => !prev);
-  }, []);
-
-  const value = useMemo(
-    () => ({
-      isOpen,
-      ticker,
-      open,
-      close,
-      timeframe,
-      setTimeframe,
-      comparisons,
-      addComparison,
-      removeComparison,
-      clearComparisons,
-      isSidebarOpen,
-      toggleSidebar,
-    }),
-    [
-      isOpen,
-      ticker,
-      open,
-      close,
-      timeframe,
-      comparisons,
-      addComparison,
-      removeComparison,
-      clearComparisons,
-      isSidebarOpen,
-      toggleSidebar,
-    ]
+  const comparisons = useMemo(
+    () => selection.selected.filter((symbol) => symbol !== selection.primary),
+    [selection.selected, selection.primary],
   );
 
-  return <TickerModalContext.Provider value={value}>{children}</TickerModalContext.Provider>;
+  return {
+    isOpen,
+    primarySymbol: selection.primary,
+    comparisons,
+    spreadLegs: selection.spreadLegs,
+    open,
+    close,
+    timeframe,
+    setTimeframe,
+    isSidebarOpen,
+    toggleSidebar,
+    setSidebarOpen,
+    showSessionLevels,
+    toggleShowSessionLevels,
+    addComparison,
+    removeComparison,
+    reorderSelection,
+    spreadEnabled: selection.spreadEnabled,
+    spreadPreset: selection.spreadPreset,
+    setSpreadEnabled,
+    toggleSpreadLegSign,
+    moveSpreadLeg,
+    reverseSpreadLegs,
+    applySpreadPreset,
+  };
+}
+
+export function TickerModalProvider({ children }: { children: ReactNode }) {
+  return <>{children}</>;
 }

@@ -5,5 +5,5 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["src/**", "public/**", "package.json", "bun.lock", "Dockerfile", "next.config.ts"]
 
 [deploy]
-healthcheckPath = "/"
+healthcheckPath = "/waitlist"
 restartPolicyType = "ON_FAILURE"

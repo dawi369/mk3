@@ -1,12 +1,13 @@
 import { CronJob } from "cron";
 import { redisStore } from "@/server/data/redis_store.js";
-import type { PolygonWSClient } from "@/server/api/polygon/ws_client.js";
-import type { PolygonAssetClass, PolygonWsRequest } from "@/types/polygon.types.js";
+import type { MassiveWSClient } from "@/server/api/massive/ws_client.js";
+import type { MassiveAssetClass, MassiveWsRequest } from "@/types/massive.types.js";
 import type { RefreshJobStatus, RefreshDetails } from "@/types/common.types.js";
 import { scheduleBuilder } from "@/utils/cbs/schedule_cb.js";
 
 class MonthlySubscriptionJob {
-  private wsClient: PolygonWSClient | null = null;
+  private cronJob: CronJob | null = null;
+  private wsClient: MassiveWSClient | null = null;
   private status: RefreshJobStatus = {
     lastRunTime: null,
     lastSuccess: false,
@@ -39,16 +40,20 @@ class MonthlySubscriptionJob {
     }
   }
 
+  attachClient(wsClient: MassiveWSClient): void {
+    this.wsClient = wsClient;
+  }
+
   private findSubscriptionByAssetClass(
-    subscriptions: PolygonWsRequest[],
-    assetClass: PolygonAssetClass,
+    subscriptions: MassiveWsRequest[],
+    assetClass: MassiveAssetClass,
     eventType: "A" | "AM"
-  ): PolygonWsRequest | undefined {
+  ): MassiveWsRequest | undefined {
     return subscriptions.find((sub) => sub.assetClass === assetClass && sub.ev === eventType);
   }
 
   private async refreshAssetClass(
-    assetClass: PolygonAssetClass,
+    assetClass: MassiveAssetClass,
     eventType: "A" | "AM"
   ): Promise<RefreshDetails> {
     const details: RefreshDetails = {
@@ -126,7 +131,7 @@ class MonthlySubscriptionJob {
     this.status.lastRefreshDetails = [];
 
     const refreshTasks: Promise<RefreshDetails>[] = [];
-    const assetClasses: PolygonAssetClass[] = [
+    const assetClasses: MassiveAssetClass[] = [
       "us_indices",
       "metals",
       "currencies",
@@ -143,7 +148,6 @@ class MonthlySubscriptionJob {
       // But let's assume config is > 0.
 
       refreshTasks.push(this.refreshAssetClass(assetClass, "A"));
-      // refreshTasks.push(this.refreshAssetClass(assetClass, "AM"));
     }
 
     // Execute all refreshes
@@ -168,6 +172,13 @@ class MonthlySubscriptionJob {
       console.log("✓ Refresh completed successfully");
     }
 
+    if (this.wsClient) {
+      const nextSymbols = this.wsClient
+        .getSubscriptions()
+        .flatMap((subscription) => subscription.symbols);
+      await redisStore.setSubscribedSymbols(nextSymbols);
+    }
+
     await this.saveStatus();
 
     // Summary
@@ -182,11 +193,15 @@ class MonthlySubscriptionJob {
     return { ...this.status };
   }
 
-  schedule(wsClient: PolygonWSClient): void {
+  schedule(wsClient: MassiveWSClient): void {
     this.wsClient = wsClient;
 
+    if (this.cronJob) {
+      return;
+    }
+
     // Run at 00:05 ET on the 1st of every month
-    new CronJob(
+    this.cronJob = new CronJob(
       "5 0 1 * *",
       async () => {
         await this.runRefresh();
@@ -197,6 +212,11 @@ class MonthlySubscriptionJob {
     );
 
     console.log("Monthly subscription refresh job scheduled (1st of month @ 00:05 ET)");
+  }
+
+  stopSchedule(): void {
+    this.cronJob?.stop();
+    this.cronJob = null;
   }
 }
 
