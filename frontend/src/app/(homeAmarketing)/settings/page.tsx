@@ -6,7 +6,6 @@ import { User, Bell, Monitor, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -163,7 +162,7 @@ export default function SettingsPage() {
                         className="bg-muted/50"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Email cannot be changed here.
+                        Email cannot be changed here. Contact support.
                       </p>
                     </div>
                   </CardContent>
@@ -193,21 +192,15 @@ export default function SettingsPage() {
                   <CardContent className="space-y-6">
                     <div className="flex items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <Label className="text-base">Dark Mode</Label>
+                        <Label className="text-base">Theme Mode</Label>
                         <p className="text-sm text-muted-foreground">
-                          Toggle between light and dark themes.
+                          Dark mode is active. Light mode is coming soon.
                         </p>
                       </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Reduced Motion</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Minimize animations for a simpler experience.
-                        </p>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-foreground">Dark</p>
+                        <p className="text-xs text-muted-foreground">Light mode coming soon</p>
                       </div>
-                      <Switch />
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-end border-t p-6">
@@ -221,37 +214,42 @@ export default function SettingsPage() {
                   <CardHeader>
                     <CardTitle>Notifications</CardTitle>
                     <CardDescription>
-                      Configure how you want to be notified about activity.
+                      Notification controls are coming soon.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-muted-foreground">
-                        Email Notifications
-                      </h3>
-                      <Separator />
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="marketing-emails" className="flex flex-col gap-1">
-                          <span>Marketing emails</span>
-                          <span className="font-normal text-muted-foreground">
-                            Receive emails about new features and offers.
-                          </span>
-                        </Label>
-                        <Switch id="marketing-emails" />
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                          Email Notifications
+                        </h3>
+                        <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Coming soon
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="security-emails" className="flex flex-col gap-1">
-                          <span>Security emails</span>
-                          <span className="font-normal text-muted-foreground">
-                            Receive emails about your account security.
-                          </span>
-                        </Label>
-                        <Switch id="security-emails" defaultChecked disabled />
+                      <Separator />
+                      <div className="flex items-start justify-between gap-6 rounded-lg border p-4">
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">Marketing emails</p>
+                          <p className="text-sm text-muted-foreground">
+                            Product updates and launch announcements.
+                          </p>
+                        </div>
+                        <span className="text-sm text-muted-foreground">Off</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-6 rounded-lg border p-4">
+                        <div className="space-y-1">
+                          <p className="font-medium text-foreground">Security emails</p>
+                          <p className="text-sm text-muted-foreground">
+                            Account access and security notices.
+                          </p>
+                        </div>
+                        <span className="text-sm text-muted-foreground">Always on</span>
                       </div>
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-end border-t p-6">
-                    <Button>Update Notifications</Button>
+                    <Button disabled>Coming Soon</Button>
                   </CardFooter>
                 </Card>
               </TabsContent>

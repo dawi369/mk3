@@ -1,11 +1,19 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, X, Sparkles, Zap, Fish } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  Check,
+  CircleDashed,
+  PauseCircle,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { TierInfo, SubscriptionTier, Subscription } from "@/types/billing.types";
+import type { SubscriptionTier, Subscription } from "@/types/billing.types";
 import { TIER_CONFIG, isSubscriptionActive } from "@/types/billing.types";
 
 interface PlanCardProps {
@@ -15,6 +23,53 @@ interface PlanCardProps {
   onManage?: () => void;
   className?: string;
   ctaLabel?: string;
+}
+
+function getStatusCopy(subscription: Subscription | null) {
+  const status = subscription?.status;
+
+  if (status === "trialing") {
+    return {
+      label: "Trial Running",
+      tone: "text-amber",
+      note: "Full desk access is live while the trial clock runs.",
+      icon: CalendarClock,
+    };
+  }
+
+  if (status === "paused") {
+    return {
+      label: "Paused",
+      tone: "text-yellow-500",
+      note: "Account state is parked until billing resumes.",
+      icon: PauseCircle,
+    };
+  }
+
+  if (status === "past_due" || status === "unpaid" || status === "incomplete") {
+    return {
+      label: "Action Needed",
+      tone: "text-red",
+      note: "Billing needs attention before Pro access is reliable.",
+      icon: ShieldAlert,
+    };
+  }
+
+  if (status === "canceled") {
+    return {
+      label: "Ending",
+      tone: "text-muted-foreground",
+      note: "Access remains available until the current cycle closes.",
+      icon: CircleDashed,
+    };
+  }
+
+  return {
+    label: "Active",
+    tone: "text-green",
+    note: "Subscription is active and in good standing.",
+    icon: ShieldCheck,
+  };
 }
 
 export function PlanCard({
@@ -30,91 +85,130 @@ export function PlanCard({
   const isPro = tier === "pro";
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-card p-6 transition-colors duration-200",
-        isPro ? "border-primary/30 bg-linear-to-br from-card to-primary/5" : "border-border",
-        isCurrentPlan && "ring-2 ring-primary/30",
+        "relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02)_38%,rgba(0,0,0,0.22))] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur-xl",
+        "before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top_left,rgba(247,181,0,0.18),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.05),transparent_34%)] before:content-['']",
+        "after:pointer-events-none after:absolute after:inset-x-0 after:top-0 after:h-px after:bg-white/15 after:content-['']",
+        !isPro && "bg-[linear-gradient(160deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015)_40%,rgba(0,0,0,0.18))]",
+        isCurrentPlan && "ring-1 ring-white/20",
         className
       )}
     >
-      {/* Popular Badge */}
-      {config.popular && (
-        <div className="absolute -right-8 top-4 rotate-45 bg-primary px-10 py-1 text-xs font-medium text-primary-foreground">
-          Popular
+      <div className="relative space-y-6">
+        <div className="space-y-3">
+          <div>
+            <h3 className="font-space text-3xl font-semibold tracking-[-0.04em] text-white">
+              {config.name}
+            </h3>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-white/58">
+              {isPro ? "Live terminal access." : config.description}
+            </p>
+          </div>
         </div>
-      )}
 
-      {/* Header */}
-      <div className="mb-4 flex items-center gap-2">
-        {/* {isPro ? (
-          <Fish className="h-5 w-5 text-primary" />
+        <div className="rounded-[22px] border border-white/10 bg-black/22 p-5">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-white/42">
+                Monthly Rate
+              </p>
+              <div className="mt-3 flex items-end gap-2">
+                <span className="font-space text-6xl font-semibold leading-none tracking-[-0.06em] text-white [font-variant-numeric:tabular-nums]">
+                  {config.priceDisplay}
+                </span>
+                <span className="pb-2 text-sm uppercase tracking-[0.2em] text-white/48">
+                  / {config.interval}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/42">
+                Terms
+              </p>
+              <p className="mt-1 text-sm font-medium text-white/86">
+                {isCurrentPlan ? "Current" : isPro ? "7-day trial" : "Invite only"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {config.features.map((feature, index) => (
+            <div
+              key={`${feature.name}-${index}`}
+              className={cn(
+                "flex min-w-0 items-start gap-3 rounded-2xl border px-4 py-3",
+                feature.included
+                  ? "border-white/10 bg-white/5 text-white"
+                  : "border-white/8 bg-black/10 text-white/38"
+              )}
+            >
+              <div
+                className={cn(
+                  "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+                  feature.included
+                    ? "border-amber/30 bg-amber/12 text-amber"
+                    : "border-white/10 bg-white/4 text-white/35"
+                )}
+              >
+                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-5">{feature.name}</p>
+                {feature.limit && (
+                  <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/42">
+                    {feature.limit}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {ctaLabel ? (
+          <Button
+            className="h-12 w-full rounded-2xl bg-white text-black hover:bg-white/92"
+            onClick={onUpgrade}
+          >
+            {ctaLabel}
+            <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+          </Button>
+        ) : isCurrentPlan ? (
+          <Button
+            variant="outline"
+            className="h-12 w-full rounded-2xl border-white/14 bg-white/4 text-white hover:bg-white/8 hover:text-white"
+            onClick={onManage}
+            disabled={tier === "free"}
+          >
+            {tier === "free" ? "Current Plan" : "Manage Subscription"}
+          </Button>
         ) : (
-          <Zap className="h-5 w-5 text-muted-foreground" />
-        )} */}
-        <h3 className="text-xl font-semibold text-foreground">{config.name}</h3>
-        {isCurrentPlan && (
-          <Badge variant="secondary" className="ml-auto">
-            Current Plan
-          </Badge>
+          <Button
+            className={cn(
+              "h-12 w-full rounded-2xl",
+              isPro
+                ? "bg-white text-black hover:bg-white/92"
+                : "border border-white/14 bg-white/4 text-white hover:bg-white/8"
+            )}
+            onClick={onUpgrade}
+          >
+            {isPro ? "Start Pro Trial" : "Return To Free"}
+            <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+          </Button>
+        )}
+
+        {isCurrentPlan && subscription?.cancelAtPeriodEnd && (
+          <p className="text-center text-xs uppercase tracking-[0.2em] text-amber">
+            Subscription ends at the close of the current cycle
+          </p>
         )}
       </div>
-
-      {/* Price */}
-      <div className="mb-4">
-        <span className="text-4xl font-bold text-foreground">{config.priceDisplay}</span>
-        <span className="text-muted-foreground">/{config.interval}</span>
-      </div>
-
-      {/* Description */}
-      <p className="mb-6 text-sm text-muted-foreground">{config.description}</p>
-
-      {/* Features */}
-      <ul className="mb-6 space-y-3">
-        {config.features.map((feature, index) => (
-          <li key={index} className="flex items-center gap-2 text-sm">
-            {feature.included ? (
-              <Check className="h-4 w-4 text-green" />
-            ) : (
-              <X className="h-4 w-4 text-muted-foreground/50" />
-            )}
-            <span className={cn(feature.included ? "text-foreground" : "text-muted-foreground/50")}>
-              {feature.name}
-              {feature.limit && (
-                <span className="ml-1 text-xs text-muted-foreground">({feature.limit})</span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {/* Action Button */}
-      {ctaLabel ? (
-        <Button
-          variant={isPro ? "default" : "outline"}
-          className="w-full"
-          onClick={onUpgrade}
-        >
-          {ctaLabel}
-        </Button>
-      ) : isCurrentPlan ? (
-        <Button variant="outline" className="w-full" onClick={onManage} disabled={tier === "free"}>
-          {tier === "free" ? "Current Plan" : "Manage Subscription"}
-        </Button>
-      ) : (
-        <Button variant={isPro ? "default" : "outline"} className="w-full" onClick={onUpgrade}>
-          {isPro ? "Upgrade to Pro" : "Downgrade to Free"}
-        </Button>
-      )}
-
-      {/* Cancel Info */}
-      {isCurrentPlan && subscription?.cancelAtPeriodEnd && (
-        <p className="mt-3 text-center text-xs text-amber">Cancels at end of billing period</p>
-      )}
-    </motion.div>
+    </motion.section>
   );
 }
 
@@ -126,7 +220,6 @@ interface CurrentPlanSummaryProps {
 export function CurrentPlanSummary({ subscription, className }: CurrentPlanSummaryProps) {
   const tier = subscription?.tier || "free";
   const config = TIER_CONFIG[tier];
-  
   const status = subscription?.status;
   const isTrialing = status === "trialing";
   const isPaused = status === "paused";
@@ -136,149 +229,94 @@ export function CurrentPlanSummary({ subscription, className }: CurrentPlanSumma
   const isIncomplete = status === "incomplete";
   const isActive = isSubscriptionActive(subscription);
 
-  let badgeVariant = "outline";
-  let badgeStyles = "border-transparent px-2.5 py-0.5 text-xs font-semibold shadow-none transition-colors";
-  let badgeLabel = "Active";
+  const statusTone = isPastDue || isUnpaid
+    ? "text-red"
+    : isTrialing
+      ? "text-amber"
+      : isPaused
+        ? "text-yellow-500"
+        : isIncomplete
+          ? "text-amber"
+          : "text-green";
 
-  if (isTrialing) {
-    badgeStyles += " bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-    badgeLabel = "Trial Active";
-  } else if (isPaused) {
-    badgeStyles += " bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
-    badgeLabel = "Paused";
-  } else if (isCanceled) {
-    badgeStyles += " bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400";
-    badgeLabel = "Canceled";
-  } else if (isPastDue || isUnpaid) {
-    badgeStyles += " bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-    badgeLabel = isPastDue ? "Past Due" : "Unpaid";
-  } else if (isIncomplete) {
-    badgeStyles += " bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-    badgeLabel = "Incomplete";
-  } else {
-    // Default Active
-    badgeStyles += " bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-  }
+  const statusLabel = isTrialing
+    ? "Trial Running"
+    : isPaused
+      ? "Paused"
+      : isCanceled
+        ? "Canceled"
+        : isPastDue
+          ? "Past Due"
+          : isUnpaid
+            ? "Unpaid"
+            : isIncomplete
+              ? "Incomplete"
+              : "Active";
+
+  const cycleLabel = isTrialing
+    ? "Trial ends"
+    : subscription?.cancelAtPeriodEnd || isCanceled
+      ? "Access until"
+      : isPastDue || isUnpaid
+        ? "Payment due"
+        : isIncomplete
+          ? "Setup expires"
+          : "Renews on";
 
   return (
-    <div className={cn("rounded-xl border bg-card p-6 shadow-sm", className)}>
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">Current Plan</p>
-          <div className="mt-1 flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-foreground">{config.name}</h2>
+    <section
+      className={cn(
+        "relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02)_35%,rgba(0,0,0,0.18))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.24)]",
+        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/12 before:content-['']",
+        className
+      )}
+    >
+      <div className="relative space-y-6">
+        <div className="space-y-3">
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-white/42">
+            Current Plan
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="font-space text-4xl font-semibold tracking-[-0.05em] text-white">
+              {config.name}
+            </h2>
             {tier !== "free" && (
-              <Badge variant="outline" className={badgeStyles}>
-                {badgeLabel}
+              <Badge className={cn("rounded-full border border-transparent px-3 py-1 text-[10px] uppercase tracking-[0.2em] shadow-none", statusTone, "bg-white/6")}>
+                {statusLabel}
               </Badge>
-            )}
-            {/* Show canceled badge separately if active but scheduled to cancel */}
-            {subscription?.cancelAtPeriodEnd && !isCanceled && (
-              <Badge variant="secondary">Cancels soon</Badge>
             )}
           </div>
         </div>
-        
-        {tier !== "free" && (
-          <div className="text-left sm:text-right">
-            <p className="text-sm font-medium text-muted-foreground">Price</p>
-            <p className="mt-1 text-2xl font-bold text-foreground">
-              {config.priceDisplay}
-              <span className="text-sm font-normal text-muted-foreground">/{config.interval}</span>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/42">
+              {cycleLabel}
+            </p>
+            <p className="mt-3 text-sm font-medium text-white/86">
+              {subscription?.currentPeriodEnd && tier !== "free"
+                ? new Intl.DateTimeFormat("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  }).format(new Date(subscription.currentPeriodEnd))
+                : "No scheduled billing cycle"}
             </p>
           </div>
-        )}
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/42">
+              Access
+            </p>
+            <p className="mt-3 text-sm font-medium text-white/86">
+              {isActive ? "Enabled" : "Limited"}
+            </p>
+            <p className="mt-1 text-sm text-white/58">
+              {isActive ? "Terminal access is available." : "Terminal access is not fully active."}
+            </p>
+          </div>
+        </div>
       </div>
-
-      <div className="mt-8 grid gap-4 border-t pt-6 sm:grid-cols-2">
-        {subscription?.currentPeriodEnd && tier !== "free" && (
-          <div>
-            <p className="text-sm text-muted-foreground">
-              {isTrialing 
-                ? "Trial ends and renews on" 
-                : (subscription.cancelAtPeriodEnd || isCanceled)
-                  ? "Access until"
-                  : (isPastDue || isUnpaid)
-                    ? "Payment due"
-                    : isIncomplete
-                      ? "Setup expires"
-                      : "Renews on"}
-            </p>
-            <p className="mt-1 font-medium text-foreground">
-              {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-          </div>
-        )}
-
-        {/* Status Banners - utilizing free space */}
-        {isPastDue && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-red-500 dark:text-red-400">Payment failed</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Update payment info to keep Pro access.
-            </p>
-          </div>
-        )}
-
-        {isUnpaid && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-red-500 dark:text-red-400">Payment failed</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Update payment info to renew Pro access.
-            </p>
-          </div>
-        )}
-        
-        {isPaused && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">On hold</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your subscription is currently paused.
-            </p>
-          </div>
-        )}
-
-        {isIncomplete && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Setup incomplete</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Please finish setting up your payment.
-            </p>
-          </div>
-        )}
-
-        {isCanceled && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-muted-foreground">Set to expire</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Enjoy your time left. We'll be here when you're ready.
-            </p>
-          </div>
-        )}
-
-        {status === "active" && !subscription?.cancelAtPeriodEnd && tier !== "free" && !isPaused && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">All systems go</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your subscription is active and automated.
-            </p>
-          </div>
-        )}
-
-        
-        {isTrialing && tier !== "free" && (
-           <div className="sm:text-right">
-            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">Test drive active</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Experience the full power of Pro.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+    </section>
   );
 }

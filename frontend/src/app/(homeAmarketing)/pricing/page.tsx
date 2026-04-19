@@ -30,18 +30,16 @@ export default function PricingPage() {
     <div className="min-h-screen relative">
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-24">
         <motion.div initial="initial" animate="animate" variants={ANIMATION_CONFIG.stagger}>
-          {/* Header */}
           <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="mb-16 text-center">
-            <h1 className="text-4xl font-bold font-space tracking-tight text-foreground md:text-5xl">
-              Simple, Transparent Pricing
+            <h1 className="mx-auto max-w-4xl text-balance font-space text-4xl font-semibold tracking-[-0.05em] text-foreground md:text-6xl">
+              One plan. Full access.
             </h1>
-            <p className="mt-4 text-xl text-muted-foreground max-w-2xl mx-auto">
-              Everything you need. No hidden fees, cancel anytime.
+            <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
+              Pro unlocks the live Swordfish terminal.
             </p>
           </motion.div>
 
-          {/* Pricing Cards */}
-          <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="flex justify-center max-w-md mx-auto">
+          <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="mx-auto flex max-w-3xl justify-center">
             <PlanCard
               tier="pro"
               ctaLabel="Start 7-day free trial"
@@ -50,10 +48,12 @@ export default function PricingPage() {
             />
           </motion.div>
 
-          {/* FAQ or Trust Section could go here */}
           <motion.div variants={ANIMATION_CONFIG.fadeInUp} className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Have questions? <a href="mailto:support@swordfish.com" className="underline underline-offset-4 hover:text-foreground">Contact support</a>
+              Have questions?{" "}
+              <a href="mailto:support@swordfish.com" className="underline underline-offset-4 hover:text-foreground">
+                Contact support
+              </a>
             </p>
           </motion.div>
         </motion.div>
