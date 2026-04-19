@@ -3,6 +3,7 @@ import { MassiveWSClient } from "@/server/api/massive/ws_client.js";
 import { redisStore } from "@/server/data/redis_store.js";
 import { timescaleStore } from "@/server/data/timescale_store.js";
 import { recoveryService } from "@/services/recovery_service.js";
+import * as massiveUtils from "@/utils/massive.utils.js";
 import type { Bar } from "@/types/common.types.js";
 
 function createBar(symbol: string, startTime: number): Bar {
@@ -168,5 +169,45 @@ describe("MassiveWSClient", () => {
     expect(client.getSubscriptions()).toHaveLength(1);
     const firstPayload = String((send as any).mock.calls[0][0]);
     expect(firstPayload).toContain('"params":"A.ESH9,A.NQH9"');
+  });
+
+  test("forces reconnect when a subscribed connection is stale during market hours", () => {
+    const client = new MassiveWSClient();
+    (client as any).state = "subscribed";
+    (client as any).subscriptions = [
+      { ev: "A", symbols: ["ESH9"], assetClass: "us_indices" },
+    ];
+    (client as any).health.lastMessageTime = 1_000;
+    const reconnectSpy = spyOn(client as any, "forceReconnect").mockImplementation(
+      () => undefined,
+    );
+    spyOn(massiveUtils, "isMarketHours").mockReturnValue({
+      isOpen: true,
+      reason: "Regular session",
+    } as any);
+
+    (client as any).checkConnectionLiveness(95_000);
+
+    expect(reconnectSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not force reconnect for stale connections while market is closed", () => {
+    const client = new MassiveWSClient();
+    (client as any).state = "subscribed";
+    (client as any).subscriptions = [
+      { ev: "A", symbols: ["ESH9"], assetClass: "us_indices" },
+    ];
+    (client as any).health.lastMessageTime = 1_000;
+    const reconnectSpy = spyOn(client as any, "forceReconnect").mockImplementation(
+      () => undefined,
+    );
+    spyOn(massiveUtils, "isMarketHours").mockReturnValue({
+      isOpen: false,
+      reason: "Weekend closure",
+    } as any);
+
+    (client as any).checkConnectionLiveness(95_000);
+
+    expect(reconnectSpy).not.toHaveBeenCalled();
   });
 });

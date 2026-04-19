@@ -29,6 +29,11 @@ const WS_TIMEOUT = {
   UNSUBSCRIBE: 10000,
 } as const;
 
+const WS_LIVENESS = {
+  CHECK_INTERVAL_MS: 15_000,
+  STALE_AFTER_MS: 90_000,
+} as const;
+
 /**
  * Wrap a promise with a timeout
  */
@@ -146,6 +151,7 @@ export class MassiveWSClient {
           this.health.connected = true;
           this.state = ConnectionState.CONNECTED;
           this.reconnectAttempts = 0;
+          this.startLivenessMonitor();
 
           // Resolve the auth promise to allow connect() to return
           if (this.authResolver) {
@@ -158,6 +164,7 @@ export class MassiveWSClient {
         if (m.status === "success" && m.message?.includes("subscribed to:")) {
           this.state = ConnectionState.SUBSCRIBED;
           this.health.connected = true;
+          this.startLivenessMonitor();
           // Resolve the subscribe promise
           if (this.subscribeResolver) {
             this.subscribeResolver();
@@ -408,6 +415,81 @@ export class MassiveWSClient {
     }
   }
 
+  private startLivenessMonitor(): void {
+    if (this.heartbeatTimer) {
+      return;
+    }
+
+    this.heartbeatTimer = setInterval(() => {
+      this.checkConnectionLiveness();
+    }, WS_LIVENESS.CHECK_INTERVAL_MS);
+  }
+
+  private stopLivenessMonitor(): void {
+    if (!this.heartbeatTimer) {
+      return;
+    }
+
+    clearInterval(this.heartbeatTimer);
+    this.heartbeatTimer = null;
+  }
+
+  private checkConnectionLiveness(nowMs = Date.now()): void {
+    if (this.state !== ConnectionState.SUBSCRIBED) {
+      return;
+    }
+
+    if (this.subscriptions.length === 0) {
+      return;
+    }
+
+    const lastMessageTime = this.health.lastMessageTime;
+    if (!lastMessageTime) {
+      return;
+    }
+
+    const marketStatus = isMarketHours();
+    if (!marketStatus.isOpen) {
+      return;
+    }
+
+    if (nowMs - lastMessageTime <= WS_LIVENESS.STALE_AFTER_MS) {
+      return;
+    }
+
+    console.warn(
+      `[MassiveWSClient] Connection stale for ${nowMs - lastMessageTime}ms during market hours; forcing reconnect`,
+    );
+    this.forceReconnect();
+  }
+
+  private forceReconnect(): void {
+    if (this.state === ConnectionState.RECONNECTING) {
+      return;
+    }
+
+    const wasLive =
+      this.state === ConnectionState.SUBSCRIBED ||
+      this.state === ConnectionState.CONNECTED;
+
+    if (wasLive) {
+      this.lastDisconnectAt = Date.now();
+    }
+
+    this.health.connected = false;
+    this.state = ConnectionState.DISCONNECTED;
+    this.stopLivenessMonitor();
+
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.close();
+      this.ws = null;
+    }
+
+    this.scheduleReconnect();
+  }
+
   private scheduleReconnect(): void {
     if (this.reconnectTimer || this.state === ConnectionState.RECONNECTING) {
       return;
@@ -444,6 +526,7 @@ export class MassiveWSClient {
     console.log("Attempting reconnect...");
     this.recoveryPhase = "buffering";
     this.recoveryBuffer = [];
+    this.stopLivenessMonitor();
 
     // Clean up old connection before creating new one
     if (this.ws) {
