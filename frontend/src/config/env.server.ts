@@ -14,13 +14,16 @@ function getOptionalEnv(name: string, value: string | undefined): string | undef
   return value && value.length > 0 ? value : undefined;
 }
 
-// Resend email configuration
-export const RESEND_API_KEY = requireEnv("RESEND_API_KEY", process.env.RESEND_API_KEY);
+// Email configuration is required lazily by email-sending routes/actions.
+// Keeping it lazy prevents unrelated API routes from failing during Next build
+// when the email provider is not configured in the build environment.
+export function getResendApiKey(): string {
+  return requireEnv("RESEND_API_KEY", process.env.RESEND_API_KEY);
+}
 
-export const FEATURE_REQUEST_EMAIL = requireEnv(
-  "FEATURE_REQUEST_EMAIL",
-  process.env.FEATURE_REQUEST_EMAIL
-);
+export function getFeatureRequestEmail(): string {
+  return requireEnv("FEATURE_REQUEST_EMAIL", process.env.FEATURE_REQUEST_EMAIL);
+}
 
 export const MASSIVE_API_KEY = getOptionalEnv("MASSIVE_API_KEY", process.env.MASSIVE_API_KEY);
 export const MASSIVE_API_URL =
