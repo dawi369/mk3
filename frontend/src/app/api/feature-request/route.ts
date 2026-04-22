@@ -1,16 +1,14 @@
 import { Resend } from "resend";
 import { NextResponse } from "next/server";
 import {
-  FEATURE_REQUEST_EMAIL,
   FEATURE_REQUEST_RATE_LIMIT_MAX,
   FEATURE_REQUEST_RATE_LIMIT_WINDOW_MS,
-  RESEND_API_KEY,
+  getFeatureRequestEmail,
+  getResendApiKey,
 } from "@/config/env.server";
 import { createClient } from "@/utils/supabase/server";
 import type { SubscriptionRow } from "@/types/billing.types";
 import { enforceRateLimit, isValidEmail } from "@/lib/server/request-guard";
-
-const resend = new Resend(RESEND_API_KEY);
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "N/A";
@@ -67,9 +65,10 @@ export async function POST(request: Request) {
       }
     }
 
+    const resend = new Resend(getResendApiKey());
     const { data, error } = await resend.emails.send({
       from: "Swordfish <onboarding@resend.dev>", // TODO, change to verified domain when we get it
-      to: FEATURE_REQUEST_EMAIL,
+      to: getFeatureRequestEmail(),
       subject: `Swordfish Feature Request from ${normalizedUserName || "Anonymous User"}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
