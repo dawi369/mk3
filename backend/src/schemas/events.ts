@@ -4,15 +4,15 @@ import { z } from "zod";
 export const MassiveAggregateEventSchema = z.object({
   ev: z.literal("A"),
   sym: z.string(),
-  v: z.number(),
-  dv: z.number(),
-  n: z.number(),
-  o: z.number(),
-  c: z.number(),
-  h: z.number(),
-  l: z.number(),
-  s: z.number(),
-  e: z.number(),
+  v: z.coerce.number(),
+  dv: z.coerce.number(),
+  n: z.coerce.number(),
+  o: z.coerce.number(),
+  c: z.coerce.number(),
+  h: z.coerce.number(),
+  l: z.coerce.number(),
+  s: z.coerce.number(),
+  e: z.coerce.number(),
 });
 
 export type MassiveAggregateEvent = z.infer<typeof MassiveAggregateEventSchema>;

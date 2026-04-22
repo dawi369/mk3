@@ -79,5 +79,5 @@ COPY --from=prerelease /app/package.json .
 # Run the app
 USER bun
 EXPOSE 3000/tcp
-# Run the app directly to allow PORT injection
-ENTRYPOINT [ "bun", "run", "next", "start" ]
+# Railway injects PORT at runtime. Keep local package scripts free to use 3010.
+ENTRYPOINT [ "sh", "-c", "bun run next start -H 0.0.0.0 -p ${PORT:-3000}" ]
