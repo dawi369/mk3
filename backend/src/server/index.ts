@@ -34,6 +34,10 @@ async function startHubServer() {
     massiveClient = new MassiveWSClient();
     const futuresMarket: MassiveMarketType = "futures";
 
+    // Expose health and public API before slower market-data warmup so deploy
+    // healthchecks are not blocked by provider latency or backfills.
+    await startHubRESTApi(massiveClient);
+
     await massiveClient.connect(futuresMarket);
 
     // Build requests dynamically using API
@@ -82,9 +86,6 @@ async function startHubServer() {
     await Bun.sleep(1000);
 
     await initializeJobRuntime(massiveClient);
-
-    // Start Hub REST API (pass massive client for subscription management)
-    await startHubRESTApi(massiveClient);
 
     console.log("Hub server running\n");
 

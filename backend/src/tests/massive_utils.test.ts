@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { MassiveAggregateEventSchema } from "@/schemas/events.js";
 import {
   aggregateToBar,
   buildSubscribeParams,
@@ -35,6 +36,35 @@ describe("massive utils", () => {
         e: 2000,
       }),
     ).toEqual({
+      symbol: "ESH9",
+      open: 10,
+      high: 11,
+      low: 9.5,
+      close: 10.5,
+      volume: 100,
+      trades: 12,
+      dollarVolume: 1050,
+      startTime: 1000,
+      endTime: 2000,
+    });
+  });
+
+  test("coerces stringified aggregate numbers from Massive", () => {
+    const event = MassiveAggregateEventSchema.parse({
+      ev: "A",
+      sym: "ESH9",
+      v: "100",
+      dv: "1050",
+      n: "12",
+      o: "10",
+      c: "10.5",
+      h: "11",
+      l: "9.5",
+      s: "1000",
+      e: "2000",
+    });
+
+    expect(aggregateToBar(event)).toEqual({
       symbol: "ESH9",
       open: 10,
       high: 11,

@@ -194,7 +194,7 @@ export class MassiveWSClient {
           return;
         }
 
-        this.handleAggregateBar(aggregateToBar(m));
+        this.handleAggregateBar(aggregateToBar(validation.data));
 
         return;
       }
