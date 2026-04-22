@@ -5,7 +5,7 @@ import { createClient } from "@/utils/supabase/server";
 import { Resend } from "resend";
 import { WaitlistEmail } from "./email-template";
 import {
-  RESEND_API_KEY,
+  getResendApiKey,
   WAITLIST_RATE_LIMIT_MAX,
   WAITLIST_RATE_LIMIT_WINDOW_MS,
 } from "@/config/env.server";
@@ -55,7 +55,7 @@ export async function addToWaitlist(email: string): Promise<WaitlistResult> {
 
   // Send confirmation email via Resend
   try {
-    const resend = new Resend(RESEND_API_KEY);
+    const resend = new Resend(getResendApiKey());
     await resend.emails.send({
       from: "Swordfish <onboarding@resend.dev>", // TODO: Update with your verified domain
       to: normalizedEmail,
