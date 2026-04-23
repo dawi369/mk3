@@ -35,7 +35,8 @@ const STATIC_EXTENSIONS = new Set([
   ".txt",
 ]);
 const WAITLIST_PATH = "/waitlist";
-const HEALTHCHECK_PATH = "/health";
+const AUTH_REFRESH_PREFIXES = ["/terminal", "/billing", "/settings", "/onboarding"];
+const AUTH_REFRESH_PATHS = new Set(["/checkout"]);
 
 function parseHost(hostHeader: string | null): string {
   if (!hostHeader) return "";
@@ -57,6 +58,18 @@ function parseHosts(value: string | undefined): string[] {
     .split(",")
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean);
+}
+
+function shouldRefreshAuth(pathname: string): boolean {
+  const normalizedPath = pathname.toLowerCase();
+
+  if (AUTH_REFRESH_PATHS.has(normalizedPath)) {
+    return true;
+  }
+
+  return AUTH_REFRESH_PREFIXES.some(
+    (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+  );
 }
 
 export async function proxy(request: NextRequest) {
@@ -127,6 +140,10 @@ export async function proxy(request: NextRequest) {
       url.pathname = WAITLIST_PATH;
       return NextResponse.rewrite(url);
     }
+  }
+
+  if (!shouldRefreshAuth(url.pathname)) {
+    return NextResponse.next();
   }
 
   let supabaseResponse = NextResponse.next({
