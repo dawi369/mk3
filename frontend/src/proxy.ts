@@ -74,6 +74,17 @@ function shouldRefreshAuth(pathname: string): boolean {
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
+
+  if (url.pathname === HEALTHCHECK_PATH) {
+    return new Response("ok", {
+      status: 200,
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   const hostname = parseHost(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host")
   );

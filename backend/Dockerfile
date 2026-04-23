@@ -32,6 +32,7 @@ COPY --from=prerelease /app/package.json .
 COPY --from=prerelease /app/tsconfig.json .
 COPY --from=prerelease /app/src src
 COPY --from=prerelease /app/tickers tickers
+RUN mkdir -p runtime/recovery && chown -R bun:bun runtime
 
 # Run the app
 USER bun
