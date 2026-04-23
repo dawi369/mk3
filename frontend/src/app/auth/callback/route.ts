@@ -8,6 +8,11 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   // if "next" is in param, use it as the redirect URL
   const next = searchParams.get("next") ?? "/terminal";
+  const redirectToCompletion = (host: string) => {
+    const completionUrl = new URL("/auth/complete", host);
+    completionUrl.searchParams.set("next", next);
+    return completionUrl;
+  };
 
   if (code) {
     const supabase = await createClient();
@@ -37,11 +42,11 @@ export async function GET(request: Request) {
 
       if (isLocalEnv) {
         // we can be stricter about redirects on production
-        return NextResponse.redirect(`${origin}${destination}`);
+        return NextResponse.redirect(redirectToCompletion(origin));
       } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${destination}`);
+        return NextResponse.redirect(redirectToCompletion(`https://${forwardedHost}`));
       } else {
-        return NextResponse.redirect(`${origin}${destination}`);
+        return NextResponse.redirect(redirectToCompletion(origin));
       }
     }
   }
