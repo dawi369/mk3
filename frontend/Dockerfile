@@ -76,11 +76,6 @@ COPY --from=prerelease /app/.next .next
 COPY --from=prerelease /app/public public
 COPY --from=prerelease /app/package.json .
 
-# Next.js writes image and fetch caches at runtime. Ensure the non-root runtime
-# user owns the copied build artifacts before switching away from root.
-RUN mkdir -p /app/.next/cache/images /app/.next/cache/fetch-cache \
-  && chown -R bun:bun /app/.next /app/public /app/node_modules /app/package.json
-
 # Run the app
 USER bun
 EXPOSE 3010/tcp
