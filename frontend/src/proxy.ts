@@ -35,6 +35,7 @@ const STATIC_EXTENSIONS = new Set([
   ".txt",
 ]);
 const WAITLIST_PATH = "/waitlist";
+const HEALTHCHECK_PATH = "/health";
 
 function parseHost(hostHeader: string | null): string {
   if (!hostHeader) return "";
@@ -60,6 +61,17 @@ function parseHosts(value: string | undefined): string[] {
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
+
+  if (url.pathname === HEALTHCHECK_PATH) {
+    return new Response("ok", {
+      status: 200,
+      headers: {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   const hostname = parseHost(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host")
   );
