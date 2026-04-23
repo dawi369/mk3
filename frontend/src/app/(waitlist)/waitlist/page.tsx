@@ -114,7 +114,7 @@ export default function WaitlistPage() {
               variants={ANIMATION_CONFIG.fadeInUp}
               className="mt-10 text-xs uppercase tracking-[0.3em] text-white/50"
             >
-              Estimated launch: <span className="text-white/70">Q2 2026</span>
+              Estimated launch: <span className="text-white/70">Q3 2026</span>
             </motion.div>
           </motion.section>
 
@@ -163,26 +163,6 @@ export default function WaitlistPage() {
             </div>
           </motion.aside>
         </main>
-
-        <section className="mx-auto w-full max-w-6xl px-6 pb-24">
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-black/70"
-          >
-            <video
-              className="h-full w-full object-cover"
-              src="/demo_vid.mp4"
-              poster="/first_frame_demo_vid.jpg"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-            />
-          </motion.div>
-        </section>
 
         <Footer />
       </div>

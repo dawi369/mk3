@@ -110,7 +110,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!STATIC_PATHS.has(url.pathname)) {
-    const shouldForceWaitlist = isWaitlistHost || (waitlistOnly && !isLocalHost);
+    const shouldForceWaitlist = false;
     if (shouldForceWaitlist && url.pathname !== WAITLIST_PATH) {
       url.pathname = WAITLIST_PATH;
       return NextResponse.rewrite(url);
